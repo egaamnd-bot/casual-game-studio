@@ -1,0 +1,68 @@
+name: Android debug APK
+
+# Builds a debug-signed APK for installing on a test phone (not a Play Store release build).
+# Runs on every push and can be started by hand from the Actions tab.
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-debug-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      # Capacitor 8 CLI requires Node 22+.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Capacitor 8's Android project compiles with Java 21.
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # No package-lock.json yet (no local Node to create one), so dependencies resolve fresh each run.
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build web app
+        run: npm run build
+
+      # The android/ project is generated here instead of committed, so no local Android tooling is needed.
+      - name: Create Android project
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-test-debug-apk-run${{ github.run_number }}
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+          if-no-files-found: error
+
+      # Uploaded so a lock file can be committed later for reproducible installs.
+      - name: Upload resolved package-lock.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-lock-run${{ github.run_number }}
+          path: package-lock.json
+          retention-days: 14
