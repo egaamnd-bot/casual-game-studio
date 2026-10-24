@@ -2,7 +2,7 @@
 
 Shared development workspace for an AI-assisted casual mobile game.
 
-> TODO: One-sentence pitch for the game once the concept is approved.
+**Pulse** (working title): hold to shrink, release to grow. Squeeze your energy orb through gaps, and stay big to grab the energy that multiplies your score.
 
 ## Mission
 
@@ -10,7 +10,7 @@ Build an original, enjoyable casual game for a broad age range, with a realistic
 
 ## Status
 
-🚧 **Concept stage.** Arcade-first, Android-first strategy approved. Game concept and art direction are not yet approved; the technology stack is provisional. See [docs/DECISIONS.md](docs/DECISIONS.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
+🚧 **Prototype.** Pulse is approved for prototyping, and the first playable prototype is built with placeholder art ([docs/PULSE_PROTOTYPE.md](docs/PULSE_PROTOTYPE.md)). The Android build pipeline is provisionally validated on a phone. Art direction is pending. See [docs/DECISIONS.md](docs/DECISIONS.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Team
 
@@ -25,9 +25,9 @@ A human producer leads a team of AI assistants. Full responsibilities and workin
 
 ## Tech Stack
 
-Provisional, pending Android pipeline validation:
+Provisional; the Android pipeline was validated on a phone (see DECISIONS.md #5):
 
-- **Framework:** Phaser 3
+- **Framework:** Phaser 3.90.0
 - **Language:** JavaScript
 - **Mobile wrapper:** Capacitor
 - **Builds:** GitHub Actions
