@@ -1,6 +1,10 @@
 # Android Pipeline Smoke Test
 
 > Throwaway test, not the game. Goal: prove that GitHub Actions can turn a Phaser 3 web app into an Android APK that installs and runs on the producer's phone. The technology stack becomes final (see [DECISIONS.md](DECISIONS.md) #3) only if this passes.
+>
+> **Result (2026-10-25): passed on the producer's Android phone** (matching touch counts, about 61 FPS). See DECISIONS.md #5.
+>
+> **Superseded:** the Pulse prototype replaced the test screen, and the APK artifact is now named `pulse-debug-apk-run<N>`. The original test screen is in commit `aa8a2b1`. The build and install steps below still apply.
 
 ## What It Is
 

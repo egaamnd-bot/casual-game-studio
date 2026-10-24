@@ -15,22 +15,27 @@ Git LFS is **not** used. Keep binary assets small; ask the producer before addin
 1. In GitHub Desktop: **File → Clone repository** → `egaamnd-bot/casual-game-studio`.
 2. Create a branch from `main` for each task (see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 
-TODO: Project-specific steps once the stack is validated.
+No local install is needed. Game code lives in `src/` as plain JavaScript (no bundler); GitHub Actions installs Phaser and Capacitor during the build.
 
 ## Running the Game
 
-TODO: How to run it in the editor, on an emulator, or on a device.
+- **On a phone:** install the debug APK from GitHub Actions (see Building).
+- **In a desktop browser:** open `tests/gameplay.html?start=0` (Phaser loads from a CDN, so you need internet). Mouse button or touch = hold.
 
 ## Building
 
 | Platform | Steps | Output |
 |----------|-------|--------|
-| Android | TODO | `.apk` (testing) / `.aab` (Play Store) |
+| Android (testing) | Push any branch → **Actions → Android debug APK** → download the artifact `pulse-debug-apk-run<N>`. Install steps: [ANDROID_PIPELINE_TEST.md](ANDROID_PIPELINE_TEST.md) | Debug-signed `.apk` |
+| Android (Play Store) | TODO: release workflow and signing key (not set up) | `.aab` |
 | iOS | Deferred (needs a Mac and a paid Apple developer account) | n/a |
 
 ## Testing
 
-- **Automated tests:** TODO (framework, plus the command to run them)
+- **Automated tests:** plain HTML test pages in `tests/`. Open each in a desktop browser; the tab title shows PASS/FAIL or the result. Details: [PULSE_PROTOTYPE.md](PULSE_PROTOTYPE.md#testing)
+  - `tests/logic.html`: collision and fairness of the obstacle generator
+  - `tests/gameplay.html?bot=1&seconds=60`: the real game played by an autopilot
+  - `tests/gameplay.html?seconds=10`: the real game with no input (should crash at the first wall)
 - **Manual checklist** before a release:
   - [ ] Fresh install launches and the tutorial completes
   - [ ] Progress saves and loads after the app restarts
