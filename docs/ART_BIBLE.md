@@ -17,8 +17,10 @@
 | Sprites / UI | PNG | TODO | Transparent background; atlas-friendly |
 | App icon | PNG | TODO (store requirements) | |
 | Animation | TODO (e.g. sprite sheet, Spine, Lottie) | TODO | Frame rate: TODO |
-| Music | OGG | TODO | Loopable, normalized |
-| SFX | WAV / OGG | TODO | Short, silence trimmed |
+| Music | MP3 | TODO | Loopable, normalized |
+| SFX | MP3 | TODO | Short, silence trimmed |
+
+MP3 is used because OGG is not reliably supported by Safari / iOS web views. Keep lossless (WAV) masters outside the game folder.
 
 ## Naming Convention
 
@@ -28,8 +30,8 @@ Lowercase with underscores: `<type>_<name>_<variant>.<ext>`
 spr_player_idle_01.png
 ui_button_play.png
 anim_coin_spin.png
-sfx_coin_pickup.wav
-mus_main_theme.ogg
+sfx_coin_pickup.mp3
+mus_main_theme.mp3
 ```
 
 ## Asset Delivery Checklist
