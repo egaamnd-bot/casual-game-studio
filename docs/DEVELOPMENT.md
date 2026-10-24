@@ -33,7 +33,9 @@ No local install is needed. Game code lives in `src/` as plain JavaScript (no bu
 ## Testing
 
 - **Automated tests:** plain HTML test pages in `tests/`. Open each in a desktop browser; the tab title shows PASS/FAIL or the result. Details: [PULSE_PROTOTYPE.md](PULSE_PROTOTYPE.md#testing)
-  - `tests/logic.html`: collision and fairness of the obstacle generator
+  - `tests/campaign.html`: campaign stages, stars, skins, save data
+  - `tests/scene.html`: the real game driven by simulated input (touch release, pause, retry, saving)
+  - `tests/logic.html`: collision and fairness of the Endless obstacle generator
   - `tests/gameplay.html?bot=1&seconds=60`: the real game played by an autopilot
   - `tests/gameplay.html?seconds=10`: the real game with no input (should crash at the first wall)
 - **Manual checklist** before a release:

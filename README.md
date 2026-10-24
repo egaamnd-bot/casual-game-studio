@@ -42,6 +42,7 @@ casual-game-studio/
 ├── docs/
 │   ├── GAME_DESIGN.md   # Game design document (GDD)
 │   ├── PULSE_PROTOTYPE.md        # Prototype rules, structure, testing, limitations
+│   ├── CAMPAIGN.md               # Campaign stages, stars, skins, save data
 │   ├── ANDROID_PIPELINE_TEST.md  # How to build and install the APK
 │   ├── ART_BIBLE.md     # Art bible and asset specifications
 │   ├── DEVELOPMENT.md   # Setup, build, test, and release instructions

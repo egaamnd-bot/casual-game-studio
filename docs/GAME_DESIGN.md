@@ -41,9 +41,10 @@ Full rules, scoring and fairness guarantees are in [PULSE_PROTOTYPE.md](PULSE_PR
 
 ## 5. Progression
 
-- Levels / stages: none in prototype 1; one endless run that gets faster
+- Levels / stages: Campaign with hand-made stages (3 so far) plus Endless. See [CAMPAIGN.md](CAMPAIGN.md)
 - Difficulty curve: speed rises for about 46 s; gap tightness and obstacle density rise over 70 s
-- Unlockables: TODO (after playtesting)
+- Stars: up to 3 per stage, for finishing and collecting energy
+- Unlockables: cosmetic orb skins at 3, 6 and 9 stars. Next stage unlocks when the previous one is finished
 
 ## 6. Monetization
 

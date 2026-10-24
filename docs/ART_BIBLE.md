@@ -1,14 +1,30 @@
 # Art Bible & Asset Specifications
 
-> Owner: Gemini (Creative Director). Status: **Draft, not approved.** All assets follow this document once the producer approves it.
+> Owner: Gemini (Creative Director). **Direction approved by the producer:** Direction A, *Kinetic Vector / Precision Cyber-Grid* (see DECISIONS.md #7).
+>
+> **Artwork status: provisional.** The game on `main` and on `feature/pulse-campaign-system` still uses placeholder shapes drawn in code. Gemini's v2.0 asset pack is being integrated separately. Nothing below counts as in the game until those files are merged and tested on the phone.
 
 ## Visual Identity
 
-- **Mood:** TODO (e.g. bright, friendly, cozy)
-- **Style:** TODO (e.g. flat vector, soft 3D, pixel art)
-- **Color palette:** TODO (hex codes)
-- **Typography:** TODO (fonts and licenses)
-- **References:** TODO (links or images in `docs/references/`)
+- **Mood:** precise, energetic, high-contrast; a dark blueprint grid with bright plasma and hazard accents
+- **Style:** clean vector shapes with glow, geometric reticles and circuit traces
+- **Core palette (from Gemini's v2.0 style guide):**
+
+| Role | Hex |
+|------|-----|
+| Background | `#0B0F19` |
+| Grid lines | `#162033` / `#1E2D47` |
+| Player orb (default) | `#00F0FF`, shrunk core `#E0FFFF`, rim `#7DF9FF` |
+| Hazard walls | rim `#FF2A54`, body `#2B111B`, gap-edge strip `#FF7A00` |
+| Energy (standard) | `#FFB800` |
+| Bonus energy | `#00FF9D` |
+| Dimmed pickups | `#475569` tint at 45% opacity |
+| Text | `#F8FAFC`, muted `#94A3B8` |
+
+- **Stage themes:** Stage 1 calm blue grid; Stage 2 teal rhythm lanes; Stage 3 dense violet circuits. All keep background brightness low so walls and energy stay readable.
+- **Skins:** Classic (Kinetic Cyan), Solar Flare, Void Prism and Retro Green. All four share the same sprite sizes and pivot.
+- **Typography:** game text is rendered by the game (UI images contain no text). TODO: choose and license a font.
+- **References:** Gemini's full guide and contact sheet will be committed with the asset pack.
 
 ## Technical Specs
 
