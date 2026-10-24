@@ -1,10 +1,26 @@
-// Cosmetic orb skins. Colours only: skins never change size, speed, timing or collection.
-// PLACEHOLDER palettes until Gemini's skin artwork is approved and integrated.
+// Cosmetic orb skins. Looks only: skins never change size, speed, timing or collection.
+// `sprite` names Gemini's v2.0 atlas frames; `colors` are used when sprites aren't available.
 Pulse.SKINS = [
-  { id: 'classic', name: 'Classic', unlockStars: 0, colors: { orb: 0x4fe3c1, shrunk: 0x8fd8ff, core: 0xe6fffa } },
-  { id: 'solar-flare', name: 'Solar Flare', unlockStars: 3, colors: { orb: 0xff9d3d, shrunk: 0xffd08a, core: 0xfff4dc } },
-  { id: 'void-prism', name: 'Void Prism', unlockStars: 6, colors: { orb: 0xa47dff, shrunk: 0xd2c0ff, core: 0xf3eeff } },
-  { id: 'retro-green', name: 'Retro Green', unlockStars: 9, colors: { orb: 0x5cf26e, shrunk: 0xb4ffbc, core: 0xecffee } },
+  {
+    id: 'classic', name: 'Classic', unlockStars: 0,
+    colors: { orb: 0x00f0ff, shrunk: 0xe0ffff, core: 0xffffff },
+    sprite: { atlas: 'pulse_gameplay', prefix: 'player_orb_', arcPrefix: 'player_tension_arcs_' },
+  },
+  {
+    id: 'solar-flare', name: 'Solar Flare', unlockStars: 3,
+    colors: { orb: 0xff7a00, shrunk: 0xfff3b0, core: 0xfff3b0 },
+    sprite: { atlas: 'pulse_skins', prefix: 'skin_solar_flare_', arcPrefix: 'skin_solar_flare_tension_arcs_' },
+  },
+  {
+    id: 'void-prism', name: 'Void Prism', unlockStars: 6,
+    colors: { orb: 0xa855f7, shrunk: 0xf3e8ff, core: 0xf3e8ff },
+    sprite: { atlas: 'pulse_skins', prefix: 'skin_void_prism_', arcPrefix: 'skin_void_prism_tension_arcs_' },
+  },
+  {
+    id: 'retro-green', name: 'Retro Green', unlockStars: 9,
+    colors: { orb: 0x00ff66, shrunk: 0xccffe0, core: 0xccffe0 },
+    sprite: { atlas: 'pulse_skins', prefix: 'skin_retro_green_', arcPrefix: 'skin_retro_green_tension_arcs_' },
+  },
 ];
 
 Pulse.Skins = {

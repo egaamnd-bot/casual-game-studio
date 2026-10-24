@@ -177,7 +177,8 @@
     r = Pulse.Campaign.recordCompletion(save, s3.id, 3);
     check(r.newSkins[0] === retro, '9 stars unlocks Retro Green');
     for (const skin of Pulse.SKINS) {
-      check(Object.keys(skin).sort().join() === 'colors,id,name,unlockStars', `${skin.id}: skin has colours only (no gameplay fields)`);
+      check(Object.keys(skin).sort().join() === 'colors,id,name,sprite,unlockStars', `${skin.id}: skin has looks only (no gameplay fields)`);
+      check(Object.keys(skin.sprite).sort().join() === 'arcPrefix,atlas,prefix', `${skin.id}: sprite entry names frames only`);
     }
 
     // ---- Save data ----
