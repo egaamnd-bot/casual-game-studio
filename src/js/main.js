@@ -11,5 +11,7 @@
     backgroundColor: Pulse.THEME.backgroundCss,
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: C.width, height },
     scene: Pulse.GameScene,
+    // Headless test browsers barely run requestAnimationFrame, so test pages use timers.
+    fps: window.PULSE_TEST ? { forceSetTimeOut: true, target: 60 } : undefined,
   });
 })();

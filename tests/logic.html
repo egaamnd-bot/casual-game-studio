@@ -58,7 +58,8 @@
         const speed = level.speedAt(elapsed);
         spawned.length = 0;
         level.update(dt, speed, elapsed);
-        for (const s of spawned) records.push(Object.assign({ speed, space: level.distanceToNext }, s));
+        // A pickup is always spawned together with the obstacle just below it (spawned[0]).
+        for (const s of spawned) records.push(Object.assign({ speed, prevTop: spawned[0].y }, s));
 
         for (const s of level.segments) {
           if (!s.active) continue;
@@ -94,6 +95,9 @@
           totalPickups++;
           check(s.offset - C.pickup.radius < R, `seed ${seed}: pickup unreachable at full size`);
           check(s.offset - C.pickup.radius > C.orb.minRadius + 6, `seed ${seed}: pickup reachable while shrunk`);
+          // Time from the previous obstacle clearing the orb to reaching the pickup.
+          const free = (s.prevTop - s.y) - R - 2.5 * C.pickup.radius;
+          check(free / s.speed >= C.pickup.minReactTime - 1e-9, `seed ${seed}: pickup too close to obstacle (${(free / s.speed).toFixed(2)}s)`);
           continue;
         }
         totalObstacles++;

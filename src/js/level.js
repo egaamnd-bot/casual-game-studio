@@ -98,25 +98,24 @@
       this.placeGap(seg, need, kind === 'tunnel' ? C.tunnel.maxOffset : C.gate.maxOffset);
       seg.y = -seg.h + overshoot;
 
-      const space = 2 * R + C.spacing.padding + speed * lerp(C.spacing.startTime, C.spacing.minTime, d);
-      this.distanceToNext = seg.h + space - overshoot;
+      let space = 2 * R + C.spacing.padding + speed * lerp(C.spacing.startTime, C.spacing.minTime, d);
 
-      // A pickup goes halfway to the next obstacle, only if there is time to regrow before it
-      // and to shrink again after it.
+      // A pickup goes halfway to the next obstacle. The gap widens if needed so there is time
+      // to regrow before the pickup and to shrink again after it.
       if (index >= 1 && this.rng() < C.pickup.chance) {
-        const free = space / 2 - R - 2.5 * C.pickup.radius;
-        if (free / speed >= C.pickup.minReactTime) {
-          const p = this.obtain();
-          p.active = true;
-          p.kind = 'pickup';
-          p.scored = false;
-          p.resolved = false;
-          p.taken = false;
-          p.h = 0;
-          p.y = seg.y - space / 2;
-          p.offset = R + C.pickup.radius - C.pickup.sizeTolerance;
-        }
+        space = Math.max(space, 2 * (R + 2.5 * C.pickup.radius + C.pickup.minReactTime * speed));
+        const p = this.obtain();
+        p.active = true;
+        p.kind = 'pickup';
+        p.scored = false;
+        p.resolved = false;
+        p.taken = false;
+        p.h = 0;
+        p.y = seg.y - space / 2;
+        p.offset = R + C.pickup.radius - C.pickup.sizeTolerance;
       }
+
+      this.distanceToNext = seg.h + space - overshoot;
 
       this.lastKind = kind;
     }
