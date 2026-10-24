@@ -12,6 +12,18 @@
     return dx * dx + dy * dy < r * r;
   }
 
+  // Pickups sit this far left and right of the orb's path, reachable only near full size.
+  const PICKUP_OFFSET = C.orb.radius + C.pickup.radius - C.pickup.sizeTolerance;
+
+  // Gap edges around the orb's path. `need` is the clearance on the tight side; `shift` widens
+  // the gap to the right (positive) or left (negative) without changing that clearance.
+  function setGap(seg, need, shift, width) {
+    const ox = C.orb.x;
+    seg.gapL = Math.max(C.wallMinWidth, ox - need + Math.min(0, shift));
+    seg.gapR = Math.min(width - C.wallMinWidth, ox + need + Math.max(0, shift));
+    seg.need = Math.min(ox - seg.gapL, seg.gapR - ox);
+  }
+
   // Segments are pooled objects, reused to avoid allocations during play:
   //   gate / tunnel: walls from x=0..gapL and gapR..width, spanning y..y+h.
   //   pickup: a pair of energy pickups at x = orb.x ± offset, centered on y.
@@ -41,14 +53,18 @@
 
     update(dt, speed, elapsed) {
       const dy = speed * dt;
+      this.moveSegments(dy);
+      this.distanceToNext -= dy;
+      while (this.distanceToNext <= 0) this.spawn(speed, elapsed, -this.distanceToNext);
+    }
+
+    moveSegments(dy) {
       for (let i = 0; i < this.segments.length; i++) {
         const s = this.segments[i];
         if (!s.active) continue;
         s.y += dy;
         if (s.y > this.height + 40) s.active = false;
       }
-      this.distanceToNext -= dy;
-      while (this.distanceToNext <= 0) this.spawn(speed, elapsed, -this.distanceToNext);
     }
 
     obtain() {
@@ -107,12 +123,13 @@
         const p = this.obtain();
         p.active = true;
         p.kind = 'pickup';
+        p.variant = 'energy';
         p.scored = false;
         p.resolved = false;
         p.taken = false;
         p.h = 0;
         p.y = seg.y - space / 2;
-        p.offset = R + C.pickup.radius - C.pickup.sizeTolerance;
+        p.offset = PICKUP_OFFSET;
       }
 
       this.distanceToNext = seg.h + space - overshoot;
@@ -123,12 +140,9 @@
     // One side of the gap sits exactly `need` from the orb's path; the other is offset
     // randomly, so gaps look varied while the requirement stays readable.
     placeGap(seg, need, maxOffset) {
-      const ox = C.orb.x;
       const offset = this.rng() * maxOffset;
       const tightLeft = this.rng() < 0.5;
-      seg.gapL = Math.max(C.wallMinWidth, ox - need - (tightLeft ? 0 : offset));
-      seg.gapR = Math.min(this.width - C.wallMinWidth, ox + need + (tightLeft ? offset : 0));
-      seg.need = Math.min(ox - seg.gapL, seg.gapR - ox);
+      setGap(seg, need, tightLeft ? offset : -offset, this.width);
     }
 
     hitsWall(seg, x, y, r) {
@@ -147,4 +161,6 @@
 
   Pulse.Level = Level;
   Pulse.circleRect = circleRect;
+  Pulse.setGap = setGap;
+  Pulse.PICKUP_OFFSET = PICKUP_OFFSET;
 })();

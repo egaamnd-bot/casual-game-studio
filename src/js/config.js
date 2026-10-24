@@ -44,6 +44,17 @@ Pulse.CONFIG = {
     // The orb must be within this many px of full size to reach a pickup.
     sizeTolerance: 8,
     minReactTime: 0.32,
+    // Pickups render at this opacity whenever the orb is too small to collect them.
+    dimAlpha: 0.45,
+  },
+
+  campaign: {
+    // Minimum clear time between two walls, after subtracting the orb's diameter.
+    minObstacleGapTime: 0.35,
+    // Bonus diamonds are allowed tighter timing than normal energy; that is their risk.
+    bonusMinReactTime: 0.22,
+    finishThickness: 24,
+    defaultStars: { two: 0.6, three: 0.9 },
   },
 
   multiplierMax: 5,
