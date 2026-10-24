@@ -7,6 +7,8 @@ Pulse.Sfx = (function () {
     pickup: { freq: 880, to: 1320, duration: 0.09, volume: 0.12, type: 'sine' },
     multiplierLost: { freq: 300, to: 200, duration: 0.12, volume: 0.08, type: 'triangle' },
     crash: { freq: 180, to: 60, duration: 0.3, volume: 0.2, type: 'sawtooth' },
+    complete: { freq: 523, to: 1046, duration: 0.35, volume: 0.14, type: 'sine' },
+    select: { freq: 600, to: 600, duration: 0.05, volume: 0.06, type: 'triangle' },
   };
 
   let ctx = null;

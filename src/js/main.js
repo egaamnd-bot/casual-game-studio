@@ -5,13 +5,25 @@
   const aspect = window.innerHeight / Math.max(1, window.innerWidth);
   const height = Math.round(Math.min(C.maxHeight, Math.max(C.minHeight, C.width * aspect)));
 
+  // Fail fast on a broken stage definition rather than at the end of a run.
+  for (const stage of Pulse.STAGES) {
+    const errors = Pulse.Campaign.validate(stage, C.width);
+    if (errors.length) console.error('Invalid stage', errors);
+  }
+
+  // Test pages can boot straight into gameplay; players start at the menu.
+  const test = window.PULSE_TEST;
+  const scenes = [Pulse.MenuScene, Pulse.StageSelectScene, Pulse.GameScene];
+  if (test && test.autoStart) scenes.unshift(scenes.pop());
+
   new Phaser.Game({
     type: Phaser.AUTO,
     parent: document.body,
     backgroundColor: Pulse.THEME.backgroundCss,
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: C.width, height },
-    scene: Pulse.GameScene,
+    input: { activePointers: 3 },
+    scene: scenes,
     // Headless test browsers barely run requestAnimationFrame, so test pages use timers.
-    fps: window.PULSE_TEST ? { forceSetTimeOut: true, target: 60 } : undefined,
+    fps: test ? { forceSetTimeOut: true, target: 60 } : undefined,
   });
 })();

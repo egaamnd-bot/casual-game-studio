@@ -8,18 +8,26 @@
 <body>
   <script>
     // Runs the real game scene. ?bot=1 uses the autopilot; without it nobody touches the screen.
-    // Results go into the page title. Phaser loads from a CDN because there is no local node_modules.
+    // ?mode=campaign&stage=N plays campaign stage N (0-based); ?start=0 opens the menu instead;
+    // ?fresh=1 clears saved data first. Results go into the page title.
+    // Phaser loads from a CDN because there is no local node_modules.
     const params = new URLSearchParams(location.search);
     const seconds = Number(params.get('seconds') || 30);
+    if (params.get('fresh') === '1') { try { localStorage.clear(); } catch (e) {} }
     window.PULSE_TEST = {
       bot: params.get('bot') === '1',
       autoStart: params.get('start') !== '0',
+      mode: params.get('mode') || 'endless',
+      stageIndex: Number(params.get('stage') || 0),
       onCrash(elapsed, score) {
         document.title = `CRASH at ${elapsed.toFixed(1)}s score ${score}`;
       },
+      onComplete(elapsed, energy, bonus, stars) {
+        document.title = `COMPLETE in ${elapsed.toFixed(1)}s energy ${energy} bonus ${bonus} stars ${stars}`;
+      },
     };
     setTimeout(() => {
-      if (document.title.startsWith('CRASH')) return;
+      if (document.title.startsWith('CRASH') || document.title.startsWith('COMPLETE')) return;
       const s = window.__pulseScene;
       document.title = s
         ? `SURVIVED ${s.elapsed.toFixed(1)}s score ${s.score} x${s.multiplier} state ${s.state}`
@@ -31,8 +39,13 @@
   <script src="../src/js/storage.js"></script>
   <script src="../src/js/sfx.js"></script>
   <script src="../src/js/level.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/skins.js"></script>
   <script src="../src/js/render.js"></script>
+  <script src="../src/js/ui.js"></script>
   <script src="../src/js/game-scene.js"></script>
+  <script src="../src/js/menu-scenes.js"></script>
   <script src="../src/js/main.js"></script>
 </body>
 </html>
