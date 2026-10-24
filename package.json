@@ -1,0 +1,17 @@
+{
+  "name": "casual-game-studio",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Android pipeline smoke test (Phaser 3 + Capacitor). Not the game.",
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3",
+    "phaser": "3.90.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}
