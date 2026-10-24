@@ -62,27 +62,46 @@ Pulse.CONFIG = {
   maxFrameSeconds: 0.05,
 };
 
-// PLACEHOLDER palette. Replace when Gemini's art direction is approved.
+// Kinetic Vector / Precision Cyber-Grid palette (Gemini v2.0 style guide, docs/art/).
+// Used directly by code-drawn shapes and as the fallback when sprites can't load.
 Pulse.THEME = {
   font: 'system-ui, -apple-system, Roboto, "Segoe UI", sans-serif',
-  background: 0x0f1328,
-  backgroundCss: '#0f1328',
-  speedLine: 0x1c2347,
-  wall: 0x2f3b6b,
-  wallEdge: 0x7c8cff,
-  orb: 0x4fe3c1,
-  orbShrunk: 0x8fd8ff,
-  orbCore: 0xe6fffa,
-  pickup: 0xffc94d,
-  bonus: 0xff7ad9,
-  starEmpty: 0x2f3b6b,
-  finishA: 0xeef1ff,
-  finishB: 0x2f3b6b,
-  panel: 0x1a2142,
-  panelEdge: 0x3a4785,
-  danger: 0xff5d6c,
-  text: '#eef1ff',
-  textDim: '#8a93c2',
-  textAccent: '#ffc94d',
-  textDanger: '#ff5d6c',
+  background: 0x0b0f19,
+  backgroundCss: '#0B0F19',
+  speedLine: 0x162033,
+  wall: 0x2b111b,
+  wallEdge: 0xff2a54,
+  gapEdge: 0xff7a00,
+  orb: 0x00f0ff,
+  orbShrunk: 0xe0ffff,
+  orbCore: 0xe0ffff,
+  pickup: 0xffb800,
+  bonus: 0x00ff9d,
+  dimTint: 0x475569,
+  starEmpty: 0x1e2d47,
+  finishA: 0xf8fafc,
+  finishB: 0x1e2d47,
+  panel: 0x101828,
+  panelEdge: 0x1e2d47,
+  progressTrack: 0x162033,
+  progressFill: 0x00f0ff,
+  danger: 0xff2a54,
+  text: '#F8FAFC',
+  textDim: '#94A3B8',
+  textAccent: '#FFB800',
+  textBonus: '#00FF9D',
+  textDanger: '#FF2A54',
+};
+
+// Sprite scale factors, measured from Gemini's v2.0 art (authored for a 1080 px wide screen;
+// this game is 540 wide). Gameplay sizes never change; art is scaled to fit them.
+Pulse.ART = {
+  base: 0.5, // general 1080 → 540 scale
+  orbBodyRadius: 46, // solid radius of *_normal in sprite px
+  orbShrunkRadius: 22, // solid radius of *_shrunk
+  energyRadius: 24, // solid radius of orb_energy_gold_*
+  bonusRadius: 28, // solid radius of orb_energy_mint_*
+  pickupDrawRadius: 16, // on-screen solid radius for both pickup types
+  wallBandTop: 12, // transparent rows above the hazard band in wall pieces
+  capReach: 52, // wall_cap_left content ends at x=52 (cap_right starts at 64-52)
 };

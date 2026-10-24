@@ -17,8 +17,13 @@ Pulse.Render = (function () {
     g.fillStyle(T.wall, 1);
     g.fillRect(0, seg.y, seg.gapL, seg.h);
     g.fillRect(seg.gapR, seg.y, width - seg.gapR, seg.h);
-    // Bright inner edges make the gap easy to read at speed.
+    // Crimson rims, plus amber strips on the gap-facing edges, so the gap reads at speed.
     g.fillStyle(edgeColor || T.wallEdge, 1);
+    g.fillRect(0, seg.y, seg.gapL, 3);
+    g.fillRect(0, seg.y + seg.h - 3, seg.gapL, 3);
+    g.fillRect(seg.gapR, seg.y, width - seg.gapR, 3);
+    g.fillRect(seg.gapR, seg.y + seg.h - 3, width - seg.gapR, 3);
+    g.fillStyle(T.gapEdge, 1);
     g.fillRect(seg.gapL - 4, seg.y, 4, seg.h);
     g.fillRect(seg.gapR, seg.y, 4, seg.h);
   }
@@ -73,9 +78,9 @@ Pulse.Render = (function () {
   }
 
   function progressBar(g, x, y, w, t) {
-    g.fillStyle(T.wall, 1);
+    g.fillStyle(T.progressTrack, 1);
     g.fillRect(x, y, w, 6);
-    g.fillStyle(T.wallEdge, 1);
+    g.fillStyle(T.progressFill, 1);
     g.fillRect(x, y, w * t, 6);
   }
 
