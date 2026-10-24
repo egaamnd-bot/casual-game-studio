@@ -10,7 +10,7 @@ Build an original, enjoyable casual game for a broad age range, with a realistic
 
 ## Status
 
-🚧 **Concept stage.** The game concept, engine, and art direction are not yet approved. See [docs/ROADMAP.md](docs/ROADMAP.md).
+🚧 **Concept stage.** Arcade-first, Android-first strategy approved. Game concept and art direction are not yet approved; the technology stack is provisional. See [docs/DECISIONS.md](docs/DECISIONS.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Team
 
@@ -25,10 +25,14 @@ A human producer leads a team of AI assistants. Full responsibilities and workin
 
 ## Tech Stack
 
-- **Engine:** TODO (e.g. Unity, Godot, Flutter + Flame)
-- **Language:** TODO
-- **Target platforms:** TODO (e.g. Android, iOS)
-- **Backend / services:** TODO (e.g. none, Firebase, ad network, analytics)
+Provisional, pending Android pipeline validation:
+
+- **Framework:** Phaser 3
+- **Language:** JavaScript
+- **Mobile wrapper:** Capacitor
+- **Builds:** GitHub Actions
+- **Target platform:** Android first; iOS deferred
+- **Backend / services:** TODO (none planned for now)
 
 ## Repository Layout
 

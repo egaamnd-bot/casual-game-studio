@@ -16,7 +16,7 @@ This guide turns the rules in [AI_TEAM.md](AI_TEAM.md) into a day-to-day workflo
    - `art/<short-description>` for art, animation, or audio assets
    - `docs/<short-description>` for documentation
 3. **Commit small, focused changes** (see the commit style below).
-4. **Run the relevant tests and builds** before asking for review.
+4. **Run the relevant tests and builds** before asking for review. Until automated tests exist, describe the manual checks you ran.
 5. **Open a pull request** into `main` that links the issue.
 6. **The human producer approves the merge.** Nobody merges into `main` without that approval.
 
@@ -60,7 +60,7 @@ Assistants don't share conversations. Each handoff (in an issue, PR, or comment)
 - Deliver assets with filenames, formats, dimensions, and integration notes.
 - An asset counts as integrated only once it is merged into the repository.
 - Only commit assets you have the right to use. Record third-party sources and licenses.
-- Use Git LFS for large binaries (TODO: size limit, e.g. files over 10 MB).
+- Git LFS is not used. Keep files small (TODO: agree a size limit) and ask the producer before adding large binaries.
 
 ## Secrets
 
