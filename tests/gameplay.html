@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse gameplay test</title>
+  <style>html, body { margin: 0; height: 100%; background: #0f1328; overflow: hidden; }</style>
+</head>
+<body>
+  <script>
+    // Runs the real game scene. ?bot=1 uses the autopilot; without it nobody touches the screen.
+    // Results go into the page title. Phaser loads from a CDN because there is no local node_modules.
+    const params = new URLSearchParams(location.search);
+    const seconds = Number(params.get('seconds') || 30);
+    window.PULSE_TEST = {
+      bot: params.get('bot') === '1',
+      autoStart: true,
+      onCrash(elapsed, score) {
+        document.title = `CRASH at ${elapsed.toFixed(1)}s score ${score}`;
+      },
+    };
+    setTimeout(() => {
+      if (document.title.startsWith('CRASH')) return;
+      const s = window.__pulseScene;
+      document.title = s
+        ? `SURVIVED ${s.elapsed.toFixed(1)}s score ${s.score} x${s.multiplier} state ${s.state}`
+        : 'ERROR scene did not start';
+    }, seconds * 1000);
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/render.js"></script>
+  <script src="../src/js/game-scene.js"></script>
+  <script src="../src/js/main.js"></script>
+</body>
+</html>

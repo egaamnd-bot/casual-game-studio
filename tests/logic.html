@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse logic tests</title>
+</head>
+<body>
+  <pre id="out">running…</pre>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script>
+    // Logic and fairness tests for src/js/level.js. Open in a browser (no server needed);
+    // the page title becomes "PASS ..." or "FAIL ...".
+    const C = Pulse.CONFIG;
+    const R = C.orb.radius;
+    const lines = [];
+    let failures = 0;
+
+    function check(ok, message) {
+      if (!ok) {
+        failures++;
+        if (failures <= 25) lines.push('FAIL ' + message);
+      }
+    }
+
+    function seeded(seed) {
+      return function () {
+        seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+        let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      };
+    }
+
+    // circleRect
+    check(Pulse.circleRect(50, 50, 10, 55, 40, 20, 20), 'circle overlapping rect edge should hit');
+    check(!Pulse.circleRect(50, 50, 10, 61, 40, 20, 20), 'circle 11px from rect should miss');
+    check(Pulse.circleRect(50, 50, 10, 0, 0, 100, 100), 'circle inside rect should hit');
+    check(!Pulse.circleRect(50, 50, 10, 57.1, 57.1, 10, 10), 'circle near rect corner should miss');
+
+    // Simulates a run with the same orb rules as the game scene. `policy` decides holding.
+    function simulate(seed, seconds, policy) {
+      const height = 1100;
+      const orbY = Math.round(height * C.orb.yRatio);
+      const level = new Pulse.Level(C.width, height, seeded(seed));
+      const spawned = [];
+      const origObtain = level.obtain.bind(level);
+      level.obtain = () => { const s = origObtain(); spawned.push(s); return s; };
+
+      let radius = R, elapsed = 0, score = 0, pickups = 0;
+      const dt = 1 / 60;
+      const records = [];
+      while (elapsed < seconds) {
+        const held = policy(level, orbY, elapsed);
+        const target = held ? C.orb.minRadius : R;
+        radius = radius > target ? Math.max(target, radius - C.orb.shrinkRate * dt) : Math.min(target, radius + C.orb.growRate * dt);
+        elapsed += dt;
+        const speed = level.speedAt(elapsed);
+        spawned.length = 0;
+        level.update(dt, speed, elapsed);
+        for (const s of spawned) records.push(Object.assign({ speed, space: level.distanceToNext }, s));
+
+        for (const s of level.segments) {
+          if (!s.active) continue;
+          if (s.kind === 'pickup') {
+            if (!s.resolved && level.touchesPickup(s, orbY, radius)) { s.resolved = true; s.taken = true; pickups++; }
+            continue;
+          }
+          if (level.hitsWall(s, C.orb.x, orbY, radius)) return { crashed: true, elapsed, score, pickups, records };
+          if (!s.scored && s.y > orbY + radius) { s.scored = true; score++; }
+        }
+      }
+      return { crashed: false, elapsed, score, pickups, records };
+    }
+
+    // Same autopilot as GameScene.botWantsHold.
+    function bot(level, orbY, elapsed) {
+      const look = level.speedAt(elapsed) * 0.28;
+      for (const s of level.segments) {
+        if (!s.active || s.kind === 'pickup') continue;
+        if (s.y + s.h > orbY - R - look && s.y < orbY + R && s.need < R) return true;
+      }
+      return false;
+    }
+
+    const SEEDS = 60, SECONDS = 150;
+    let totalObstacles = 0, totalPickups = 0, collected = 0, shrinkObstacles = 0, tunnels = 0;
+    for (let seed = 1; seed <= SEEDS; seed++) {
+      const run = simulate(seed, SECONDS, bot);
+      check(!run.crashed, `seed ${seed}: perfect-timing bot crashed at ${run.elapsed.toFixed(1)}s (unfair pattern?)`);
+      collected += run.pickups;
+      for (const s of run.records) {
+        if (s.kind === 'pickup') {
+          totalPickups++;
+          check(s.offset - C.pickup.radius < R, `seed ${seed}: pickup unreachable at full size`);
+          check(s.offset - C.pickup.radius > C.orb.minRadius + 6, `seed ${seed}: pickup reachable while shrunk`);
+          continue;
+        }
+        totalObstacles++;
+        if (s.need < R) shrinkObstacles++;
+        if (s.kind === 'tunnel') tunnels++;
+        check(s.need >= C.orb.minRadius + C.fairMargin - 1e-9, `seed ${seed}: gap need ${s.need.toFixed(1)} below fair minimum`);
+        check(s.gapL >= C.wallMinWidth && s.gapR <= C.width - C.wallMinWidth, `seed ${seed}: gap off screen`);
+        check(s.gapL < C.orb.x && s.gapR > C.orb.x, `seed ${seed}: gap does not contain orb path`);
+      }
+    }
+
+    // With no input the first gate (needs a shrink) must end the run quickly.
+    const idle = simulate(7, 20, () => false);
+    check(idle.crashed && idle.elapsed < 5, `idle run should crash on the first gate, got crashed=${idle.crashed} at ${idle.elapsed.toFixed(1)}s`);
+
+    // Holding forever passes walls but never collects pickups.
+    const holder = simulate(7, 40, () => true);
+    check(holder.pickups === 0, `always-shrunk run should collect no pickups, got ${holder.pickups}`);
+
+    lines.push(`${SEEDS} seeds × ${SECONDS}s with autopilot`);
+    lines.push(`obstacles ${totalObstacles} (need shrink ${shrinkObstacles}, tunnels ${tunnels}), pickups spawned ${totalPickups}, collected ${collected}`);
+    lines.push(`idle run crashed at ${idle.elapsed.toFixed(2)}s; always-shrunk run: crashed=${holder.crashed}, pickups ${holder.pickups}`);
+    lines.unshift(failures === 0 ? 'PASS' : `FAIL (${failures})`);
+    document.getElementById('out').textContent = lines.join('\n');
+    document.title = (failures === 0 ? 'PASS ' : 'FAIL ') + lines.slice(1).join(' | ');
+  </script>
+</body>
+</html>

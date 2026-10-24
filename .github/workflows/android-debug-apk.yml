@@ -47,6 +47,14 @@ jobs:
           npx cap add android
           npx cap sync android
 
+      # Pulse is a portrait game. Warn (don't fail) if the generated manifest changes shape.
+      - name: Lock portrait orientation
+        run: |
+          manifest=android/app/src/main/AndroidManifest.xml
+          sed -i 's/<activity\b/<activity android:screenOrientation="portrait"/' "$manifest"
+          grep -q 'screenOrientation="portrait"' "$manifest" \
+            || echo "::warning::Portrait lock not applied; AndroidManifest.xml format changed"
+
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
@@ -54,7 +62,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: pipeline-test-debug-apk-run${{ github.run_number }}
+          name: pulse-debug-apk-run${{ github.run_number }}
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14
           if-no-files-found: error
