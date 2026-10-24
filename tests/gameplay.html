@@ -13,7 +13,7 @@
     const seconds = Number(params.get('seconds') || 30);
     window.PULSE_TEST = {
       bot: params.get('bot') === '1',
-      autoStart: true,
+      autoStart: params.get('start') !== '0',
       onCrash(elapsed, score) {
         document.title = `CRASH at ${elapsed.toFixed(1)}s score ${score}`;
       },
