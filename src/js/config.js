@@ -18,41 +18,39 @@ Pulse.CONFIG = {
 
   speed: { start: 270, perSecond: 8, max: 640 },
 
-  // Distance between obstacles, expressed as reaction time at the current speed.
-  spacing: { startTime: 1.0, minTime: 0.62, rampSeconds: 70, padding: 40 },
+  // Endless difficulty reaches its maximum after this many seconds.
+  spacing: { rampSeconds: 70 },
 
   // Every gap leaves at least this much room around a fully shrunk orb.
   fairMargin: 8,
   wallMinWidth: 24,
-  firstObstacleDelay: 0.9,
 
-  gate: { thickness: 36, shrinkChance: 0.45, shrinkChanceGrowth: 0.4, maxOffset: 70 },
+  gate: { thickness: 36, maxShift: 70 },
 
-  tunnel: {
-    unlockSeconds: 12,
-    chance: 0.18,
-    chanceGrowth: 0.12,
-    minLength: 160,
-    maxLength: 380,
-    extraClearance: 4,
-    maxOffset: 24,
+  // Full-width cyan barrier: smashed if the orb is charged (near full size), fatal if shrunk.
+  barrier: { thickness: 22 },
+
+  // Fairness: minimum clear time (s) to switch size between two demands, used by
+  // Pulse.Track.validateItems for campaign stages and Endless patterns alike.
+  track: {
+    minWallSpace: 40, // px between any two walls/barriers, for readability
+    toSmall: 0.35, // grown (or start) → must be shrunk for a gate
+    toBarrier: 0.32, // shrunk → must be charged for a barrier
+    toEnergy: 0.32, // shrunk → charged for gold
+    energyToSmall: 0.32, // gold → shrunk again
+    bonusTime: 0.22, // either side of a mint bonus: it's the risky option
   },
 
   pickup: {
     radius: 14,
-    chance: 0.55,
-    // The orb must be within this many px of full size to reach a pickup.
+    // The orb must be within this many px of full size ("charged") to reach a pickup or
+    // smash a barrier.
     sizeTolerance: 8,
-    minReactTime: 0.32,
     // Pickups render at this opacity whenever the orb is too small to collect them.
     dimAlpha: 0.45,
   },
 
   campaign: {
-    // Minimum clear time between two walls, after subtracting the orb's diameter.
-    minObstacleGapTime: 0.35,
-    // Bonus diamonds are allowed tighter timing than normal energy; that is their risk.
-    bonusMinReactTime: 0.22,
     finishThickness: 24,
     defaultStars: { two: 0.6, three: 0.9 },
   },

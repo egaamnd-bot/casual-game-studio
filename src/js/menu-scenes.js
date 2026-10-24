@@ -28,7 +28,7 @@
 
       if (sprites) this.add.image(cx, H * 0.13, 'pulse_ui', 'ui_logo_pulse').setScale(0.6);
       else UI.text(this, cx, H * 0.13, 'PULSE', 96, T.text, true);
-      UI.text(this, cx, H * 0.13 + 74, 'Hold to shrink · Release to grow', 24, T.textDim);
+      UI.text(this, cx, H * 0.13 + 74, 'Hold to shrink · Release to grow and smash', 24, T.textDim);
 
       const stars = Pulse.Campaign.totalStars(this.save);
       const max = Pulse.STAGES.length * 3;

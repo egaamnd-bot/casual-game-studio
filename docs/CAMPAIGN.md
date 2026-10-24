@@ -12,13 +12,13 @@
 
 | # | Id | Name | Speed (px/s) | Teaches | Energy | Bonus | Autopilot time |
 |---|----|------|--------------|---------|--------|-------|----------------|
-| 1 | `s1-first-pulse` | First Pulse | 220 → 240 | Shrink and release, collecting at full size. Generous, centred gaps | 7 | 0 | 23.5 s |
-| 2 | `s2-find-the-rhythm` | Find the Rhythm | 260 → 300 | Gaps shifted left or right, alternating; tighter and closer together | 8 | 0 | 22.6 s |
-| 3 | `s3-controlled-overload` | Controlled Overload | 300 → 400 | Everything combined, faster and longer. Optional bonus diamonds with tighter timing | 9 | 3 | 24.9 s |
+| 1 | `s1-first-pulse` | First Pulse | 220 → 240 | Shrink basics, gold between gaps, one hold-through | 6 | 0 | 20.6 s |
+| 2 | `s2-find-the-rhythm` | Find the Rhythm | 260 → 300 | Cyan barriers (stay big), then squeeze/smash rhythm | 5 | 0 | 19.3 s |
+| 3 | `s3-controlled-overload` | Controlled Overload | 300 → 400 | Combinations, a long hold, two optional mint dares | 5 | 2 | 21.4 s |
 
-No tunnels and no moving hazards in the campaign yet. Every stage ends at a checkered finish line. Times come from the test autopilot; a person will take about the same, since speed is fixed.
+Redesigned in Gameplay Variety v1. Why and how is in [GAMEPLAY_VARIETY.md](GAMEPLAY_VARIETY.md). Every stage ends at a checkered finish line. Times come from the test autopilot.
 
-**Design note for review:** the orb always stays in the middle of the screen. So "alternating gap positions" means the *tight* edge switches sides while the gap still contains the orb's path. It's a reading challenge, not a steering one.
+**Design note:** the orb always stays in the middle of the screen, so a gap's left/right `shift` is visual only. Variety comes from *what size* each obstacle demands and *when*.
 
 ## Stars
 
@@ -50,9 +50,11 @@ Choose a skin with the arrows on the main menu; locked skins show their requirem
 Stages are plain data in [`src/js/stages.js`](../src/js/stages.js); the schema is documented at the top of that file. Each item's `space` is the clear distance from the previous item, in game pixels (the field is 540 px wide):
 
 ```js
-{ type: 'gate', space: 260, need: 44, shift: 70 }  // wall; 44 px clearance on the tight side; gap extends 70 px right
-{ type: 'energy', space: 220 }                      // energy pair (counts for stars)
-{ type: 'bonus', space: 190 }                       // bonus diamonds (extra, tighter timing allowed)
+{ type: 'gate', space: 260, need: 44, shift: 70 }  // wall; 44 px clearance (below 56 = must shrink)
+{ type: 'gate', space: 270, need: 38, length: 220 } // tunnel: hold through its whole length
+{ type: 'barrier', space: 260 }                     // cyan barrier: smash it at full size
+{ type: 'energy', space: 220 }                      // gold pair (counts for stars)
+{ type: 'bonus', space: 190 }                       // mint pair (optional, tighter timing allowed)
 ```
 
 `src/js/campaign.js` compiles a stage into fixed track positions and runs it through the same obstacle pool, collision and pickup code as Endless. Speed rises linearly from `speed.start` to `speed.end` over the stage's length, so a stage plays the same way every time.
@@ -63,8 +65,8 @@ Stages are plain data in [`src/js/stages.js`](../src/js/stages.js); the schema i
 2. Open `tests/campaign.html`. It validates every stage and fails if any of these are wrong:
    - a field is missing
    - a gap is narrower than a fully shrunk orb plus 8 px
-   - there's too little time between walls (0.35 s)
-   - there's too little time between a wall and energy (0.32 s) or bonus (0.22 s)
+   - there's too little time to switch size: to shrink 0.35 s, to grow for a barrier or gold 0.32 s, either side of mint 0.22 s, checked across whole sequences (see GAMEPLAY_VARIETY.md)
+   - walls closer than 40 px
    - the autopilot can't finish, or can't collect every energy pair, at screen heights 860, 1100 and 1240
 3. Update the stage-count check in that test, which currently expects exactly 3 stages.
 

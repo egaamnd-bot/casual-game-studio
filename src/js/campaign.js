@@ -1,9 +1,8 @@
 // Campaign: compiles stage data into a fixed track, validates it, runs it through the shared
-// Level segment pool and collision, and handles stars and stage progress.
+// Level core (level.js), and handles stars and stage progress.
 (function () {
   const C = Pulse.CONFIG;
-  const R = C.orb.radius;
-  const ITEM_TYPES = ['gate', 'energy', 'bonus'];
+  const ITEM_TYPES = ['gate', 'barrier', 'energy', 'bonus'];
 
   // Turns relative `space` values into absolute track positions. `at` is where the item's
   // near (bottom) edge sits, measured in distance travelled; pickups have zero height.
@@ -11,12 +10,10 @@
     const items = [];
     let prevTop = 0;
     for (let i = 0; i < stage.items.length; i++) {
-      const src = stage.items[i];
-      const h = src.type === 'gate' ? C.gate.thickness : 0;
-      const item = { index: i, type: src.type, at: prevTop + src.space, h, space: src.space };
-      if (src.type === 'gate') Pulse.setGap(item, src.need, src.shift || 0, width);
+      const item = Pulse.Track.placeItem(stage.items[i], prevTop, width);
+      item.index = i;
       items.push(item);
-      prevTop = item.at + h;
+      prevTop = item.at + item.h;
     }
     const finishAt = prevTop + stage.exit.runout;
     const energyTotal = items.filter((it) => it.type === 'energy').length;
@@ -54,31 +51,7 @@
     if (errors.length) return errors;
 
     const track = compile(stage, width);
-    const minNeed = C.orb.minRadius + C.fairMargin;
-    let prev = null;
-    for (const it of track.items) {
-      const speed = speedAtDistance(stage, track.finishAt, it.at);
-      if (it.type === 'gate') {
-        if (it.need < minNeed - 1e-9) err(`gate ${it.index}: clearance ${it.need} below fair minimum ${minNeed}`);
-        if (!(it.gapL < C.orb.x && it.gapR > C.orb.x)) err(`gate ${it.index}: gap does not contain the orb's path`);
-      }
-      if (prev) {
-        const prevWall = prev.type === 'gate';
-        const curWall = it.type === 'gate';
-        if (prevWall && curWall) {
-          const t = (it.space - 2 * R) / speed;
-          if (t < C.campaign.minObstacleGapTime - 1e-9) err(`gate ${it.index}: only ${t.toFixed(2)}s after previous wall`);
-        } else if (prevWall !== curWall) {
-          // Wall ↔ pickup: there must be time to change size between them.
-          const bonus = it.type === 'bonus' || prev.type === 'bonus';
-          const minTime = bonus ? C.campaign.bonusMinReactTime : C.pickup.minReactTime;
-          const t = (it.space - R - 2.5 * C.pickup.radius) / speed;
-          if (t < minTime - 1e-9) err(`item ${it.index}: only ${t.toFixed(2)}s between wall and pickup (min ${minTime})`);
-        }
-      }
-      prev = it;
-    }
-    return errors;
+    return Pulse.Track.validateItems(track.items, (it) => speedAtDistance(stage, track.finishAt, it.at), stage.id);
   }
 
   function starRules(stage) {
@@ -129,52 +102,17 @@
     };
   }
 
-  // Runs one compiled stage through the shared segment pool and collision of Pulse.Level.
+  // Runs one compiled stage through the shared Level core; speed depends on distance travelled,
+  // so a stage plays identically every time.
   class CampaignLevel extends Pulse.Level {
     constructor(width, height, stage) {
-      super(width, height, () => 0);
+      super(width, height);
       this.track = compile(stage, width);
-      this.reset();
-    }
-
-    reset() {
-      super.reset();
-      this.travelled = 0;
-      this.nextIndex = 0;
+      this.items = this.track.items;
     }
 
     speedAt() {
       return speedAtDistance(this.track.stage, this.track.finishAt, this.travelled);
-    }
-
-    update(dt, speed) {
-      const dy = speed * dt;
-      this.moveSegments(dy);
-      this.travelled += dy;
-      const items = this.track.items;
-      while (this.nextIndex < items.length && this.travelled >= items[this.nextIndex].at) {
-        this.spawnItem(items[this.nextIndex++]);
-      }
-    }
-
-    spawnItem(it) {
-      const seg = this.obtain();
-      seg.active = true;
-      seg.scored = false;
-      seg.resolved = false;
-      seg.taken = false;
-      seg.h = it.h;
-      seg.y = this.travelled - it.at - it.h;
-      if (it.type === 'gate') {
-        seg.kind = 'gate';
-        seg.gapL = it.gapL;
-        seg.gapR = it.gapR;
-        seg.need = it.need;
-      } else {
-        seg.kind = 'pickup';
-        seg.variant = it.type;
-        seg.offset = Pulse.PICKUP_OFFSET;
-      }
     }
 
     // Screen y of the finish line; the stage is complete once it reaches the orb.

@@ -36,42 +36,58 @@
       };
     }
 
-    // Plays a stage with the same orb rules as GameScene. policy(level, orbY) → hold?
+    // Plays a stage with the game's own rules (Level.resolve). policy(level, orbY, speed) → hold?
     function play(stage, policy, height) {
       height = height || 1100;
       const orbY = Math.round(height * C.orb.yRatio);
       const level = new Pulse.Campaign.CampaignLevel(W, height, stage);
-      let radius = R, frames = 0, energy = 0, bonus = 0;
+      let radius = R, frames = 0, energy = 0, bonus = 0, smashed = 0;
       const dt = 1 / 60;
+      const done = (crashed, completed) => ({ crashed, completed, frames, energy, bonus, smashed, travelled: level.travelled });
       while (frames < 60 * 300) {
-        const target = policy(level, orbY) ? C.orb.minRadius : R;
+        const target = policy(level, orbY, level.speedAt()) ? C.orb.minRadius : R;
         radius = radius > target ? Math.max(target, radius - C.orb.shrinkRate * dt) : Math.min(target, radius + C.orb.growRate * dt);
         frames++;
         level.update(dt, level.speedAt());
         for (const s of level.segments) {
           if (!s.active) continue;
-          if (s.kind === 'pickup') {
-            if (!s.resolved && level.touchesPickup(s, orbY, radius)) {
-              s.resolved = s.taken = true;
-              if (s.variant === 'bonus') bonus++; else energy++;
-            }
-            continue;
-          }
-          if (level.hitsWall(s, C.orb.x, orbY, radius)) return { crashed: true, completed: false, frames, energy, bonus, travelled: level.travelled };
+          const e = level.resolve(s, orbY, radius);
+          if (e === 'crash') return done(true, false);
+          if (e === 'collect') { if (s.variant === 'bonus') bonus++; else energy++; }
+          if (e === 'break') smashed++;
         }
-        if (level.finishY() >= orbY) return { crashed: false, completed: true, frames, energy, bonus, travelled: level.travelled };
+        if (level.finishY() >= orbY) return done(false, true);
       }
-      return { crashed: false, completed: false, frames, energy, bonus, travelled: level.travelled };
+      return done(false, false);
     }
 
-    // Same autopilot as GameScene.botWantsHold.
-    function bot(level, orbY) {
-      const look = level.speedAt() * 0.28;
+    // The game's own test autopilot (level.js).
+    const bot = Pulse.autopilot;
+
+    // A cautious player: holds whenever a gap is within 0.75 s, so never lets go inside a dare.
+    function cautious(level, orbY, speed) {
+      let nearest = null, bottom = -Infinity;
       for (const s of level.segments) {
-        if (!s.active || s.kind === 'pickup') continue;
-        if (s.y + s.h > orbY - R - look && s.y < orbY + R && s.need < R) return true;
+        if (!s.active || s.kind === 'pickup' || s.broken) continue;
+        if (s.kind === 'gate' && (s.need >= R || s.y >= orbY + R)) continue;
+        const btm = s.y + s.h;
+        if (btm < orbY - R - speed * 0.75) continue;
+        if (btm > bottom) { nearest = s; bottom = btm; }
       }
-      return false;
+      return !!nearest && nearest.kind === 'gate';
+    }
+
+    // How often the required action flips (shrink ↔ stay big) from one obstacle to the next.
+    function decisionFlips(stage) {
+      let prev = null, flips = 0, n = 0;
+      for (const it of Pulse.Campaign.compile(stage, W).items) {
+        const need = Pulse.Track.demand(it);
+        if (!need || it.type === 'energy' || it.type === 'bonus') continue;
+        if (prev && need !== prev) flips++;
+        prev = need;
+        n++;
+      }
+      return { flips, n };
     }
 
     // ---- Stage definitions ----
@@ -88,23 +104,37 @@
       for (let k = 1; k < track.items.length; k++) check(track.items[k].at > track.items[k - 1].at, `stage ${stage.id}: items ordered`);
     });
     const [s1, s2, s3] = Pulse.STAGES;
-    check(s1.items.every((it) => it.type !== 'bonus' && (it.type !== 'gate' || !it.shift)), 'stage 1 has no bonus or shifted gaps');
+    const count = (s, type) => s.items.filter((it) => it.type === type).length;
+    // Stage 1: shrink basics only; generous gaps; introduces one hold-through.
+    check(count(s1, 'barrier') === 0 && count(s1, 'bonus') === 0 && s1.items.every((it) => !it.shift && !it.length), 'stage 1 has only gaps and gold');
     check(s1.items.filter((it) => it.type === 'gate').every((it) => it.need >= 42), 'stage 1 gaps are generous (need ≥ 42)');
-    check(s2.items.some((it) => it.shift > 0) && s2.items.some((it) => it.shift < 0), 'stage 2 alternates gap sides');
+    // Stage 2: barriers introduced alone first, before any gap demands a switch into one.
+    check(count(s2, 'barrier') >= 5 && s2.items[0].type === 'barrier', 'stage 2 introduces barriers, first one on its own');
+    check(count(s2, 'bonus') === 0, 'stage 2 has no bonus yet');
+    // Stage 3: everything, faster, plus long hold and optional mint dares.
     check(s3.speed.end > s3.speed.start && s3.speed.start >= s2.speed.end, 'stage 3 is faster and accelerates');
-    check(s3.items.some((it) => it.type === 'bonus'), 'stage 3 has bonus pickups');
+    check(count(s3, 'bonus') >= 2 && s3.items.some((it) => it.length), 'stage 3 has mint dares and a long hold');
     check(s3.items.length > s2.items.length, 'stage 3 is the longest sequence');
+    // Decision variety: stages 2 and 3 switch between shrink and stay-big often.
+    for (const st of [s2, s3]) {
+      const v = decisionFlips(st);
+      check(v.flips / (v.n - 1) >= 0.5, `${st.id}: required action changes at least every other obstacle (${v.flips}/${v.n - 1})`);
+    }
 
     // validate() rejects bad data.
-    const bad = (mutate) => { const s = JSON.parse(JSON.stringify(s1)); mutate(s); return Pulse.Campaign.validate(s, W); };
-    check(bad((s) => delete s.id).length > 0, 'missing id is rejected');
-    check(bad((s) => { s.exit = null; }).length > 0, 'missing exit is rejected');
-    check(bad((s) => { s.items = []; }).length > 0, 'empty items are rejected');
-    check(bad((s) => { s.items[2].need = 20; }).length > 0, 'unfair narrow gap is rejected');
-    check(bad((s) => { s.items[1].space = 60; }).length > 0, 'pickup too close to wall is rejected');
-    check(bad((s) => { s.items[5].space = 120; }).length > 0, 'walls too close together are rejected');
-    check(bad((s) => { s.items[0].type = 'laser'; }).length > 0, 'unknown item type is rejected');
-    check(bad((s) => { s.stars = { two: 0.9, three: 0.6 }; }).length > 0, 'inverted star thresholds are rejected');
+    const bad = (base, mutate) => { const s = JSON.parse(JSON.stringify(base)); mutate(s); return Pulse.Campaign.validate(s, W); };
+    check(bad(s1, (s) => delete s.id).length > 0, 'missing id is rejected');
+    check(bad(s1, (s) => { s.exit = null; }).length > 0, 'missing exit is rejected');
+    check(bad(s1, (s) => { s.items = []; }).length > 0, 'empty items are rejected');
+    check(bad(s1, (s) => { s.items[2].need = 20; }).length > 0, 'unfair narrow gap is rejected');
+    check(bad(s1, (s) => { s.items[3].space = 60; }).length > 0, 'gold too soon after a gap is rejected');
+    check(bad(s1, (s) => { s.items[10].space = 30; }).length > 0, 'walls overlapping is rejected');
+    check(bad(s2, (s) => { s.items[3].space = 150; }).length > 0, 'barrier too soon after a gap is rejected');
+    check(bad(s2, (s) => { s.items[7].space = 140; }).length > 0, 'gap too soon after a barrier is rejected');
+    check(bad(s3, (s) => { s.items[7].space = 120; }).length > 0, 'mint too soon after a gap is rejected');
+    check(bad(s1, (s) => { s.items[10].space = 60; }).length === 0, 'hold-through gaps may sit close together');
+    check(bad(s1, (s) => { s.items[0].type = 'laser'; }).length > 0, 'unknown item type is rejected');
+    check(bad(s1, (s) => { s.stars = { two: 0.9, three: 0.6 }; }).length > 0, 'inverted star thresholds are rejected');
     check(Pulse.Campaign.validate(null, W).length > 0, 'null stage is rejected');
 
     // ---- Playback: completable, reachable, deterministic ----
@@ -122,8 +152,14 @@
       check(idle.crashed && !idle.completed, `${stage.id}: no input must crash`);
       const hold = play(stage, () => true);
       check(hold.energy === 0 && hold.bonus === 0, `${stage.id}: always shrunk collects nothing`);
+      if (track.items.some((it) => it.type === 'barrier')) {
+        check(hold.crashed, `${stage.id}: holding the whole time must crash on a barrier`);
+      }
+      const safe = play(stage, cautious);
+      check(safe.completed, `${stage.id}: a cautious player who skips every dare can finish`);
       const secs = a.frames / 60;
-      lines.push(`${stage.id}: ${secs.toFixed(1)}s, energy ${a.energy}/${track.energyTotal}, bonus ${a.bonus}/${track.bonusTotal}, speed ${stage.speed.start}→${stage.speed.end}`);
+      const v = decisionFlips(stage);
+      lines.push(`${stage.id}: ${secs.toFixed(1)}s, energy ${a.energy}/${track.energyTotal}, bonus ${a.bonus}/${track.bonusTotal}, barriers ${a.smashed}, action flips ${v.flips}/${v.n - 1}, hold-always ${hold.crashed ? 'crashes' : 'finishes'}, cautious bonus ${safe.bonus}`);
     });
 
     // ---- Stars ----

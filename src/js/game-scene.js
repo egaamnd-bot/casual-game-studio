@@ -34,7 +34,7 @@
         this.level = new Pulse.Campaign.CampaignLevel(this.W, this.H, this.stage);
         visual = this.stage.visual || visual;
       } else {
-        this.level = new Pulse.Level(this.W, this.H);
+        this.level = new Pulse.EndlessLevel(this.W, this.H);
       }
       // Sprites when Gemini's assets loaded; otherwise the code-drawn shapes in render.js.
       this.view = Pulse.Assets.ok ? new Pulse.SpriteView(this, visual, this.skin) : null;
@@ -129,7 +129,7 @@
           show(this.subText, this.stage.intro, T.textDim);
         } else {
           show(this.titleText, 'PULSE', T.text);
-          show(this.subText, 'Hold to shrink · Release to grow', T.textDim);
+          show(this.subText, 'Shrink through gaps · Grow to smash cyan barriers', T.textDim);
         }
         show(this.hintText, 'Tap to start');
       } else if (state === 'over') {
@@ -237,9 +237,10 @@
       return false;
     }
 
-    // Pickups can be collected only above this radius, and are drawn dimmed below it.
+    // "Charged": big enough to collect pickups and smash barriers. Pickups dim and barriers turn
+    // red whenever the orb isn't charged.
     canCollect() {
-      return this.radius > C.orb.radius - C.pickup.sizeTolerance;
+      return Pulse.isCharged(this.radius);
     }
 
     update(time, delta) {
@@ -265,53 +266,54 @@
       this.scroll += speed * dt * 0.5;
       this.level.update(dt, speed, this.elapsed);
 
+      // Pulse.Level.resolve applies the rules; this only turns its events into score and feedback.
       const segs = this.level.segments;
       const r = this.radius;
       for (let i = 0; i < segs.length; i++) {
         const s = segs[i];
         if (!s.active) continue;
+        const event = this.level.resolve(s, this.orbY, r);
+        if (!event) continue;
 
-        if (s.kind === 'pickup') {
-          if (s.resolved) continue;
-          if (this.level.touchesPickup(s, this.orbY, r)) {
-            s.taken = true;
-            s.resolved = true;
-            this.ringT = 0;
-            if (this.view) this.view.collect(s);
-            if (campaign) {
-              if (s.variant === 'bonus') this.bonus++;
-              else this.energy++;
-              this.popup(s.variant === 'bonus' ? 'Bonus!' : '+1', T.textAccent);
-            } else {
-              this.multiplier = Math.min(C.multiplierMax, this.multiplier + 1);
-              this.popup(`x${this.multiplier}`, T.textAccent);
-            }
-            Pulse.Sfx.play('pickup');
-            this.updateHud();
-          } else if (s.y - C.pickup.radius > this.orbY + r) {
-            s.resolved = true;
-            if (!campaign && this.multiplier > 1) {
-              this.multiplier = 1;
-              this.popup('x1', T.textDim);
-              Pulse.Sfx.play('multiplierLost');
-              this.updateHud();
-            }
-          }
-          continue;
-        }
-
-        if (this.level.hitsWall(s, this.orbX, this.orbY, r)) {
+        if (event === 'crash') {
           this.crash();
           return;
         }
-        if (!s.scored && s.y > this.orbY + r) {
-          s.scored = true;
+        if (event === 'collect') {
+          this.ringT = 0;
+          if (this.view) this.view.collect(s);
+          if (campaign) {
+            if (s.variant === 'bonus') this.bonus++;
+            else this.energy++;
+            this.popup(s.variant === 'bonus' ? 'Bonus!' : '+1', s.variant === 'bonus' ? T.textBonus : T.textAccent);
+          } else {
+            this.multiplier = Math.min(C.multiplierMax, this.multiplier + 1);
+            this.popup(`x${this.multiplier}`, s.variant === 'bonus' ? T.textBonus : T.textAccent);
+          }
+          Pulse.Sfx.play('pickup');
+          this.updateHud();
+        } else if (event === 'miss') {
+          // Skipping gold resets the Endless multiplier; skipping a mint bonus doesn't, so
+          // declining a risky bonus is always a safe choice.
+          if (!campaign && s.variant !== 'bonus' && this.multiplier > 1) {
+            this.multiplier = 1;
+            this.popup('x1', T.textDim);
+            Pulse.Sfx.play('multiplierLost');
+            this.updateHud();
+          }
+        } else {
+          // 'pass' (wall cleared) or 'break' (barrier smashed): both count as an obstacle.
           if (!campaign) {
             this.score += this.multiplier;
             this.updateHud();
           }
-          Pulse.Sfx.play('pass');
-          this.checkNearMiss(s, r);
+          if (event === 'break') {
+            Pulse.Sfx.play('smash');
+            if (this.view) this.view.smash(s);
+          } else {
+            Pulse.Sfx.play('pass');
+            this.checkNearMiss(s, r);
+          }
         }
       }
 
@@ -371,6 +373,7 @@
           const s = segs[i];
           if (!s.active || s.y > this.H || s.y + s.h < -40) continue;
           if (s.kind === 'pickup') Pulse.Render.pickup(g, s, this.orbX, dimmed);
+          else if (s.kind === 'barrier') Pulse.Render.barrier(g, s, this.W, !dimmed);
           else Pulse.Render.walls(g, s, this.W);
         }
       }
@@ -391,19 +394,10 @@
       }
     }
 
-    // Test-only autopilot: shrinks for any wall it cannot fit through, otherwise stays big.
+    // Test-only autopilot (Pulse.autopilot in level.js, shared with the logic tests).
     botWantsHold() {
       if (this.state !== 'playing') return false;
-      const speed = this.level.speedAt(this.elapsed);
-      const look = speed * 0.28;
-      const segs = this.level.segments;
-      for (let i = 0; i < segs.length; i++) {
-        const s = segs[i];
-        if (!s.active || s.kind === 'pickup') continue;
-        const near = s.y + s.h > this.orbY - C.orb.radius - look && s.y < this.orbY + C.orb.radius;
-        if (near && s.need < C.orb.radius) return true;
-      }
-      return false;
+      return Pulse.autopilot(this.level, this.orbY, this.level.speedAt(this.elapsed));
     }
   }
 

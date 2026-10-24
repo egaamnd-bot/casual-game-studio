@@ -28,6 +28,20 @@ Pulse.Render = (function () {
     g.fillRect(seg.gapR, seg.y, 4, seg.h);
   }
 
+  // Cyan barrier (code-drawn in both renderers; there is no barrier art yet). Cyan while the orb
+  // is charged and would smash it, red while the orb is too small and would crash.
+  function barrier(g, seg, width, charged) {
+    if (seg.broken) return;
+    const color = charged ? T.orb : T.danger;
+    g.fillStyle(color, 0.16);
+    g.fillRect(0, seg.y, width, seg.h);
+    g.fillStyle(color, 1);
+    g.fillRect(0, seg.y, width, 3);
+    g.fillRect(0, seg.y + seg.h - 3, width, 3);
+    g.fillStyle(color, 0.7);
+    for (let x = 9; x < width; x += 36) g.fillRect(x, seg.y + seg.h / 2 - 2, 18, 4);
+  }
+
   // Energy is a circle, bonus a diamond. `dimmed` while the orb is too small to collect.
   function pickup(g, seg, orbX, dimmed) {
     if (seg.taken) return;
@@ -102,5 +116,5 @@ Pulse.Render = (function () {
     for (let i = 0; i < max; i++) star(g, x0 + i * step, y, r, i < count);
   }
 
-  return { background, walls, pickup, finishLine, orb, collectRing, progressBar, star, stars };
+  return { background, walls, barrier, pickup, finishLine, orb, collectRing, progressBar, star, stars };
 })();

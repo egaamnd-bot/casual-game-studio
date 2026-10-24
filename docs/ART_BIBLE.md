@@ -27,7 +27,9 @@ Mapping decisions:
 
 Not used yet: tutorial hands, audio toggle icons, HUD brackets, header banners and badges, `wall_joint_divider`, and the separate `bg_speed_ticks` variants beyond Endless. There's no audio in the pack; sounds remain synthesized placeholders.
 
-Feedback for Gemini: `ui_icon_status_lock` looks like an *open* padlock; a closed one would read better for locked stages.
+Feedback for Gemini:
+- `ui_icon_status_lock` looks like an *open* padlock; a closed one would read better for locked stages.
+- New art request: a **cyan barrier** (full-width tileable energy membrane, 44 px tall in 1080-space; charged-cyan and danger-red states; shatter effect) and optionally a height-tileable tunnel body. Both are code-drawn for now. See [GAMEPLAY_VARIETY.md](GAMEPLAY_VARIETY.md).
 
 ## Visual Identity
 

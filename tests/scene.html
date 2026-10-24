@@ -25,6 +25,7 @@
   <script src="../src/js/level.js"></script>
   <script src="../src/js/stages.js"></script>
   <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/patterns.js"></script>
   <script src="../src/js/skins.js"></script>
   <script src="../src/js/render.js"></script>
   <script src="../src/js/ui.js"></script>
@@ -137,7 +138,7 @@
       s.scene.start('game', { mode: 'endless' });
       await wait(300);
       const e = scene();
-      check(e.mode === 'endless' && e.level.constructor === Pulse.Level, 'endless uses the random generator');
+      check(e.mode === 'endless' && e.level instanceof Pulse.EndlessLevel, 'endless uses the pattern generator');
       check(e.best === 77, `endless best migrated (best=${e.best})`);
       e.startRun(); e.test.bot = true; await wait(5000);
       check(e.state === 'playing' && e.score > 0, `endless plays and scores (score=${e.score})`);

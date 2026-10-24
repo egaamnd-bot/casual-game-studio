@@ -23,7 +23,9 @@
 - [x] Campaign system v1: data-driven stages, 3 stages, stars, skins, save data ([CAMPAIGN.md](CAMPAIGN.md))
 - [x] Phone playtest of the campaign (producer: works well)
 - [x] Integrate Gemini's v2.0 asset pack (`feature/pulse-art-v2`)
-- [ ] Phone check of the new art
+- [x] Phone check of the new art (producer: looks good)
+- [x] Gameplay variety v1: barriers, Endless patterns, stage redesign ([GAMEPLAY_VARIETY.md](GAMEPLAY_VARIETY.md))
+- [ ] Phone playtest of gameplay variety
 - [ ] Playtest with 3–5 people against the targets in [PULSE_PROTOTYPE.md](PULSE_PROTOTYPE.md)
 
 ## Later / Ideas

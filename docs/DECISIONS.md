@@ -22,6 +22,8 @@ Add new entries at the top.
 
 ## Pending Decisions
 
+- Gameplay variety v1 (cyan barriers, pattern-based Endless, redesigned stages, Endless mint-miss no longer resets the multiplier): built on `feature/pulse-gameplay-variety`, awaiting phone playtest ([GAMEPLAY_VARIETY.md](GAMEPLAY_VARIETY.md))
+
 - Pulse as the commercial game (after playtesting the prototype and campaign)
 - Final technology stack (pipeline provisionally validated; see #5)
 - Android app ID: currently `com.casualgamestudio.pipelinetest`. It must be final before the first Play Store upload, because it can't change afterwards

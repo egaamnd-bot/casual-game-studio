@@ -1,5 +1,11 @@
 # Pulse: Playable Prototype
 
+> **Historical.** This page describes prototype 1. Since then:
+> - Campaign was added ([CAMPAIGN.md](CAMPAIGN.md)).
+> - Endless moved from independent random walls to patterns, and cyan barriers were added ([GAMEPLAY_VARIETY.md](GAMEPLAY_VARIETY.md)).
+>
+> The rules below on orb size, speed, points and multiplier still apply. The generator and fairness sections are superseded.
+
 > Status: **Prototype 1, not yet playtested on a phone.** Placeholder visuals and sounds only. Branch `feature/pulse-playable-prototype`.
 
 ## How to Play

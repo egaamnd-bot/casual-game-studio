@@ -1,10 +1,17 @@
-// Obstacle generation and collision. Pure logic with no Phaser dependency, so it can be
-// tested on its own (see tests/logic.html).
+// Shared track core for both modes: item placement, the obstacle pool, collision, the rules for
+// what happens when the orb meets each obstacle, fairness validation, and the test autopilot.
+// Pure logic with no Phaser dependency, so it can be tested on its own.
+//
+// Item types (campaign data and Endless patterns use the same ones):
+//   gate     wall with a gap; the orb must be no bigger than `need` (or longer: `length` = a tunnel)
+//   barrier  full-width cyan barrier; the orb must be charged (near full size) to smash it
+//   energy   gold pickup pair; collected only while charged
+//   bonus    mint pickup pair; optional extra, allowed tighter timing
 (function () {
   const C = Pulse.CONFIG;
+  const R = C.orb.radius;
 
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-  const lerp = (a, b, t) => a + (b - a) * t;
 
   function circleRect(cx, cy, r, rx, ry, rw, rh) {
     const dx = cx - clamp(cx, rx, rx + rw);
@@ -12,8 +19,12 @@
     return dx * dx + dy * dy < r * r;
   }
 
-  // Pickups sit this far left and right of the orb's path, reachable only near full size.
-  const PICKUP_OFFSET = C.orb.radius + C.pickup.radius - C.pickup.sizeTolerance;
+  // "Charged" = close enough to full size to collect energy and smash barriers.
+  const CHARGED_RADIUS = R - C.pickup.sizeTolerance;
+  const isCharged = (r) => r > CHARGED_RADIUS;
+
+  // Pickups sit this far left and right of the orb's path, reachable only when charged.
+  const PICKUP_OFFSET = R + C.pickup.radius - C.pickup.sizeTolerance;
 
   // Gap edges around the orb's path. `need` is the clearance on the tight side; `shift` widens
   // the gap to the right (positive) or left (negative) without changing that clearance.
@@ -24,23 +35,93 @@
     seg.need = Math.min(ox - seg.gapL, seg.gapR - ox);
   }
 
-  // Segments are pooled objects, reused to avoid allocations during play:
-  //   gate / tunnel: walls from x=0..gapL and gapR..width, spanning y..y+h.
-  //   pickup: a pair of energy pickups at x = orb.x ± offset, centered on y.
+  const isPickup = (type) => type === 'energy' || type === 'bonus';
+  const itemHeight = (src) => (src.type === 'gate' ? (src.length || C.gate.thickness)
+    : src.type === 'barrier' ? C.barrier.thickness : 0);
+
+  // What size an item demands: 'small' (gate narrower than the orb), 'big' (barrier, pickups)
+  // or null (wide gate: any size passes).
+  function demand(it) {
+    if (it.type === 'gate') return it.need < R ? 'small' : null;
+    return 'big';
+  }
+
+  // Distance the orb itself takes up between two items when measuring clear time.
+  const extent = (type) => (isPickup(type) ? 2.5 * C.pickup.radius : R);
+
+  // Clear time (s) between item a's far edge and item b's near edge at `speed`, and the inverse.
+  const clearTime = (aType, bType, distance, speed) => (distance - extent(aType) - extent(bType)) / speed;
+  const spaceFor = (aType, bType, seconds, speed) => extent(aType) + extent(bType) + seconds * speed;
+
+  // Places one item `space` px after `prevTop`. Returns the compiled item.
+  function placeItem(src, prevTop, width) {
+    const h = itemHeight(src);
+    const item = { type: src.type, at: prevTop + src.space, h, space: src.space };
+    if (src.type === 'gate') Pulse.setGap(item, src.need, src.shift || 0, width);
+    if (src.pattern) item.pattern = src.pattern;
+    return item;
+  }
+
+  // Minimum time to switch from one demand to the other, by what the orb is switching to/from.
+  function minSwitchTime(from, to) {
+    const T = C.track;
+    if (from.type === 'bonus' || to.type === 'bonus') return T.bonusTime;
+    if (to.type === 'barrier') return T.toBarrier;
+    if (to.type === 'energy') return T.toEnergy;
+    return from.type === 'energy' ? T.energyToSmall : T.toSmall;
+  }
+
+  // Fairness of a compiled item list. Tracks the last moment the orb had to be small and the last
+  // moment it had to be big, and checks there is time to switch between them, however many items
+  // sit in between. `speedOf(item)` gives the speed when the item reaches the orb.
+  function validateItems(items, speedOf, label) {
+    const errors = [];
+    const err = (i, msg) => errors.push(`${label}: item ${i} (${items[i].type}): ${msg}`);
+    const minNeed = C.orb.minRadius + C.fairMargin;
+    // The run starts with a full-size orb.
+    let lastBig = { type: 'start', top: 0 };
+    let lastSmall = null;
+    let prevTop = 0;
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const speed = speedOf(it);
+      if (it.type === 'gate') {
+        if (it.need < minNeed - 1e-9) err(i, `clearance ${it.need.toFixed(1)} below fair minimum ${minNeed}`);
+        if (!(it.gapL < C.orb.x && it.gapR > C.orb.x)) err(i, "gap does not contain the orb's path");
+      }
+      if (i > 0 && it.at - prevTop < (isPickup(it.type) || isPickup(items[i - 1].type) ? 2 * C.pickup.radius : C.track.minWallSpace)) {
+        err(i, `only ${(it.at - prevTop).toFixed(0)} px after previous item`);
+      }
+      const need = demand(it);
+      const from = need === 'small' ? lastBig : need === 'big' ? lastSmall : null;
+      if (from) {
+        const t = clearTime(from.type === 'start' ? 'gate' : from.type, it.type, it.at - from.top, speed);
+        const min = minSwitchTime(from, it);
+        if (t < min - 1e-9) err(i, `${t.toFixed(2)}s to become ${need} after ${from.type} (min ${min})`);
+      }
+      const rec = { type: it.type, top: it.at + it.h };
+      if (need === 'small') lastSmall = rec;
+      if (need === 'big') lastBig = rec;
+      prevTop = it.at + it.h;
+    }
+    return errors;
+  }
+
+  // Segments are pooled objects, reused to avoid allocations during play. Items stream in from
+  // `this.items` (absolute positions) as the track scrolls; subclasses fill that list.
   class Level {
-    constructor(width, height, rng) {
+    constructor(width, height) {
       this.width = width;
       this.height = height;
-      this.rng = rng || Math.random;
       this.segments = [];
+      this.items = [];
       this.reset();
     }
 
     reset() {
       for (let i = 0; i < this.segments.length; i++) this.segments[i].active = false;
-      this.spawnCount = 0;
-      this.lastKind = null;
-      this.distanceToNext = C.speed.start * C.firstObstacleDelay;
+      this.travelled = 0;
+      this.nextIndex = 0;
     }
 
     difficulty(elapsed) {
@@ -51,11 +132,18 @@
       return Math.min(C.speed.start + C.speed.perSecond * elapsed, C.speed.max);
     }
 
+    // Hook for subclasses to append items ahead of the orb.
+    fill() {}
+
     update(dt, speed, elapsed) {
       const dy = speed * dt;
       this.moveSegments(dy);
-      this.distanceToNext -= dy;
-      while (this.distanceToNext <= 0) this.spawn(speed, elapsed, -this.distanceToNext);
+      this.travelled += dy;
+      this.fill(elapsed, speed);
+      const items = this.items;
+      while (this.nextIndex < items.length && this.travelled >= items[this.nextIndex].at) {
+        this.spawnItem(items[this.nextIndex++]);
+      }
     }
 
     moveSegments(dy) {
@@ -76,80 +164,39 @@
       return s;
     }
 
-    // Gap half-width the orb must fit through. Gets tighter more often as difficulty rises.
-    shrinkNeed(d) {
-      const lo = C.orb.minRadius + C.fairMargin;
-      const hi = C.orb.radius - 8;
-      return hi - (hi - lo) * Math.pow(this.rng(), lerp(1.4, 0.55, d));
-    }
-
-    spawn(speed, elapsed, overshoot) {
-      const d = this.difficulty(elapsed);
-      const R = C.orb.radius;
-      const index = this.spawnCount++;
-
-      let kind = 'gate';
-      if (index >= 2 && elapsed >= C.tunnel.unlockSeconds && this.lastKind !== 'tunnel' &&
-          this.rng() < C.tunnel.chance + C.tunnel.chanceGrowth * d) {
-        kind = 'tunnel';
-      }
-
-      // The first two gates teach: one gentle shrink, then a wide gap with a pickup.
-      let need;
-      if (index === 0) need = R - 16;
-      else if (index === 1) need = R + 30;
-      else if (kind === 'tunnel') need = this.shrinkNeed(d) + C.tunnel.extraClearance;
-      else if (this.rng() < C.gate.shrinkChance + C.gate.shrinkChanceGrowth * d) need = this.shrinkNeed(d);
-      else need = R + 12 + this.rng() * 36;
-
+    spawnItem(it) {
       const seg = this.obtain();
       seg.active = true;
-      seg.kind = kind;
       seg.scored = false;
       seg.resolved = false;
       seg.taken = false;
-      seg.h = kind === 'tunnel'
-        ? lerp(C.tunnel.minLength, C.tunnel.maxLength, this.rng()) * (0.8 + 0.4 * d)
-        : C.gate.thickness;
-      this.placeGap(seg, need, kind === 'tunnel' ? C.tunnel.maxOffset : C.gate.maxOffset);
-      seg.y = -seg.h + overshoot;
-
-      let space = 2 * R + C.spacing.padding + speed * lerp(C.spacing.startTime, C.spacing.minTime, d);
-
-      // A pickup goes halfway to the next obstacle. The gap widens if needed so there is time
-      // to regrow before the pickup and to shrink again after it.
-      if (index >= 1 && this.rng() < C.pickup.chance) {
-        space = Math.max(space, 2 * (R + 2.5 * C.pickup.radius + C.pickup.minReactTime * speed));
-        const p = this.obtain();
-        p.active = true;
-        p.kind = 'pickup';
-        p.variant = 'energy';
-        p.scored = false;
-        p.resolved = false;
-        p.taken = false;
-        p.h = 0;
-        p.y = seg.y - space / 2;
-        p.offset = PICKUP_OFFSET;
+      seg.broken = false;
+      seg.h = it.h;
+      seg.y = this.travelled - it.at - it.h;
+      seg.pattern = it.pattern || null;
+      if (it.type === 'gate') {
+        seg.kind = 'gate';
+        seg.gapL = it.gapL;
+        seg.gapR = it.gapR;
+        seg.need = it.need;
+      } else if (it.type === 'barrier') {
+        seg.kind = 'barrier';
+      } else {
+        seg.kind = 'pickup';
+        seg.variant = it.type;
+        seg.offset = PICKUP_OFFSET;
       }
-
-      this.distanceToNext = seg.h + space - overshoot;
-
-      this.lastKind = kind;
-    }
-
-    // One side of the gap sits exactly `need` from the orb's path; the other is offset
-    // randomly, so gaps look varied while the requirement stays readable.
-    placeGap(seg, need, maxOffset) {
-      const offset = this.rng() * maxOffset;
-      const tightLeft = this.rng() < 0.5;
-      setGap(seg, need, tightLeft ? offset : -offset, this.width);
     }
 
     hitsWall(seg, x, y, r) {
-      if (seg.kind === 'pickup') return false;
+      if (seg.kind !== 'gate') return false;
       if (y + r < seg.y || y - r > seg.y + seg.h) return false;
       return circleRect(x, y, r, 0, seg.y, seg.gapL, seg.h) ||
         circleRect(x, y, r, seg.gapR, seg.y, this.width - seg.gapR, seg.h);
+    }
+
+    touchesBarrier(seg, y, r) {
+      return circleRect(C.orb.x, y, r, 0, seg.y, this.width, seg.h);
     }
 
     touchesPickup(seg, y, r) {
@@ -157,10 +204,65 @@
       const reach = r + C.pickup.radius;
       return seg.offset * seg.offset + dy * dy < reach * reach;
     }
+
+    // The game's rules for one segment this frame. Marks the segment and returns what happened:
+    // 'crash' | 'pass' (wall cleared) | 'break' (barrier smashed) | 'collect' | 'miss' | null.
+    // Shared by the game scene and the tests so they can't drift apart.
+    resolve(s, orbY, r) {
+      if (s.kind === 'pickup') {
+        if (s.resolved) return null;
+        if (this.touchesPickup(s, orbY, r)) {
+          s.taken = s.resolved = true;
+          return 'collect';
+        }
+        if (s.y - C.pickup.radius > orbY + r) {
+          s.resolved = true;
+          return 'miss';
+        }
+        return null;
+      }
+      if (s.kind === 'barrier') {
+        if (s.broken || !this.touchesBarrier(s, orbY, r)) return null;
+        if (!isCharged(r)) return 'crash';
+        s.broken = s.scored = true;
+        return 'break';
+      }
+      if (this.hitsWall(s, C.orb.x, orbY, r)) return 'crash';
+      if (!s.scored && s.y > orbY + r) {
+        s.scored = true;
+        return 'pass';
+      }
+      return null;
+    }
+  }
+
+  // Test autopilot with perfect reading: acts on the nearest obstacle within ~0.3 s.
+  // Shrinks for a gate narrower than the orb, stays full size for a barrier, otherwise grows
+  // (which collects pickups). It skips mint bonuses that are too tight to reach in time.
+  function autopilot(level, orbY, speed) {
+    const look = speed * 0.3;
+    let nearest = null;
+    let nearestBottom = -Infinity;
+    const segs = level.segments;
+    for (let i = 0; i < segs.length; i++) {
+      const s = segs[i];
+      if (!s.active || s.kind === 'pickup' || s.broken) continue;
+      if (s.kind === 'gate' && (s.need >= R || s.y >= orbY + R)) continue;
+      const bottom = s.y + s.h;
+      if (bottom < orbY - R - look) continue;
+      if (bottom > nearestBottom) {
+        nearest = s;
+        nearestBottom = bottom;
+      }
+    }
+    return !!nearest && nearest.kind === 'gate';
   }
 
   Pulse.Level = Level;
   Pulse.circleRect = circleRect;
   Pulse.setGap = setGap;
   Pulse.PICKUP_OFFSET = PICKUP_OFFSET;
+  Pulse.isCharged = isCharged;
+  Pulse.Track = { placeItem, validateItems, clearTime, spaceFor, demand, itemHeight };
+  Pulse.autopilot = autopilot;
 })();

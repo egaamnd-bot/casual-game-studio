@@ -37,6 +37,7 @@
       }).setDepth(6);
       this.sparksGold = sparks(T.pickup);
       this.sparksMint = sparks(T.bonus);
+      this.sparksCyan = sparks(T.orb);
       this.shards = scene.add.particles(0, 0, 'pulse_gameplay', {
         frame: ['fx_shatter_shard_01', 'fx_shatter_shard_02', 'fx_shatter_shard_03'],
         speed: { min: 140, max: 340 }, lifespan: 650, rotate: { min: 0, max: 360 },
@@ -73,10 +74,13 @@
           continue;
         }
         const onScreen = s.y < H && s.y + s.h > -60;
-        if (s.kind === 'tunnel') {
-          // Tunnels (Endless only) are taller than the wall art; draw them in the same palette.
+        if (s.kind === 'barrier' || (s.kind === 'gate' && s.h > C.gate.thickness)) {
+          // Barriers have no art yet, and tunnels are taller than the wall art: both are drawn
+          // in code with the same palette.
           this.release(s);
-          if (onScreen) Pulse.Render.walls(wallGraphics, s, this.scene.W);
+          if (!onScreen) continue;
+          if (s.kind === 'barrier') Pulse.Render.barrier(wallGraphics, s, this.scene.W, !dimmed);
+          else Pulse.Render.walls(wallGraphics, s, this.scene.W);
         } else if (s.kind === 'gate') {
           this.placeGate(this.acquire(s, 'gate'), s, onScreen);
         } else {
@@ -189,6 +193,15 @@
       const x = this.scene.orbX;
       em.explode(6, x - seg.offset, seg.y);
       em.explode(6, x + seg.offset, seg.y);
+    }
+
+    // Barrier smashed: cyan sparks along the barrier and a cyan shockwave from the orb.
+    smash(seg) {
+      const sc = this.scene;
+      for (let x = 40; x < sc.W; x += 90) this.sparksCyan.explode(3, x, seg.y + seg.h / 2);
+      sc.tweens.killTweensOf(this.shockwave);
+      this.shockwave.setVisible(true).setAlpha(0.9).setScale(0.35).setTint(T.orb).setPosition(sc.orbX, sc.orbY);
+      sc.tweens.add({ targets: this.shockwave, scale: 0.9, alpha: 0, duration: 300, ease: 'Quad.easeOut' });
     }
 
     crash() {
