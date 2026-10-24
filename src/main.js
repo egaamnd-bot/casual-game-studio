@@ -2,6 +2,7 @@
 // inside the Capacitor WebView. Throwaway: not the Pulse prototype.
 
 const COLORS = [0x38bdf8, 0xf472b6, 0xfacc15, 0x4ade80, 0xa78bfa];
+const FONT = 'system-ui, -apple-system, Roboto, "Segoe UI", sans-serif';
 
 class SmokeTestScene extends Phaser.Scene {
   constructor() {
@@ -17,16 +18,19 @@ class SmokeTestScene extends Phaser.Scene {
     const info = window.BUILD_INFO || { commit: 'preview', run: '-' };
     const platform = window.Capacitor?.getPlatform?.() ?? 'web';
 
-    this.add.text(width / 2, 60, 'Pipeline smoke test', { fontSize: '36px', color: '#f9fafb' }).setOrigin(0.5);
-    this.add.text(width / 2, 110, `Phaser ${Phaser.VERSION} · ${platform}`, { fontSize: '22px', color: '#9ca3af' }).setOrigin(0.5);
-    this.add.text(width / 2, 140, `build ${info.commit} · run #${info.run}`, { fontSize: '22px', color: '#9ca3af' }).setOrigin(0.5);
+    const label = (y, str, size, color) =>
+      this.add.text(width / 2, y, str, { fontFamily: FONT, fontSize: `${size}px`, color }).setOrigin(0.5);
+
+    label(60, 'Pipeline smoke test', 36, '#f9fafb');
+    label(110, `Phaser ${Phaser.VERSION} · ${platform}`, 22, '#9ca3af');
+    label(140, `build ${info.commit} · run #${info.run}`, 22, '#9ca3af');
 
     this.ball = this.add.circle(width / 2, height / 2, 110, COLORS[0]);
 
-    this.countText = this.add.text(width / 2, height - 200, '', { fontSize: '28px', color: '#f9fafb' }).setOrigin(0.5);
-    this.audioText = this.add.text(width / 2, height - 150, 'audio: not started', { fontSize: '22px', color: '#9ca3af' }).setOrigin(0.5);
-    this.fpsText = this.add.text(width / 2, height - 110, '', { fontSize: '22px', color: '#9ca3af' }).setOrigin(0.5);
-    this.add.text(width / 2, height - 50, 'Hold anywhere to shrink, release to grow', { fontSize: '22px', color: '#6b7280' }).setOrigin(0.5);
+    this.countText = label(height - 200, '', 28, '#f9fafb');
+    this.audioText = label(height - 150, 'audio: not started', 22, '#9ca3af');
+    this.fpsText = label(height - 110, '', 22, '#9ca3af');
+    label(height - 50, 'Hold to shrink · release to grow', 22, '#6b7280');
 
     this.input.on('pointerdown', () => this.press());
     this.input.on('pointerup', () => this.release());
