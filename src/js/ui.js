@@ -8,7 +8,7 @@ Pulse.UI = {
   text(scene, x, y, str, size, color, bold) {
     return scene.add.text(x, y, str, {
       fontFamily: Pulse.THEME.font, fontSize: `${size}px`, color, fontStyle: bold ? 'bold' : 'normal',
-      align: 'center', wordWrap: { width: Pulse.CONFIG.width - 80 },
+      align: 'center', wordWrap: { width: 520 },
     }).setOrigin(0.5);
   },
 

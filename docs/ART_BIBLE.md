@@ -2,7 +2,9 @@
 
 > Owner: Gemini (Creative Director). **Direction approved by the producer:** Direction A, *Kinetic Vector / Precision Cyber-Grid* (see DECISIONS.md #7).
 >
-> **Artwork status:** Gemini's v2.0 asset pack is integrated on branch `feature/pulse-art-v2` and passes automated checks. It is **not yet tested on the phone or merged**. Gemini's own documents: [art/PALETTE_AND_STYLE_GUIDE.md](art/PALETTE_AND_STYLE_GUIDE.md), [art/GEMINI_INTEGRATION_GUIDE_v2.md](art/GEMINI_INTEGRATION_GUIDE_v2.md), [art/PULSE_v2_Asset_Contact_Sheet.png](art/PULSE_v2_Asset_Contact_Sheet.png).
+> **Artwork status:** the **v3.0 pack (landscape)** is integrated on `feature/pulse-landscape` and passes automated checks; it isn't tested on the phone or merged. How it's used: [LANDSCAPE.md](LANDSCAPE.md). v3 documents: [art/v3/](art/v3/) (style guide, landscape layout guide, charged-barrier spec, integration guide, reference sheets). The v2.0 pack (portrait) is on `feature/pulse-art-v2`; its documents remain in [art/](art/).
+>
+> The v3 integration rules match v2's below: art is scaled to gameplay sizes, and the v3 sprites keep v2's measured geometry. v3's new barrier bands measure 44 px (plain) and 60 px (charged), which become 22 and 30 px in-game, the collision thicknesses.
 
 ## Integration Rules (v2.0)
 

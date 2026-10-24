@@ -1,5 +1,7 @@
-// Gemini's v2.0 asset pack: loading, animations, and a check that every frame the game uses
-// is present. If anything fails to load, the game falls back to code-drawn shapes.
+// Gemini's v3.0 asset pack (landscape): loading, animations, and a check that every frame the
+// game uses is present. If anything fails to load, the game falls back to code-drawn shapes.
+// Texture memory (RGBA, uncompressed): gameplay 1024² 4 MB, skins 1024×512 2 MB,
+// UI 2048² 16 MB, backgrounds ≈ 3 MB → about 25 MB of GPU memory.
 Pulse.Assets = {
   ATLASES: {
     pulse_gameplay: 'assets/atlases/pulse_gameplay_atlas',
@@ -7,15 +9,21 @@ Pulse.Assets = {
     pulse_ui: 'assets/atlases/pulse_ui_atlas',
   },
 
+  // Landscape backgrounds: a 512² repeating base tile, a 1024×256 ridge strip (floor; flipped
+  // for the ceiling) and a 512×128 tick rail (bottom edge; flipped for the top) per theme.
   IMAGES: [
-    'bg_grid_tile', 'bg_speed_ticks',
-    'bg_stage1_first_pulse', 'bg_stage1_ticks',
-    'bg_stage2_find_rhythm', 'bg_stage2_ticks',
-    'bg_stage3_overload', 'bg_stage3_ticks',
+    'bg_grid_tile', 'bg_endless_mid_parallax', 'bg_speed_rail_horiz',
+    'bg_stage1_first_pulse', 'bg_stage1_mid_parallax', 'bg_stage1_rail_horiz',
+    'bg_stage2_find_rhythm', 'bg_stage2_mid_parallax', 'bg_stage2_rail_horiz',
+    'bg_stage3_overload', 'bg_stage3_mid_parallax', 'bg_stage3_rail_horiz',
   ],
 
-  // Background used by Endless; campaign stages name theirs in `visual` (stages.js).
-  ENDLESS_VISUAL: { background: 'bg_grid_tile', ticks: 'bg_speed_ticks', bgSpeed: 0.22, tickSpeed: 0.5 },
+  // Background used by Endless and menus; campaign stages name theirs in `visual` (stages.js).
+  // Speeds are fractions of the obstacles' speed (parallax).
+  ENDLESS_VISUAL: {
+    background: 'bg_grid_tile', mid: 'bg_endless_mid_parallax', rail: 'bg_speed_rail_horiz',
+    bgSpeed: 0.22, midSpeed: 0.4, railSpeed: 0.75,
+  },
 
   // Every atlas frame the code references. Checked after loading and by tests/assets.html.
   requiredFrames() {
@@ -24,6 +32,16 @@ Pulse.Assets = {
         'wall_body_tile', 'wall_cap_left', 'wall_cap_right', 'orb_lock_ring',
         'fx_near_miss_arc', 'fx_spark_diamond', 'fx_shockwave_ring',
         'fx_shatter_shard_01', 'fx_shatter_shard_02', 'fx_shatter_shard_03',
+        // v3.0: barriers, charge ring, tunnels, finish line, indicators, event effects.
+        'barrier_smash_ready_tile', 'barrier_smash_danger_tile',
+        'barrier_charged_ready_tile', 'barrier_charged_danger_tile',
+        'barrier_charged_emblem_ready', 'barrier_charged_emblem_danger',
+        'charge_ring_state_a_empty', 'charge_ring_state_b_step_01', 'charge_ring_state_b_step_02',
+        'charge_ring_state_b_step_03', 'charge_ring_state_b_step_04', 'charge_ring_state_c_full',
+        'fx_charge_complete_burst', 'tunnel_wall_edge_tile', 'ind_long_hold_guide_tile',
+        'ind_upcoming_charged_warn', 'finish_line_tile',
+        'fx_smash_ordinary_burst', 'fx_smash_charged_nova', 'fx_fail_charged_deflect',
+        'fx_collect_gold_burst', 'fx_collect_mint_burst', 'fx_mult_up_chevron', 'fx_mult_x5_starburst',
       ],
       pulse_skins: [],
       pulse_ui: [
@@ -32,6 +50,7 @@ Pulse.Assets = {
         'ui_stage_card_locked', 'ui_stage_card_unlocked', 'ui_stage_card_completed',
         'ui_star_empty', 'ui_star_filled', 'ui_icon_status_lock', 'ui_icon_status_check',
         'ui_panel_modal_9slice', 'ui_skin_slot_selected', 'ui_skin_slot_unselected',
+        'ui_hud_bracket_right',
       ],
     };
     for (let i = 1; i <= 4; i++) {

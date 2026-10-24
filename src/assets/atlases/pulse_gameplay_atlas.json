@@ -1,9 +1,465 @@
 {
   "frames": {
+    "barrier_charged_danger_tile": {
+      "frame": {
+        "x": 844,
+        "y": 764,
+        "w": 64,
+        "h": 84
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 84
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 84
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "barrier_charged_emblem_danger": {
+      "frame": {
+        "x": 400,
+        "y": 632,
+        "w": 96,
+        "h": 96
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 96,
+        "h": 96
+      },
+      "sourceSize": {
+        "w": 96,
+        "h": 96
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "barrier_charged_emblem_ready": {
+      "frame": {
+        "x": 500,
+        "y": 632,
+        "w": 96,
+        "h": 96
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 96,
+        "h": 96
+      },
+      "sourceSize": {
+        "w": 96,
+        "h": 96
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "barrier_charged_ready_tile": {
+      "frame": {
+        "x": 912,
+        "y": 764,
+        "w": 64,
+        "h": 84
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 84
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 84
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "barrier_smash_danger_tile": {
+      "frame": {
+        "x": 504,
+        "y": 864,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "barrier_smash_ready_tile": {
+      "frame": {
+        "x": 572,
+        "y": 864,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "charge_ring_state_a_empty": {
+      "frame": {
+        "x": 396,
+        "y": 264,
+        "w": 168,
+        "h": 168
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 168,
+        "h": 168
+      },
+      "sourceSize": {
+        "w": 168,
+        "h": 168
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "charge_ring_state_b_step_01": {
+      "frame": {
+        "x": 568,
+        "y": 264,
+        "w": 168,
+        "h": 168
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 168,
+        "h": 168
+      },
+      "sourceSize": {
+        "w": 168,
+        "h": 168
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "charge_ring_state_b_step_02": {
+      "frame": {
+        "x": 740,
+        "y": 264,
+        "w": 168,
+        "h": 168
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 168,
+        "h": 168
+      },
+      "sourceSize": {
+        "w": 168,
+        "h": 168
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "charge_ring_state_b_step_03": {
+      "frame": {
+        "x": 4,
+        "y": 460,
+        "w": 168,
+        "h": 168
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 168,
+        "h": 168
+      },
+      "sourceSize": {
+        "w": 168,
+        "h": 168
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "charge_ring_state_b_step_04": {
+      "frame": {
+        "x": 176,
+        "y": 460,
+        "w": 168,
+        "h": 168
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 168,
+        "h": 168
+      },
+      "sourceSize": {
+        "w": 168,
+        "h": 168
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "charge_ring_state_c_full": {
+      "frame": {
+        "x": 348,
+        "y": 460,
+        "w": 168,
+        "h": 168
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 168,
+        "h": 168
+      },
+      "sourceSize": {
+        "w": 168,
+        "h": 168
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "finish_line_tile": {
+      "frame": {
+        "x": 4,
+        "y": 948,
+        "w": 64,
+        "h": 48
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 48
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 48
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "fx_charge_complete_burst": {
+      "frame": {
+        "x": 4,
+        "y": 264,
+        "w": 192,
+        "h": 192
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 192,
+        "h": 192
+      },
+      "sourceSize": {
+        "w": 192,
+        "h": 192
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "fx_collect_gold_burst": {
+      "frame": {
+        "x": 520,
+        "y": 460,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "fx_collect_mint_burst": {
+      "frame": {
+        "x": 652,
+        "y": 460,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "fx_fail_charged_deflect": {
+      "frame": {
+        "x": 784,
+        "y": 4,
+        "w": 220,
+        "h": 220
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 220,
+        "h": 220
+      },
+      "sourceSize": {
+        "w": 220,
+        "h": 220
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "fx_mult_up_chevron": {
+      "frame": {
+        "x": 600,
+        "y": 632,
+        "w": 96,
+        "h": 96
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 96,
+        "h": 96
+      },
+      "sourceSize": {
+        "w": 96,
+        "h": 96
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "fx_mult_x5_starburst": {
+      "frame": {
+        "x": 4,
+        "y": 4,
+        "w": 256,
+        "h": 256
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 256,
+        "h": 256
+      },
+      "sourceSize": {
+        "w": 256,
+        "h": 256
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
     "fx_near_miss_arc": {
       "frame": {
-        "x": 528,
-        "y": 4,
+        "x": 700,
+        "y": 632,
         "w": 64,
         "h": 96
       },
@@ -26,8 +482,8 @@
     },
     "fx_shatter_shard_01": {
       "frame": {
-        "x": 168,
-        "y": 364,
+        "x": 72,
+        "y": 948,
         "w": 32,
         "h": 32
       },
@@ -50,8 +506,8 @@
     },
     "fx_shatter_shard_02": {
       "frame": {
-        "x": 204,
-        "y": 364,
+        "x": 108,
+        "y": 948,
         "w": 32,
         "h": 32
       },
@@ -74,8 +530,8 @@
     },
     "fx_shatter_shard_03": {
       "frame": {
-        "x": 240,
-        "y": 364,
+        "x": 144,
+        "y": 948,
         "w": 32,
         "h": 32
       },
@@ -98,7 +554,7 @@
     },
     "fx_shockwave_ring": {
       "frame": {
-        "x": 4,
+        "x": 264,
         "y": 4,
         "w": 256,
         "h": 256
@@ -120,10 +576,58 @@
         "y": 0.5
       }
     },
+    "fx_smash_charged_nova": {
+      "frame": {
+        "x": 524,
+        "y": 4,
+        "w": 256,
+        "h": 256
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 256,
+        "h": 256
+      },
+      "sourceSize": {
+        "w": 256,
+        "h": 256
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "fx_smash_ordinary_burst": {
+      "frame": {
+        "x": 200,
+        "y": 264,
+        "w": 192,
+        "h": 192
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 192,
+        "h": 192
+      },
+      "sourceSize": {
+        "w": 192,
+        "h": 192
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
     "fx_spark_diamond": {
       "frame": {
-        "x": 276,
-        "y": 364,
+        "x": 180,
+        "y": 948,
         "w": 24,
         "h": 24
       },
@@ -144,10 +648,82 @@
         "y": 0.5
       }
     },
+    "ind_long_hold_guide_tile": {
+      "frame": {
+        "x": 640,
+        "y": 864,
+        "w": 48,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 48,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 48,
+        "h": 64
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "ind_recovery_chevron": {
+      "frame": {
+        "x": 692,
+        "y": 864,
+        "w": 128,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 64
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "ind_upcoming_charged_warn": {
+      "frame": {
+        "x": 824,
+        "y": 864,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
     "orb_energy_gold_01": {
       "frame": {
-        "x": 644,
-        "y": 264,
+        "x": 4,
+        "y": 864,
         "w": 80,
         "h": 80
       },
@@ -170,8 +746,8 @@
     },
     "orb_energy_gold_02": {
       "frame": {
-        "x": 728,
-        "y": 264,
+        "x": 88,
+        "y": 864,
         "w": 80,
         "h": 80
       },
@@ -194,8 +770,8 @@
     },
     "orb_energy_gold_03": {
       "frame": {
-        "x": 812,
-        "y": 264,
+        "x": 172,
+        "y": 864,
         "w": 80,
         "h": 80
       },
@@ -218,8 +794,8 @@
     },
     "orb_energy_gold_04": {
       "frame": {
-        "x": 896,
-        "y": 264,
+        "x": 256,
+        "y": 864,
         "w": 80,
         "h": 80
       },
@@ -242,8 +818,8 @@
     },
     "orb_energy_mint_01": {
       "frame": {
-        "x": 596,
-        "y": 4,
+        "x": 768,
+        "y": 632,
         "w": 96,
         "h": 96
       },
@@ -266,8 +842,8 @@
     },
     "orb_energy_mint_02": {
       "frame": {
-        "x": 696,
-        "y": 4,
+        "x": 868,
+        "y": 632,
         "w": 96,
         "h": 96
       },
@@ -290,8 +866,8 @@
     },
     "orb_energy_mint_03": {
       "frame": {
-        "x": 796,
-        "y": 4,
+        "x": 4,
+        "y": 764,
         "w": 96,
         "h": 96
       },
@@ -314,8 +890,8 @@
     },
     "orb_energy_mint_04": {
       "frame": {
-        "x": 896,
-        "y": 4,
+        "x": 104,
+        "y": 764,
         "w": 96,
         "h": 96
       },
@@ -338,8 +914,8 @@
     },
     "orb_lock_ring": {
       "frame": {
-        "x": 4,
-        "y": 364,
+        "x": 340,
+        "y": 864,
         "w": 80,
         "h": 80
       },
@@ -360,10 +936,58 @@
         "y": 0.5
       }
     },
+    "player_orb_morph_01": {
+      "frame": {
+        "x": 784,
+        "y": 460,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "player_orb_morph_02": {
+      "frame": {
+        "x": 4,
+        "y": 632,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
     "player_orb_normal": {
       "frame": {
-        "x": 264,
-        "y": 4,
+        "x": 136,
+        "y": 632,
         "w": 128,
         "h": 128
       },
@@ -386,8 +1010,8 @@
     },
     "player_orb_ring": {
       "frame": {
-        "x": 396,
-        "y": 4,
+        "x": 268,
+        "y": 632,
         "w": 128,
         "h": 128
       },
@@ -410,8 +1034,8 @@
     },
     "player_orb_shrunk": {
       "frame": {
-        "x": 88,
-        "y": 364,
+        "x": 424,
+        "y": 864,
         "w": 76,
         "h": 76
       },
@@ -434,8 +1058,8 @@
     },
     "player_tension_arcs_01": {
       "frame": {
-        "x": 4,
-        "y": 264,
+        "x": 204,
+        "y": 764,
         "w": 96,
         "h": 96
       },
@@ -458,8 +1082,8 @@
     },
     "player_tension_arcs_02": {
       "frame": {
-        "x": 104,
-        "y": 264,
+        "x": 304,
+        "y": 764,
         "w": 96,
         "h": 96
       },
@@ -482,8 +1106,8 @@
     },
     "player_tension_arcs_03": {
       "frame": {
-        "x": 204,
-        "y": 264,
+        "x": 404,
+        "y": 764,
         "w": 96,
         "h": 96
       },
@@ -506,8 +1130,8 @@
     },
     "player_tension_arcs_04": {
       "frame": {
-        "x": 304,
-        "y": 264,
+        "x": 504,
+        "y": 764,
         "w": 96,
         "h": 96
       },
@@ -528,10 +1152,34 @@
         "y": 0.5
       }
     },
+    "tunnel_wall_edge_tile": {
+      "frame": {
+        "x": 892,
+        "y": 864,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
     "wall_body_tile": {
       "frame": {
-        "x": 404,
-        "y": 264,
+        "x": 604,
+        "y": 764,
         "w": 64,
         "h": 96
       },
@@ -554,8 +1202,8 @@
     },
     "wall_cap_left": {
       "frame": {
-        "x": 472,
-        "y": 264,
+        "x": 672,
+        "y": 764,
         "w": 64,
         "h": 96
       },
@@ -578,8 +1226,8 @@
     },
     "wall_cap_right": {
       "frame": {
-        "x": 540,
-        "y": 264,
+        "x": 740,
+        "y": 764,
         "w": 64,
         "h": 96
       },
@@ -602,8 +1250,8 @@
     },
     "wall_joint_divider": {
       "frame": {
-        "x": 608,
-        "y": 264,
+        "x": 808,
+        "y": 764,
         "w": 32,
         "h": 96
       },
@@ -626,13 +1274,13 @@
     }
   },
   "meta": {
-    "app": "PULSE Studio Atlas Packer v2.0 (Phaser 3.90.0 JSON Hash)",
-    "version": "2.0.0",
+    "app": "PULSE v3.0 Atlas Packer (Phaser 3.90.0 JSON Hash)",
+    "version": "3.0.0",
     "image": "pulse_gameplay_atlas.png",
     "format": "RGBA8888",
     "size": {
       "w": 1024,
-      "h": 512
+      "h": 1024
     },
     "scale": "1"
   }

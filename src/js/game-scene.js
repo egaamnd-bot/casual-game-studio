@@ -1,8 +1,14 @@
-// Gameplay for both modes. States: ready → playing → over | complete, plus paused when the
-// app loses focus or the pause button is pressed.
-//   Endless:  random Pulse.Level, score × multiplier, best score.
+// Gameplay for both modes, in landscape. States: ready → playing → over | complete, plus
+// paused when the app loses focus or the pause button is pressed.
+//   Endless:  pattern-based Pulse.EndlessLevel, score × multiplier, best score.
 //   Campaign: fixed Pulse.Campaign.CampaignLevel, energy count, finish line, stars.
 // Orb, input, collision and pickups are shared; only scoring and the level source differ.
+//
+// Coordinates: the rules run in track space (see config.js): this.W = lane width (540),
+// this.H = track length, the orb at (orbX, orbY). Everything in the world is drawn inside
+// `this.layer`, a container at the screen's right edge rotated 90°, which maps track (x, y) to
+// screen (SW − y, x): obstacles enter on the right and travel left; the lane fills the screen
+// height. The HUD, menus and overlays are laid out directly in screen space (SW × SH).
 (function () {
   const C = Pulse.CONFIG;
   const T = Pulse.THEME;
@@ -29,10 +35,16 @@
     }
 
     create() {
-      this.W = this.scale.width;
-      this.H = this.scale.height;
+      this.SW = this.scale.width;
+      this.SH = this.scale.height;
+      this.W = C.width;
+      this.H = this.SW;
       this.orbX = C.orb.x;
       this.orbY = Math.round(this.H * C.orb.yRatio);
+      // Where the orb appears on screen.
+      this.orbSX = this.SW - this.orbY;
+      this.orbSY = this.orbX;
+      this.layer = this.add.container(this.SW, 0).setRotation(Math.PI / 2).setDepth(2);
 
       this.save = Pulse.Save.load();
       this.skin = Pulse.Skins.selected(this.save);
@@ -45,9 +57,6 @@
       } else {
         this.level = new Pulse.EndlessLevel(this.W, this.H);
       }
-      // Sprites when Gemini's assets loaded; otherwise the code-drawn shapes in render.js.
-      this.view = Pulse.Assets.ok ? new Pulse.SpriteView(this, visual, this.skin) : null;
-      this.nearMisses = 0;
 
       this.orbState = Pulse.Orb.create();
       this.scoring = Pulse.Scoring.create();
@@ -58,9 +67,15 @@
       this.bonus = 0;
       this.scroll = 0;
       this.ringT = 1;
+      this.nearMisses = 0;
       this.test = window.PULSE_TEST || null;
 
+      // Sprites when Gemini's assets loaded; otherwise the code-drawn shapes in render.js.
+      this.view = Pulse.Assets.ok ? new Pulse.SpriteView(this, visual, this.skin, this.layer) : null;
       this.world = this.add.graphics().setDepth(3);
+      this.layer.add(this.world);
+      this.layer.sort('depth');
+      this.hud = this.add.graphics().setDepth(9);
       this.overlay = this.add.graphics().setDepth(15);
       this.overlayImages = [];
       this.createHud();
@@ -82,35 +97,54 @@
       if (this.test && this.test.autoStart) this.startRun();
     }
 
+    // Landscape HUD (Gemini's layout guide, scaled to the screen width): pause top-left,
+    // campaign progress top-centre, score/energy readout top-right. The lane below stays clear.
     createHud() {
       const UI = Pulse.UI;
-      const cx = this.W / 2;
-      const top = Math.round(this.H * 0.09);
-      this.hudTop = top;
-      this.scoreText = UI.text(this, cx, top, '', 64, T.text, true).setDepth(10);
-      this.multText = UI.text(this, cx, top + 52, '', 26, T.textAccent, true).setDepth(10);
-      this.bestText = UI.text(this, cx, top + 86, '', 22, T.textDim).setDepth(10);
-      this.energyText = UI.text(this, cx, top + 6, '', 30, T.textAccent, true).setDepth(10);
+      const SW = this.SW;
+      this.hudTop = 44;
+      this.rightX = SW - 128;
+      if (Pulse.Assets.ok) {
+        this.bracket = this.add.image(SW - 120, 46, 'pulse_ui', 'ui_hud_bracket_right').setScale(0.6).setDepth(9);
+      }
+      this.scoreText = UI.text(this, this.rightX, 36, '', 32, T.text, true).setDepth(10);
+      this.bestText = UI.text(this, this.rightX - 26, 64, '', 15, T.textAccent, true).setDepth(10);
+      this.multText = UI.text(this, this.rightX + 58, 64, '', 18, T.textAccent, true).setDepth(10);
+      this.energyText = UI.text(this, this.rightX, 46, '', 22, T.textAccent, true).setDepth(10);
 
-      const mid = Math.round(this.H * 0.3);
-      this.titleText = UI.text(this, cx, mid, '', 88, T.text, true).setDepth(16);
-      this.subText = UI.text(this, cx, mid + 80, '', 26, T.textDim).setDepth(16);
-      this.detailText = UI.text(this, cx, mid + 175, '', 24, T.textDim).setDepth(16);
-      this.hintText = UI.text(this, cx, mid + 140, '', 30, T.textAccent, true).setDepth(16);
+      // Overlay text sits to the right of the orb, over the lane ahead.
+      const cx = this.overlayX();
+      const wrap = SW - cx - 60;
+      this.titleText = UI.text(this, cx, 150, '', 72, T.text, true).setDepth(16);
+      this.subText = UI.text(this, cx, 220, '', 22, T.textDim).setDepth(16).setWordWrapWidth(wrap * 2 - 40);
+      this.detailText = UI.text(this, cx, 290, '', 20, T.textDim).setDepth(16);
+      this.hintText = UI.text(this, cx, 300, '', 28, T.textAccent, true).setDepth(16);
       this.tweens.add({ targets: this.hintText, alpha: 0.35, duration: 650, yoyo: true, repeat: -1 });
 
-      this.popupText = UI.text(this, this.orbX, this.orbY, '', 30, T.textAccent, true).setAlpha(0).setDepth(10);
+      this.popupText = UI.text(this, this.orbSX, this.orbSY, '', 26, T.textAccent, true).setAlpha(0).setDepth(10);
+
+      // Read-ahead aid: a charged barrier is coming from the right.
+      if (Pulse.Assets.ok) {
+        this.warnIcon = this.add.image(SW - 40, this.SH / 2, 'pulse_gameplay', 'ind_upcoming_charged_warn')
+          .setScale(0.6).setDepth(9).setVisible(false);
+        this.tweens.add({ targets: this.warnIcon, alpha: 0.4, duration: 300, yoyo: true, repeat: -1 });
+      }
+    }
+
+    // Centre of the overlay area: between the orb and the right edge.
+    overlayX() {
+      return Math.round((this.orbSX + C.orb.radius + this.SW) / 2);
     }
 
     createButtons() {
       const UI = Pulse.UI;
-      const cx = this.W / 2;
       const campaign = this.mode === 'campaign';
-      this.pauseBtn = UI.iconButton(this, 52, this.hudTop, 64, 'ui_btn_icon_pause_up', 'II', () => this.pause());
-      this.backBtn = UI.button(this, cx, this.H - 80, 300, 70, campaign ? 'Stages' : 'Menu', () => this.leave());
-      this.retryBtn = UI.button(this, cx, this.H - 170, 300, 70, 'Retry', () => this.canAct() && this.startRun());
-      this.nextBtn = UI.button(this, cx, this.H - 260, 300, 70, 'Next stage', () => this.canAct() && this.nextStage(),
-        { edge: T.wallEdge, primary: 'mint' });
+      const y = this.SH - 64;
+      this.pauseBtn = UI.iconButton(this, 56, this.hudTop, 48, 'ui_btn_icon_pause_up', 'II', () => this.pause());
+      this.backBtn = UI.button(this, this.overlayX(), y, 200, 60, campaign ? 'Stages' : 'Menu', () => this.leave(), { size: 24 });
+      this.retryBtn = UI.button(this, this.overlayX(), y, 200, 60, 'Retry', () => this.canAct() && this.startRun(), { size: 24 });
+      this.nextBtn = UI.button(this, this.overlayX(), y, 200, 60, 'Next stage', () => this.canAct() && this.nextStage(),
+        { edge: T.wallEdge, primary: 'mint', size: 24 });
     }
 
     canAct() {
@@ -127,14 +161,14 @@
       };
 
       for (const t of [this.titleText, this.subText, this.hintText, this.detailText]) t.setVisible(false);
-      this.titleText.setFontSize(88);
+      this.titleText.setFontSize(72);
       this.overlay.clear();
       for (const img of this.overlayImages) img.destroy();
       this.overlayImages.length = 0;
 
       if (state === 'ready') {
         if (campaign) {
-          this.titleText.setFontSize(54);
+          this.titleText.setFontSize(46);
           show(this.titleText, this.stage.name, T.text);
           show(this.subText, this.stage.intro, T.textDim);
         } else {
@@ -143,6 +177,8 @@
         }
         show(this.hintText, 'Tap to start');
       } else if (state === 'over') {
+        // Light dim so the text reads over whatever obstacles are frozen behind it.
+        this.overlay.fillStyle(T.background, 0.55).fillRect(0, 0, this.SW, this.SH);
         if (campaign) {
           show(this.titleText, 'Crashed', T.textDanger);
           show(this.subText, `${Math.round(this.level.progress(this.orbY) * 100)}% of the way`, T.textDim);
@@ -154,33 +190,42 @@
         show(this.hintText, 'Tap to retry');
       } else if (state === 'complete') {
         const r = this.result;
-        this.titleText.setFontSize(64);
+        this.titleText.setFontSize(56);
         show(this.titleText, 'Stage clear', T.text);
         // Dim the frozen play field so the results and buttons read cleanly over it.
-        this.overlay.fillStyle(T.background, 0.82).fillRect(0, 0, this.W, this.H);
-        Pulse.UI.stars(this, this.overlay, this.W / 2, this.titleText.y + 80, 26, r.stars, 3, this.overlayImages, 17);
+        this.overlay.fillStyle(T.background, 0.82).fillRect(0, 0, this.SW, this.SH);
+        Pulse.UI.stars(this, this.overlay, this.titleText.x, 215, 24, r.stars, 3, this.overlayImages, 17);
         const lines = [`Energy ${this.energy}/${this.level.track.energyTotal}`];
         if (this.level.track.bonusTotal) lines[0] += ` · Bonus ${this.bonus}/${this.level.track.bonusTotal}`;
         if (r.record.bestStars > r.stars) lines.push(`Best ${r.record.bestStars} stars`);
         if (r.record.unlockedNext) lines.push(`Unlocked: ${r.record.unlockedNext.name}`);
         for (const skin of r.record.newSkins) lines.push(`New skin: ${skin.name}`);
         show(this.detailText, lines.join('\n'), T.textDim);
+        this.detailText.setY(300);
       } else if (state === 'paused') {
+        this.overlay.fillStyle(T.background, 0.55).fillRect(0, 0, this.SW, this.SH);
         show(this.titleText, 'Paused', T.text);
         show(this.hintText, 'Tap to resume');
       }
 
+      // End-screen buttons in one row along the bottom of the overlay area.
       const hasNext = campaign && state === 'complete' && this.stageIndex + 1 < Pulse.STAGES.length;
+      const row = state === 'complete' ? [this.backBtn, this.retryBtn].concat(hasNext ? [this.nextBtn] : [])
+        : state === 'playing' ? [] : [this.backBtn];
+      // Three buttons need the full width (they sit below the orb, so they can't cover it).
+      const cx = row.length > 2 ? this.SW / 2 : this.overlayX();
+      row.forEach((b, i) => b.setX(cx + (i - (row.length - 1) / 2) * 216));
       this.pauseBtn.setEnabled(state === 'playing');
-      this.backBtn.setEnabled(state !== 'playing');
+      this.backBtn.setEnabled(row.includes(this.backBtn));
       this.backBtn.label.setText(state === 'paused' ? 'Quit' : (campaign ? 'Stages' : 'Menu'));
-      this.retryBtn.setEnabled(state === 'complete');
-      this.nextBtn.setEnabled(hasNext);
+      this.retryBtn.setEnabled(row.includes(this.retryBtn));
+      this.nextBtn.setEnabled(row.includes(this.nextBtn));
       this.updateHud();
     }
 
     updateHud() {
       const playing = this.state === 'playing' || this.state === 'paused';
+      if (this.bracket) this.bracket.setVisible(playing);
       if (this.mode === 'campaign') {
         this.scoreText.setVisible(false);
         this.multText.setVisible(false);
@@ -191,7 +236,7 @@
       this.energyText.setVisible(false);
       this.scoreText.setVisible(playing).setText(String(this.score));
       this.multText.setVisible(playing && this.multiplier > 1).setText(`x${this.multiplier}`);
-      this.bestText.setText(`BEST ${this.best}`).setVisible(this.state !== 'over');
+      this.bestText.setText(`BEST ${this.best}`).setVisible(playing);
     }
 
     startRun() {
@@ -282,7 +327,7 @@
         if (!event) continue;
 
         if (event === 'crash') {
-          this.crash();
+          this.crash(s);
           return;
         }
         // Endless scoring rules live in Pulse.Scoring (level.js); this turns them into feedback.
@@ -331,15 +376,17 @@
       if (campaign && this.level.finishY() >= this.orbY) this.completeStage();
     }
 
-    crash() {
+    // `seg` is what the orb hit, so the effect can show why (e.g. a charged barrier too early).
+    crash(seg) {
       if (this.mode === 'endless' && this.score > this.best) {
         this.best = this.score;
         this.save.endless.best = this.best;
         Pulse.Save.write(this.save);
       }
+      this.crashedOn = seg ? (seg.kind === 'barrier' ? (seg.charged ? 'charged barrier' : 'barrier') : 'gap') : null;
       if (this.test && this.test.onCrash) this.test.onCrash(this.elapsed, this.score);
       Pulse.Sfx.play('crash');
-      if (this.view) this.view.crash();
+      if (this.view) this.view.crash(seg);
       this.cameras.main.shake(220, 0.012);
       this.cameras.main.flash(120, 255, 93, 108);
       this.setState('over');
@@ -361,6 +408,7 @@
       this.tweens.killTweensOf(this.multText);
       this.multText.setScale(1.35);
       this.tweens.add({ targets: this.multText, scale: 1, duration: 220, ease: 'Back.easeOut' });
+      if (this.view) this.view.multUp();
     }
 
     // Feedback only: reaching the maximum multiplier gets one restrained flourish.
@@ -378,18 +426,32 @@
       if (this.view) this.view.nearMiss(this.orbX - s.gapL <= s.gapR - this.orbX ? -1 : 1, r);
     }
 
+    // Popups rise above the orb in screen space.
     popup(str, color) {
       this.tweens.killTweensOf(this.popupText);
-      this.popupText.setText(str).setColor(color).setAlpha(1).setPosition(this.orbX, this.orbY - C.orb.radius - 30);
-      this.tweens.add({ targets: this.popupText, y: this.popupText.y - 60, alpha: 0, duration: 650, ease: 'Quad.easeOut' });
+      this.popupText.setText(str).setColor(color).setAlpha(1).setPosition(this.orbSX, this.orbSY - C.orb.radius - 30);
+      this.tweens.add({ targets: this.popupText, y: this.popupText.y - 50, alpha: 0, duration: 650, ease: 'Quad.easeOut' });
+    }
+
+    // A charged barrier that hasn't entered the screen yet but will within half a screen.
+    chargedComing() {
+      const items = this.level.items;
+      for (let i = this.level.nextIndex; i < items.length; i++) {
+        const ahead = items[i].at - this.level.travelled;
+        if (ahead > this.H * 0.5) return false;
+        if (items[i].charged) return true;
+      }
+      return false;
     }
 
     draw() {
       const g = this.world;
       g.clear();
+      this.hud.clear();
       const dimmed = !this.canCollect();
       // Barriers show whether hitting them *right now* would smash them.
       const canSmash = (s) => this.level.canSmash(s, this.radius, this.orbState.charge);
+      const active = this.state === 'playing' || this.state === 'paused';
 
       if (this.view) {
         this.view.render(this.level, this.scroll, dimmed, g, canSmash);
@@ -406,19 +468,20 @@
       }
 
       // The charge ring only appears while a charged barrier is on screen.
-      if (this.state === 'playing' || this.state === 'paused') {
-        this.chargeRingShown = this.level.segments.some((s) => s.active && s.charged && !s.broken && s.y < this.orbY && s.y + s.h > 0);
-        if (this.chargeRingShown) Pulse.Render.chargeRing(g, this.orbX, this.orbY, this.radius, this.orbState.charge);
-      } else {
-        this.chargeRingShown = false;
-      }
+      this.chargeRingShown = active &&
+        this.level.segments.some((s) => s.active && s.charged && !s.broken && s.y < this.orbY && s.y + s.h > 0);
+      if (this.view) this.view.renderChargeRing(this.chargeRingShown, this.orbState.charge, this.radius);
+      else if (this.chargeRingShown) Pulse.Render.chargeRing(g, this.orbX, this.orbY, this.radius, this.orbState.charge);
+
+      this.warnShown = active && this.chargedComing();
+      if (this.warnIcon) this.warnIcon.setVisible(this.warnShown);
 
       if (this.mode === 'campaign') {
         const fy = this.level.finishY();
-        if (fy > -C.campaign.finishThickness && fy < this.H) Pulse.Render.finishLine(g, fy, this.W);
-        if (this.state === 'playing' || this.state === 'paused') {
-          Pulse.Render.progressBar(g, 100, this.hudTop - 40, this.W - 140, this.level.progress(this.orbY));
-        }
+        const finishVisible = fy > -C.campaign.finishThickness && fy < this.H;
+        if (this.view) this.view.renderFinish(fy, finishVisible);
+        else if (finishVisible) Pulse.Render.finishLine(g, fy, this.W);
+        if (active) Pulse.Render.progressBar(this.hud, this.SW / 2 - 200, 36, 400, this.level.progress(this.orbY));
       }
 
       if (this.view) {

@@ -33,7 +33,8 @@ No local install is needed. Game code lives in `src/` as plain JavaScript (no bu
 ## Testing
 
 - **Automated tests:** plain HTML test pages in `tests/`. Open each in a desktop browser; the tab title shows PASS/FAIL or the result. Details: [PULSE_PROTOTYPE.md](PULSE_PROTOTYPE.md#testing)
-  - `tests/assets.html`: Gemini's asset pack loads, every used frame exists, art lines up with collision sizes
+  - `tests/landscape.html`: landscape sizing at different aspect ratios, track-to-screen mapping, HUD and button bounds (resize the window to test other phones)
+  - `tests/assets.html`: Gemini's asset pack loads, every used frame exists, art lines up with collision sizes, barrier and charge-ring states match the rules
   - `tests/campaign.html`: campaign stages, stars, skins, save data
   - Pages that load the game's images need Chrome/Edge started with `--allow-file-access-from-files` when opened as local files. `scene.html?noassets=1` and `gameplay.html?noassets=1` test the shape fallback
   - `tests/scene.html`: the real game driven by simulated input (touch release, pause, retry, saving)

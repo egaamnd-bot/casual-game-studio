@@ -28,6 +28,18 @@ Pulse.Render = (function () {
     g.fillRect(seg.gapR, seg.y, 4, seg.h);
   }
 
+  // Tunnel body for the sprite renderer (its edges and lane guide are sprites).
+  function tunnelBody(g, seg, width) {
+    g.fillStyle(T.wall, 1);
+    g.fillRect(0, seg.y, seg.gapL - 20, seg.h);
+    g.fillRect(seg.gapR + 20, seg.y, width - seg.gapR - 20, seg.h);
+    g.fillStyle(T.wallEdge, 1);
+    g.fillRect(0, seg.y, seg.gapL - 20, 3);
+    g.fillRect(0, seg.y + seg.h - 3, seg.gapL - 20, 3);
+    g.fillRect(seg.gapR + 20, seg.y, width - seg.gapR - 20, 3);
+    g.fillRect(seg.gapR + 20, seg.y + seg.h - 3, width - seg.gapR - 20, 3);
+  }
+
   // Cyan barrier (code-drawn in both renderers; there is no barrier art yet).
   // State is shown by colour AND shape: when hitting it now would smash it, cyan with solid
   // edges; when it would crash you, red with broken (dashed) edges.
@@ -156,5 +168,5 @@ Pulse.Render = (function () {
     for (let i = 0; i < max; i++) star(g, x0 + i * step, y, r, i < count);
   }
 
-  return { background, walls, barrier, chargeRing, pickup, finishLine, orb, collectRing, progressBar, star, stars };
+  return { background, walls, tunnelBody, barrier, chargeRing, pickup, finishLine, orb, collectRing, progressBar, star, stars };
 })();

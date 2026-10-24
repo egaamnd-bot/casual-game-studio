@@ -6,7 +6,7 @@
 
 - **Working title:** Pulse
 - **Genre:** One-touch arcade, endless
-- **Platforms:** Android first; iOS deferred
+- **Platforms:** Android first, **landscape** (see [LANDSCAPE.md](LANDSCAPE.md)); iOS deferred
 - **Target audience:** Broad age range; short sessions on the go
 - **Elevator pitch:** Hold to shrink, release to grow. Squeeze your energy orb through gaps, and stay big to grab the energy that multiplies your score.
 

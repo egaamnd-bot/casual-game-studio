@@ -27,8 +27,9 @@
 - [x] Gameplay variety v1: barriers, Endless patterns, stage redesign ([GAMEPLAY_VARIETY.md](GAMEPLAY_VARIETY.md))
 - [x] Phone playtest of gameplay variety (producer: genuinely fun)
 - [x] Gameplay evolution v2: charged barriers, combo sequences, multiplier feedback ([GAMEPLAY_EVOLUTION.md](GAMEPLAY_EVOLUTION.md))
-- [ ] Phone playtest of gameplay evolution v2
-- [ ] Barrier and charge-ring art from Gemini
+- [x] Barrier and charge-ring art from Gemini (v3.0 pack)
+- [x] Landscape conversion with v3 art ([LANDSCAPE.md](LANDSCAPE.md))
+- [ ] Phone playtest of the landscape build
 - [ ] Playtest with 3–5 people against the targets in [PULSE_PROTOTYPE.md](PULSE_PROTOTYPE.md)
 
 ## Later / Ideas

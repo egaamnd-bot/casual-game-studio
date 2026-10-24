@@ -7,13 +7,14 @@
 //   intro     one-line guidance shown before the stage starts
 //   speed     { start, end } forward speed, interpolated linearly over the stage's length
 //   stars     optional { two, three } share of energy pairs needed (defaults in config.js)
-//   visual    optional { background, ticks, bgSpeed, tickSpeed } background image keys (assets.js)
-//             and their scroll speed relative to the walls
+//   visual    optional { background, mid, rail, bgSpeed, midSpeed, railSpeed } landscape
+//             background keys (assets.js) and their scroll speed relative to the obstacles
 //   exit      { type: 'finish', runout } finish line `runout` px after the last item
 //   items     ordered list; each item's `space` is the clear distance from the previous item:
 //     { type: 'gate', space, need, shift?, length? }  wall with a gap. `need` = clearance on the
 //                                  tight side of the orb's path (below 56 = must shrink);
-//                                  `shift` widens the gap right (+) or left (-), visual only;
+//                                  `shift` widens the gap toward one edge (+ down / − up on the
+//                                  landscape screen), visual only;
 //                                  `length` makes it a tunnel you must hold through
 //     { type: 'barrier', space }   full-width cyan barrier: smash it at full size
 //     { type: 'barrier', space, charged: true }  charged barrier: also needs a full charge ring,
@@ -35,7 +36,7 @@ Pulse.STAGES = [
     sector: { id: 'sector-1', name: 'Sector 1' },
     intro: 'Hold to shrink through gaps. Release to grow, catch gold and smash cyan barriers.',
     speed: { start: 220, end: 240 },
-    visual: { background: 'bg_stage1_first_pulse', ticks: 'bg_stage1_ticks', bgSpeed: 0.22, tickSpeed: 0.5 },
+    visual: { background: 'bg_stage1_first_pulse', mid: 'bg_stage1_mid_parallax', rail: 'bg_stage1_rail_horiz', bgSpeed: 0.22, midSpeed: 0.4, railSpeed: 0.5 },
     exit: { type: 'finish', runout: 360 },
     items: [
       { type: 'gate', space: 420, need: 76 },
@@ -66,7 +67,7 @@ Pulse.STAGES = [
     sector: { id: 'sector-1', name: 'Sector 1' },
     intro: 'Keep the beat. Double-edged barriers need a full charge ring: let go early.',
     speed: { start: 260, end: 300 },
-    visual: { background: 'bg_stage2_find_rhythm', ticks: 'bg_stage2_ticks', bgSpeed: 0.3, tickSpeed: 0.65 },
+    visual: { background: 'bg_stage2_find_rhythm', mid: 'bg_stage2_mid_parallax', rail: 'bg_stage2_rail_horiz', bgSpeed: 0.3, midSpeed: 0.5, railSpeed: 0.65 },
     exit: { type: 'finish', runout: 360 },
     items: [
       { type: 'gate', space: 420, need: 50, shift: 60 },
@@ -101,7 +102,7 @@ Pulse.STAGES = [
     sector: { id: 'sector-1', name: 'Sector 1' },
     intro: 'Everything, faster. Mint hexagons are risky bonus energy: holding through is safe.',
     speed: { start: 300, end: 400 },
-    visual: { background: 'bg_stage3_overload', ticks: 'bg_stage3_ticks', bgSpeed: 0.38, tickSpeed: 0.8 },
+    visual: { background: 'bg_stage3_overload', mid: 'bg_stage3_mid_parallax', rail: 'bg_stage3_rail_horiz', bgSpeed: 0.38, midSpeed: 0.6, railSpeed: 0.8 },
     exit: { type: 'finish', runout: 420 },
     items: [
       { type: 'gate', space: 420, need: 46, shift: 60 },

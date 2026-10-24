@@ -10,7 +10,7 @@ Build an original, enjoyable casual game for a broad age range, with a realistic
 
 ## Status
 
-🚧 **Prototype.** Pulse is approved for prototyping, and the first playable prototype is built with placeholder art ([docs/PULSE_PROTOTYPE.md](docs/PULSE_PROTOTYPE.md)). The Android build pipeline is provisionally validated on a phone. Art direction is pending. See [docs/DECISIONS.md](docs/DECISIONS.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
+🚧 **In development.** A landscape, one-touch arcade game with Campaign (3 stages) and Endless modes, built with Gemini's v3 art ([docs/LANDSCAPE.md](docs/LANDSCAPE.md)), charged barriers and combo patterns ([docs/GAMEPLAY_EVOLUTION.md](docs/GAMEPLAY_EVOLUTION.md)). See [docs/DECISIONS.md](docs/DECISIONS.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Team
 

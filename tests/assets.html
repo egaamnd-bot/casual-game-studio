@@ -55,8 +55,9 @@
       notes.push(`${frames} required frames present`);
 
       for (const stage of Pulse.STAGES) {
-        check(stage.visual && Pulse.Assets.IMAGES.includes(stage.visual.background) && Pulse.Assets.IMAGES.includes(stage.visual.ticks),
-          `${stage.id}: background images are known`);
+        const v = stage.visual;
+        check(v && ['background', 'mid', 'rail'].every((k) => Pulse.Assets.IMAGES.includes(v[k])),
+          `${stage.id}: landscape background images are known`);
       }
       for (const key of ['anim_orb_gold', 'anim_orb_mint', ...Pulse.SKINS.map((s) => `anim_arcs_${s.id}`)]) {
         const anim = active().anims.get(key);
@@ -96,8 +97,42 @@
         }
       }
 
-      // Cosmetic near miss: forcing one must not change score.
+      // Barrier art: right tiles, bands aligned with collision, and the state shown matches the
+      // rules (Level.canSmash vs Level.resolve) for plain and charged barriers.
       const g = active();
+      const view = g.view;
+      const R = C.orb.radius;
+      for (const charged of [false, true]) {
+        const seg = { kind: 'barrier', charged, y: 200, h: charged ? C.barrier.chargedThickness : C.barrier.thickness, broken: false };
+        const v = view.makeBarrier();
+        for (const [r, charge] of [[R, 1], [R, 0.5], [R, 0], [30, 1], [R - 8, 1]]) {
+          const ready = g.level.canSmash(seg, r, charge);
+          view.placeBarrier(v, seg, true, ready);
+          const want = (charged ? 'barrier_charged_' : 'barrier_smash_') + (ready ? 'ready' : 'danger') + '_tile';
+          const shownFrame = (v.parts[0].displayFrame || v.parts[0].frame).name; // TileSprite: displayFrame = tile image
+          check(shownFrame === want, `${charged ? 'charged' : 'plain'} barrier at r=${r} charge=${charge} shows ${want} (got ${shownFrame})`);
+          const probe = Object.assign(g.level.obtain(), seg, { active: true, y: g.orbY - R - 5, scored: false });
+          const outcome = g.level.resolve(probe, g.orbY, r, charge);
+          probe.active = false;
+          check(ready === (outcome === 'break'), `${charged ? 'charged' : 'plain'} barrier: shown ${ready ? 'ready' : 'danger'} but outcome ${outcome}`);
+          if (charged) check(v.parts[1].visible && v.parts[1].frame.name === `barrier_charged_emblem_${ready ? 'ready' : 'danger'}`, 'charged emblem matches state');
+        }
+        const band = charged ? 12 : 10;
+        check(Math.abs(v.parts[0].y + band * A.base - seg.y) < 0.5 && Math.abs(v.parts[0].displayHeight - (charged ? 42 : 32)) < 0.5,
+          `${charged ? 'charged' : 'plain'} barrier band aligned with its ${seg.h}px collision band`);
+        v.show(false);
+      }
+      // Charge ring: A empty, B steps, C full with a one-off completion burst.
+      view.renderChargeRing(true, 0, R);
+      check(view.chargeRing.frame.name === 'charge_ring_state_a_empty', 'charge ring: empty state');
+      view.renderChargeRing(true, 0.5, R);
+      check(view.chargeRing.frame.name === 'charge_ring_state_b_step_03', 'charge ring: 50% shows step 3 of 4');
+      view.renderChargeRing(true, 1, R);
+      check(view.chargeRing.frame.name === 'charge_ring_state_c_full' && view.chargeBurst.visible, 'charge ring: full state with burst');
+      view.renderChargeRing(false, 1, R);
+      check(!view.chargeRing.visible, 'charge ring hidden when no charged barrier is on screen');
+
+      // Cosmetic near miss: forcing one must not change score.
       const before = g.score;
       const fakeGate = { need: g.radius + 2, gapL: g.orbX - g.radius - 2, gapR: g.orbX + 80 };
       g.checkNearMiss(fakeGate, g.radius);

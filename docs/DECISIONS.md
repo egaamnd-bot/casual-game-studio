@@ -6,6 +6,8 @@ Add new entries at the top.
 
 | # | Date | Decision | Approved by | Link |
 |---|------|----------|-------------|------|
+| 10 | 2026-10-25 | Integrate Gemini's v3.0 asset pack (charged barriers, charge ring, effects, landscape backgrounds and UI), with art scaled to the tested gameplay sizes | Human Producer | [LANDSCAPE.md](LANDSCAPE.md) |
+| 9 | 2026-10-25 | **Orientation: landscape.** Obstacles travel right to left, orb toward the left, landscape HUD and menus, Android locked to landscape. Gameplay mechanics, difficulty, scoring, charge duration, collision, stage ids, stars, unlocks and saves unchanged. Replaces the portrait layout. | Human Producer | [LANDSCAPE.md](LANDSCAPE.md) |
 | 8 | 2026-10-25 | Integrate Gemini's v2.0 asset pack by **scaling the art to the current tested gameplay sizes** (no collision or timing changes). Keep existing scoring (no +100/+250 values). Gold = standard energy, mint = bonus. | Human Producer | [ART_BIBLE.md](ART_BIBLE.md) |
 | 7 | 2026-10-25 | Art direction: **Direction A, Kinetic Vector / Precision Cyber-Grid** (Gemini). Artwork stays provisional until integrated and tested on the phone. | Human Producer | [ART_BIBLE.md](ART_BIBLE.md) |
 | 6 | 2026-10-25 | Game structure: **Campaign + existing Endless**; gradual difficulty; stars (1 = finish, 2 = 60% energy, 3 = 90% energy); cosmetic orb skins (Solar Flare 3★, Void Prism 6★, Retro Green 9★; names provisional). First scope: a data-driven stage system and 3 stages. No shop, purchases or ads. | Human Producer | [CAMPAIGN.md](CAMPAIGN.md) |

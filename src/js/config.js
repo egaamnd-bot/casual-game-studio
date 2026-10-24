@@ -2,14 +2,20 @@
 // so balancing and the final art swap happen in one place.
 window.Pulse = window.Pulse || {};
 
+// Coordinates. Gameplay runs in "track space": `x` runs across the lane (0..width) and `y`
+// runs along the direction of travel, increasing as things move toward and past the orb.
+// The screen is landscape: track x maps to screen y (lane = screen height, 540) and track y maps
+// to screen x reversed, so obstacles enter on the right and move left. The screen width (the
+// track length) follows the phone's aspect ratio between minLength and maxLength.
+// See GameScene.create and docs/LANDSCAPE.md.
 Pulse.CONFIG = {
-  width: 540,
-  minHeight: 860,
-  maxHeight: 1240,
+  width: 540, // lane width = landscape screen height
+  minLength: 860, // track length = landscape screen width (16:9 = 960)
+  maxLength: 1240,
 
   orb: {
-    x: 270,
-    yRatio: 0.7,
+    x: 270, // lane centre (screen vertical centre)
+    yRatio: 0.7, // 70% of the track is ahead of the orb: orb sits 30% from the left edge
     radius: 56,
     minRadius: 20,
     shrinkRate: 190, // px per second while holding

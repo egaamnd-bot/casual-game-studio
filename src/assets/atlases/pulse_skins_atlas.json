@@ -506,8 +506,8 @@
     }
   },
   "meta": {
-    "app": "PULSE Studio Atlas Packer v2.0 (Phaser 3.90.0 JSON Hash)",
-    "version": "2.0.0",
+    "app": "PULSE v3.0 Atlas Packer (Phaser 3.90.0 JSON Hash)",
+    "version": "3.0.0",
     "image": "pulse_skins_atlas.png",
     "format": "RGBA8888",
     "size": {

@@ -44,7 +44,7 @@
 
     function at(gx, gy) {
       const rect = document.querySelector('canvas').getBoundingClientRect();
-      const k = rect.width / C.width;
+      const k = rect.width / window.__pulseGame.scale.width; // screen (landscape) game px
       return { clientX: rect.left + gx * k, clientY: rect.top + gy * k };
     }
     function down(gx, gy) {
@@ -67,7 +67,7 @@
       await wait(500);
       const s = scene();
       check(s && s.mode === 'campaign' && s.state === 'playing', 'campaign stage starts');
-      const cx = C.width / 2, cy = s.H / 2;
+      const cx = s.SW * 0.75, cy = s.SH / 2; // tap in the open lane ahead of the orb
 
       // Hold and release.
       down(cx, cy); await wait(300);
@@ -88,7 +88,7 @@
       check(s.state === 'playing', 'tap resumes');
 
       // Pause button.
-      down(52, s.hudTop); up(52, s.hudTop); await wait(100);
+      down(s.pauseBtn.x, s.pauseBtn.y); up(s.pauseBtn.x, s.pauseBtn.y); await wait(100);
       check(s.state === 'paused', 'pause button pauses');
       down(cx, cy); up(cx, cy); await wait(100);
       check(s.state === 'playing', 'tap resumes after pause button');
@@ -98,7 +98,7 @@
       check(sprites === !window.PULSE_TEST.noAssets, `renderer is ${sprites ? 'sprites' : 'shapes'} as requested`);
       const pickupSprites = () => sprites
         ? s.view.free.pickup.concat(s.level.segments.filter((g) => g._vis && g._vis.kind === 'pickup').map((g) => g._vis))
-          .flatMap((v) => v.parts.map((p) => p.orb)).filter((o) => o.visible)
+          .flatMap((v) => [v.parts[0], v.parts[2]]).filter((o) => o.visible) // parts: orb, lock, orb, lock
         : [];
       // Wait until a pickup is actually on screen.
       const pickupVisible = () => s.level.segments.some((g) => g.active && g.kind === 'pickup' && !g.taken && g.y > 0 && g.y < s.orbY - 40);
