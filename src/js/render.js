@@ -28,18 +28,58 @@ Pulse.Render = (function () {
     g.fillRect(seg.gapR, seg.y, 4, seg.h);
   }
 
-  // Cyan barrier (code-drawn in both renderers; there is no barrier art yet). Cyan while the orb
-  // is charged and would smash it, red while the orb is too small and would crash.
-  function barrier(g, seg, width, charged) {
+  // Cyan barrier (code-drawn in both renderers; there is no barrier art yet).
+  // State is shown by colour AND shape: when hitting it now would smash it, cyan with solid
+  // edges; when it would crash you, red with broken (dashed) edges.
+  // Charged barriers are thicker, with a second inner edge and diamond studs.
+  function barrier(g, seg, width, ready) {
     if (seg.broken) return;
-    const color = charged ? T.orb : T.danger;
+    const color = ready ? T.orb : T.danger;
+    const y = seg.y;
+    const h = seg.h;
     g.fillStyle(color, 0.16);
-    g.fillRect(0, seg.y, width, seg.h);
+    g.fillRect(0, y, width, h);
     g.fillStyle(color, 1);
-    g.fillRect(0, seg.y, width, 3);
-    g.fillRect(0, seg.y + seg.h - 3, width, 3);
-    g.fillStyle(color, 0.7);
-    for (let x = 9; x < width; x += 36) g.fillRect(x, seg.y + seg.h / 2 - 2, 18, 4);
+    if (ready) {
+      g.fillRect(0, y, width, 3);
+      g.fillRect(0, y + h - 3, width, 3);
+    } else {
+      for (let x = 0; x < width; x += 24) {
+        g.fillRect(x, y, 14, 3);
+        g.fillRect(x + 12, y + h - 3, 14, 3);
+      }
+    }
+    if (seg.charged) {
+      g.fillStyle(color, 0.8);
+      g.fillRect(0, y + 6, width, 2);
+      g.fillRect(0, y + h - 8, width, 2);
+      const cy = y + h / 2;
+      for (let x = 27; x < width; x += 54) {
+        g.fillTriangle(x, cy - 7, x - 7, cy, x + 7, cy);
+        g.fillTriangle(x, cy + 7, x - 7, cy, x + 7, cy);
+      }
+    } else {
+      g.fillStyle(color, 0.7);
+      for (let x = 9; x < width; x += 36) g.fillRect(x, y + h / 2 - 2, 18, 4);
+    }
+  }
+
+  // Charge ring around the orb: fills clockwise while the orb stays full size; a closed, thicker
+  // ring means a charged barrier will break.
+  function chargeRing(g, x, y, radius, charge) {
+    const r = radius + 16;
+    g.lineStyle(2, T.orb, 0.25);
+    g.strokeCircle(x, y, r);
+    if (charge <= 0) return;
+    const full = charge >= 1;
+    g.lineStyle(full ? 5 : 3, full ? T.orbCore : T.orb, full ? 1 : 0.85);
+    if (full) {
+      g.strokeCircle(x, y, r);
+    } else {
+      g.beginPath();
+      g.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + charge * Math.PI * 2, false);
+      g.strokePath();
+    }
   }
 
   // Energy is a circle, bonus a diamond. `dimmed` while the orb is too small to collect.
@@ -116,5 +156,5 @@ Pulse.Render = (function () {
     for (let i = 0; i < max; i++) star(g, x0 + i * step, y, r, i < count);
   }
 
-  return { background, walls, barrier, pickup, finishLine, orb, collectRing, progressBar, star, stars };
+  return { background, walls, barrier, chargeRing, pickup, finishLine, orb, collectRing, progressBar, star, stars };
 })();

@@ -12,11 +12,11 @@
 
 | # | Id | Name | Speed (px/s) | Teaches | Energy | Bonus | Autopilot time |
 |---|----|------|--------------|---------|--------|-------|----------------|
-| 1 | `s1-first-pulse` | First Pulse | 220 → 240 | Shrink basics, gold between gaps, one hold-through | 6 | 0 | 20.6 s |
-| 2 | `s2-find-the-rhythm` | Find the Rhythm | 260 → 300 | Cyan barriers (stay big), then squeeze/smash rhythm | 5 | 0 | 19.3 s |
-| 3 | `s3-controlled-overload` | Controlled Overload | 300 → 400 | Combinations, a long hold, two optional mint dares | 5 | 2 | 21.4 s |
+| 1 | `s1-first-pulse` | First Pulse | 220 → 240 | Gaps first, then cyan barriers (first one on its own) | 6 | 0 | 21.6 s |
+| 2 | `s2-find-the-rhythm` | Find the Rhythm | 260 → 300 | Squeeze/smash beat, then charged barriers (first one on its own) | 5 | 0 | 21.8 s |
+| 3 | `s3-controlled-overload` | Controlled Overload | 300 → 400 | Combos, long hold → charged barrier, two optional mint dares | 5 | 2 | 22.4 s |
 
-Redesigned in Gameplay Variety v1. Why and how is in [GAMEPLAY_VARIETY.md](GAMEPLAY_VARIETY.md). Every stage ends at a checkered finish line. Times come from the test autopilot.
+Refined in Gameplay Evolution v2. Why and how is in [GAMEPLAY_EVOLUTION.md](GAMEPLAY_EVOLUTION.md) and [GAMEPLAY_VARIETY.md](GAMEPLAY_VARIETY.md). Every stage ends at a checkered finish line. Times come from the test autopilot.
 
 **Design note:** the orb always stays in the middle of the screen, so a gap's left/right `shift` is visual only. Variety comes from *what size* each obstacle demands and *when*.
 

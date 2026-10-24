@@ -4,7 +4,8 @@
 //
 // Item types (campaign data and Endless patterns use the same ones):
 //   gate     wall with a gap; the orb must be no bigger than `need` (or longer: `length` = a tunnel)
-//   barrier  full-width cyan barrier; the orb must be charged (near full size) to smash it
+//   barrier  full-width cyan barrier; the orb must be charged (near full size) to smash it.
+//            `charged: true` = charged barrier: also needs a full charge ring (held full size)
 //   energy   gold pickup pair; collected only while charged
 //   bonus    mint pickup pair; optional extra, allowed tighter timing
 (function () {
@@ -23,6 +24,22 @@
   const CHARGED_RADIUS = R - C.pickup.sizeTolerance;
   const isCharged = (r) => r > CHARGED_RADIUS;
 
+  // Orb state shared by the game and the tests: radius follows the touch, and the charge ring
+  // fills while the orb stays charged (full in `chargeTime` s) and empties the moment it isn't.
+  const Orb = {
+    create() {
+      return { radius: R, charge: 1 };
+    },
+    step(o, held, dt) {
+      const target = held ? C.orb.minRadius : R;
+      o.radius = o.radius > target
+        ? Math.max(target, o.radius - C.orb.shrinkRate * dt)
+        : Math.min(target, o.radius + C.orb.growRate * dt);
+      o.charge = isCharged(o.radius) ? Math.min(1, o.charge + dt / C.barrier.chargeTime) : 0;
+      return o;
+    },
+  };
+
   // Pickups sit this far left and right of the orb's path, reachable only when charged.
   const PICKUP_OFFSET = R + C.pickup.radius - C.pickup.sizeTolerance;
 
@@ -37,7 +54,7 @@
 
   const isPickup = (type) => type === 'energy' || type === 'bonus';
   const itemHeight = (src) => (src.type === 'gate' ? (src.length || C.gate.thickness)
-    : src.type === 'barrier' ? C.barrier.thickness : 0);
+    : src.type === 'barrier' ? (src.charged ? C.barrier.chargedThickness : C.barrier.thickness) : 0);
 
   // What size an item demands: 'small' (gate narrower than the orb), 'big' (barrier, pickups)
   // or null (wide gate: any size passes).
@@ -58,6 +75,7 @@
     const h = itemHeight(src);
     const item = { type: src.type, at: prevTop + src.space, h, space: src.space };
     if (src.type === 'gate') Pulse.setGap(item, src.need, src.shift || 0, width);
+    if (src.type === 'barrier' && src.charged) item.charged = true;
     if (src.pattern) item.pattern = src.pattern;
     return item;
   }
@@ -65,6 +83,7 @@
   // Minimum time to switch from one demand to the other, by what the orb is switching to/from.
   function minSwitchTime(from, to) {
     const T = C.track;
+    if (to.type === 'barrier' && to.charged) return T.toChargedBarrier;
     if (from.type === 'bonus' || to.type === 'bonus') return T.bonusTime;
     if (to.type === 'barrier') return T.toBarrier;
     if (to.type === 'energy') return T.toEnergy;
@@ -89,8 +108,11 @@
         if (it.need < minNeed - 1e-9) err(i, `clearance ${it.need.toFixed(1)} below fair minimum ${minNeed}`);
         if (!(it.gapL < C.orb.x && it.gapR > C.orb.x)) err(i, "gap does not contain the orb's path");
       }
-      if (i > 0 && it.at - prevTop < (isPickup(it.type) || isPickup(items[i - 1].type) ? 2 * C.pickup.radius : C.track.minWallSpace)) {
-        err(i, `only ${(it.at - prevTop).toFixed(0)} px after previous item`);
+      if (i > 0) {
+        const prev = items[i - 1];
+        const min = isPickup(it.type) || isPickup(prev.type) ? 2 * C.pickup.radius
+          : it.type !== prev.type ? C.track.minMixedSpace : C.track.minWallSpace;
+        if (it.at - prevTop < min) err(i, `only ${(it.at - prevTop).toFixed(0)} px after previous ${prev.type} (min ${min})`);
       }
       const need = demand(it);
       const from = need === 'small' ? lastBig : need === 'big' ? lastSmall : null;
@@ -181,6 +203,7 @@
         seg.need = it.need;
       } else if (it.type === 'barrier') {
         seg.kind = 'barrier';
+        seg.charged = !!it.charged;
       } else {
         seg.kind = 'pickup';
         seg.variant = it.type;
@@ -199,6 +222,11 @@
       return circleRect(C.orb.x, y, r, 0, seg.y, this.width, seg.h);
     }
 
+    // Whether hitting this barrier right now would smash it (also used to colour it).
+    canSmash(seg, r, charge) {
+      return isCharged(r) && (!seg.charged || (charge === undefined ? 1 : charge) >= 1);
+    }
+
     touchesPickup(seg, y, r) {
       const dy = seg.y - y;
       const reach = r + C.pickup.radius;
@@ -207,8 +235,9 @@
 
     // The game's rules for one segment this frame. Marks the segment and returns what happened:
     // 'crash' | 'pass' (wall cleared) | 'break' (barrier smashed) | 'collect' | 'miss' | null.
+    // `charge` (0..1) is the orb's charge ring; charged barriers need it full.
     // Shared by the game scene and the tests so they can't drift apart.
-    resolve(s, orbY, r) {
+    resolve(s, orbY, r, charge) {
       if (s.kind === 'pickup') {
         if (s.resolved) return null;
         if (this.touchesPickup(s, orbY, r)) {
@@ -223,7 +252,7 @@
       }
       if (s.kind === 'barrier') {
         if (s.broken || !this.touchesBarrier(s, orbY, r)) return null;
-        if (!isCharged(r)) return 'crash';
+        if (!this.canSmash(s, r, charge)) return 'crash';
         s.broken = s.scored = true;
         return 'break';
       }
@@ -236,11 +265,13 @@
     }
   }
 
-  // Test autopilot with perfect reading: acts on the nearest obstacle within ~0.3 s.
-  // Shrinks for a gate narrower than the orb, stays full size for a barrier, otherwise grows
-  // (which collects pickups). It skips mint bonuses that are too tight to reach in time.
-  function autopilot(level, orbY, speed) {
-    const look = speed * 0.3;
+  // Test autopilot with perfect reading: acts on the nearest obstacle within ~`lookSeconds`.
+  // Shrinks for a gate narrower than the orb, stays full size for a barrier (looking further
+  // ahead for charged barriers, to fill the ring), otherwise grows, which collects pickups.
+  // A larger `lookSeconds` gives the cautious player: it holds through every close dare.
+  function autopilot(level, orbY, speed, lookSeconds) {
+    const look = speed * (lookSeconds || 0.3);
+    const chargeLook = speed * C.barrier.chargeTime;
     let nearest = null;
     let nearestBottom = -Infinity;
     const segs = level.segments;
@@ -249,7 +280,7 @@
       if (!s.active || s.kind === 'pickup' || s.broken) continue;
       if (s.kind === 'gate' && (s.need >= R || s.y >= orbY + R)) continue;
       const bottom = s.y + s.h;
-      if (bottom < orbY - R - look) continue;
+      if (bottom < orbY - R - look - (s.charged ? chargeLook : 0)) continue;
       if (bottom > nearestBottom) {
         nearest = s;
         nearestBottom = bottom;
@@ -258,11 +289,46 @@
     return !!nearest && nearest.kind === 'gate';
   }
 
+  // Endless scoring, shared by the game and the tests. Values are unchanged from v1:
+  // +1 × multiplier per wall passed or barrier smashed; gold or mint adds +1 to the multiplier
+  // (max ×5); missing gold resets it, missing mint does not. Returns feedback flags only.
+  const Scoring = {
+    create() {
+      return { score: 0, multiplier: 1, maxStreak: 0 };
+    },
+    apply(st, event, seg) {
+      const out = {};
+      const max = C.multiplierMax;
+      if (event === 'pass' || event === 'break') {
+        st.score += st.multiplier;
+        if (st.multiplier === max) {
+          st.maxStreak++;
+          if (st.maxStreak % C.maxStreakCallout === 0) out.streak = st.maxStreak;
+        }
+      } else if (event === 'collect') {
+        const before = st.multiplier;
+        st.multiplier = Math.min(max, st.multiplier + 1);
+        out.gained = st.multiplier > before;
+        if (st.multiplier === max && before < max) {
+          out.reachedMax = true;
+          st.maxStreak = 0;
+        }
+      } else if (event === 'miss' && seg.variant !== 'bonus' && st.multiplier > 1) {
+        st.multiplier = 1;
+        st.maxStreak = 0;
+        out.reset = true;
+      }
+      return out;
+    },
+  };
+
   Pulse.Level = Level;
   Pulse.circleRect = circleRect;
   Pulse.setGap = setGap;
   Pulse.PICKUP_OFFSET = PICKUP_OFFSET;
   Pulse.isCharged = isCharged;
+  Pulse.Orb = Orb;
+  Pulse.Scoring = Scoring;
   Pulse.Track = { placeItem, validateItems, clearTime, spaceFor, demand, itemHeight };
   Pulse.autopilot = autopilot;
 })();

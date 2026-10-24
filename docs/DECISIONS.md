@@ -22,7 +22,8 @@ Add new entries at the top.
 
 ## Pending Decisions
 
-- Gameplay variety v1 (cyan barriers, pattern-based Endless, redesigned stages, Endless mint-miss no longer resets the multiplier): built on `feature/pulse-gameplay-variety`, awaiting phone playtest ([GAMEPLAY_VARIETY.md](GAMEPLAY_VARIETY.md))
+- Gameplay variety v1 (cyan barriers, pattern-based Endless, redesigned stages, Endless mint-miss no longer resets the multiplier): built on `feature/pulse-gameplay-variety` (`648dcf5`); the producer reported it fun on the phone ([GAMEPLAY_VARIETY.md](GAMEPLAY_VARIETY.md))
+- Gameplay evolution v2 (charged barriers with charge ring, combo sequences with recovery, multiplier milestones, stage refinements): built on `feature/pulse-gameplay-evolution`, awaiting phone playtest ([GAMEPLAY_EVOLUTION.md](GAMEPLAY_EVOLUTION.md)). Pulse Fields deferred.
 
 - Pulse as the commercial game (after playtesting the prototype and campaign)
 - Final technology stack (pipeline provisionally validated; see #5)

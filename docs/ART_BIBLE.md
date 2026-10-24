@@ -29,7 +29,7 @@ Not used yet: tutorial hands, audio toggle icons, HUD brackets, header banners a
 
 Feedback for Gemini:
 - `ui_icon_status_lock` looks like an *open* padlock; a closed one would read better for locked stages.
-- New art request: a **cyan barrier** (full-width tileable energy membrane, 44 px tall in 1080-space; charged-cyan and danger-red states; shatter effect) and optionally a height-tileable tunnel body. Both are code-drawn for now. See [GAMEPLAY_VARIETY.md](GAMEPLAY_VARIETY.md).
+- New art request (updated for v2 in [GAMEPLAY_EVOLUTION.md](GAMEPLAY_EVOLUTION.md): adds a charged barrier and a charge ring): a **cyan barrier** (full-width tileable energy membrane, 44 px tall in 1080-space; charged-cyan and danger-red states; shatter effect) and optionally a height-tileable tunnel body. Both are code-drawn for now. See [GAMEPLAY_VARIETY.md](GAMEPLAY_VARIETY.md).
 
 ## Visual Identity
 

@@ -12,6 +12,15 @@
       super('game');
     }
 
+    // Orb size and charge live in Pulse.Orb state (shared with the tests).
+    get radius() {
+      return this.orbState.radius;
+    }
+
+    set radius(v) {
+      this.orbState.radius = v;
+    }
+
     init(data) {
       const test = window.PULSE_TEST || {};
       data = data && data.mode ? data : test;
@@ -40,7 +49,8 @@
       this.view = Pulse.Assets.ok ? new Pulse.SpriteView(this, visual, this.skin) : null;
       this.nearMisses = 0;
 
-      this.radius = C.orb.radius;
+      this.orbState = Pulse.Orb.create();
+      this.scoring = Pulse.Scoring.create();
       this.score = 0;
       this.multiplier = 1;
       this.prevBest = this.best;
@@ -187,6 +197,7 @@
     startRun() {
       this.level.reset();
       this.elapsed = 0;
+      this.scoring = Pulse.Scoring.create();
       this.score = 0;
       this.multiplier = 1;
       this.prevBest = this.best;
@@ -247,12 +258,7 @@
       const dt = Math.min(delta / 1000, C.maxFrameSeconds);
 
       // The orb responds in every state except the end screens, so players can practise.
-      if (this.state !== 'over' && this.state !== 'complete') {
-        const target = this.isHeld() ? C.orb.minRadius : C.orb.radius;
-        this.radius = this.radius > target
-          ? Math.max(target, this.radius - C.orb.shrinkRate * dt)
-          : Math.min(target, this.radius + C.orb.growRate * dt);
-      }
+      if (this.state !== 'over' && this.state !== 'complete') Pulse.Orb.step(this.orbState, this.isHeld(), dt);
 
       if (this.state === 'playing') this.step(dt);
       if (this.ringT < 1) this.ringT = Math.min(1, this.ringT + dt * 3);
@@ -272,41 +278,46 @@
       for (let i = 0; i < segs.length; i++) {
         const s = segs[i];
         if (!s.active) continue;
-        const event = this.level.resolve(s, this.orbY, r);
+        const event = this.level.resolve(s, this.orbY, r, this.orbState.charge);
         if (!event) continue;
 
         if (event === 'crash') {
           this.crash();
           return;
         }
+        // Endless scoring rules live in Pulse.Scoring (level.js); this turns them into feedback.
+        const fb = campaign ? {} : Pulse.Scoring.apply(this.scoring, event, s);
+        this.score = this.scoring.score;
+        this.multiplier = this.scoring.multiplier;
         if (event === 'collect') {
           this.ringT = 0;
           if (this.view) this.view.collect(s);
+          const color = s.variant === 'bonus' ? T.textBonus : T.textAccent;
           if (campaign) {
             if (s.variant === 'bonus') this.bonus++;
             else this.energy++;
-            this.popup(s.variant === 'bonus' ? 'Bonus!' : '+1', s.variant === 'bonus' ? T.textBonus : T.textAccent);
+            this.popup(s.variant === 'bonus' ? 'Bonus!' : '+1', color);
+          } else if (fb.reachedMax) {
+            this.popup(`MAX ×${this.multiplier}`, color);
+            this.milestone();
           } else {
-            this.multiplier = Math.min(C.multiplierMax, this.multiplier + 1);
-            this.popup(`x${this.multiplier}`, s.variant === 'bonus' ? T.textBonus : T.textAccent);
+            this.popup(`x${this.multiplier}`, color);
           }
+          if (fb.gained) this.bumpMultiplier();
           Pulse.Sfx.play('pickup');
           this.updateHud();
         } else if (event === 'miss') {
           // Skipping gold resets the Endless multiplier; skipping a mint bonus doesn't, so
           // declining a risky bonus is always a safe choice.
-          if (!campaign && s.variant !== 'bonus' && this.multiplier > 1) {
-            this.multiplier = 1;
+          if (fb.reset) {
             this.popup('x1', T.textDim);
             Pulse.Sfx.play('multiplierLost');
             this.updateHud();
           }
         } else {
           // 'pass' (wall cleared) or 'break' (barrier smashed): both count as an obstacle.
-          if (!campaign) {
-            this.score += this.multiplier;
-            this.updateHud();
-          }
+          if (!campaign) this.updateHud();
+          if (fb.streak) this.popup(`×${C.multiplierMax} streak ${fb.streak}`, T.textAccent);
           if (event === 'break') {
             Pulse.Sfx.play('smash');
             if (this.view) this.view.smash(s);
@@ -345,6 +356,20 @@
       this.setState('complete');
     }
 
+    // Feedback only (no points): the multiplier text pops when it rises.
+    bumpMultiplier() {
+      this.tweens.killTweensOf(this.multText);
+      this.multText.setScale(1.35);
+      this.tweens.add({ targets: this.multText, scale: 1, duration: 220, ease: 'Back.easeOut' });
+    }
+
+    // Feedback only: reaching the maximum multiplier gets one restrained flourish.
+    milestone() {
+      Pulse.Sfx.play('milestone');
+      if (this.view) this.view.milestone();
+      else this.ringT = 0;
+    }
+
     // Cosmetic only: flashes a graze arc when the orb squeezed past a wall edge with little room.
     // It reads state after scoring is done and never touches score, stars or the multiplier.
     checkNearMiss(s, r) {
@@ -363,9 +388,11 @@
       const g = this.world;
       g.clear();
       const dimmed = !this.canCollect();
+      // Barriers show whether hitting them *right now* would smash them.
+      const canSmash = (s) => this.level.canSmash(s, this.radius, this.orbState.charge);
 
       if (this.view) {
-        this.view.render(this.level, this.scroll, dimmed, g);
+        this.view.render(this.level, this.scroll, dimmed, g, canSmash);
       } else {
         Pulse.Render.background(g, this.W, this.H, this.scroll);
         const segs = this.level.segments;
@@ -373,9 +400,17 @@
           const s = segs[i];
           if (!s.active || s.y > this.H || s.y + s.h < -40) continue;
           if (s.kind === 'pickup') Pulse.Render.pickup(g, s, this.orbX, dimmed);
-          else if (s.kind === 'barrier') Pulse.Render.barrier(g, s, this.W, !dimmed);
+          else if (s.kind === 'barrier') Pulse.Render.barrier(g, s, this.W, canSmash(s));
           else Pulse.Render.walls(g, s, this.W);
         }
+      }
+
+      // The charge ring only appears while a charged barrier is on screen.
+      if (this.state === 'playing' || this.state === 'paused') {
+        this.chargeRingShown = this.level.segments.some((s) => s.active && s.charged && !s.broken && s.y < this.orbY && s.y + s.h > 0);
+        if (this.chargeRingShown) Pulse.Render.chargeRing(g, this.orbX, this.orbY, this.radius, this.orbState.charge);
+      } else {
+        this.chargeRingShown = false;
       }
 
       if (this.mode === 'campaign') {
@@ -397,7 +432,7 @@
     // Test-only autopilot (Pulse.autopilot in level.js, shared with the logic tests).
     botWantsHold() {
       if (this.state !== 'playing') return false;
-      return Pulse.autopilot(this.level, this.orbY, this.level.speedAt(this.elapsed));
+      return Pulse.autopilot(this.level, this.orbY, this.level.speedAt(this.elapsed), this.test.look);
     }
   }
 

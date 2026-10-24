@@ -59,7 +59,8 @@
     }
 
     // `scroll` is the scene's background scroll (half the distance travelled).
-    render(level, scroll, dimmed, wallGraphics) {
+    // `canSmash(seg)` says whether hitting a barrier now would smash it (colours and edges).
+    render(level, scroll, dimmed, wallGraphics, canSmash) {
       const travel = scroll * 2;
       this.bg.tilePositionY = -(travel * this.visual.bgSpeed) / A.base;
       this.tickL.tilePositionY = this.tickR.tilePositionY = -(travel * this.visual.tickSpeed) / A.base;
@@ -79,7 +80,7 @@
           // in code with the same palette.
           this.release(s);
           if (!onScreen) continue;
-          if (s.kind === 'barrier') Pulse.Render.barrier(wallGraphics, s, this.scene.W, !dimmed);
+          if (s.kind === 'barrier') Pulse.Render.barrier(wallGraphics, s, this.scene.W, canSmash ? canSmash(s) : !dimmed);
           else Pulse.Render.walls(wallGraphics, s, this.scene.W);
         } else if (s.kind === 'gate') {
           this.placeGate(this.acquire(s, 'gate'), s, onScreen);
@@ -202,6 +203,14 @@
       sc.tweens.killTweensOf(this.shockwave);
       this.shockwave.setVisible(true).setAlpha(0.9).setScale(0.35).setTint(T.orb).setPosition(sc.orbX, sc.orbY);
       sc.tweens.add({ targets: this.shockwave, scale: 0.9, alpha: 0, duration: 300, ease: 'Quad.easeOut' });
+    }
+
+    // Multiplier reached its maximum: one gold shockwave from the orb (feedback only).
+    milestone() {
+      const sc = this.scene;
+      sc.tweens.killTweensOf(this.shockwave);
+      this.shockwave.setVisible(true).setAlpha(0.8).setScale(0.4).setTint(T.pickup).setPosition(sc.orbX, sc.orbY);
+      sc.tweens.add({ targets: this.shockwave, scale: 1.3, alpha: 0, duration: 450, ease: 'Quad.easeOut' });
     }
 
     crash() {

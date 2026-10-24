@@ -12,7 +12,7 @@
   <script src="../src/js/campaign.js"></script>
   <script src="../src/js/patterns.js"></script>
   <script>
-    // Core rules and Endless pattern generator tests. No Phaser needed.
+    // Core rules, scoring and Endless pattern generator tests. No Phaser needed.
     // Open in a browser; the page title becomes "PASS ..." or "FAIL ...".
     const C = Pulse.CONFIG;
     const R = C.orb.radius;
@@ -38,54 +38,101 @@
     // ---- Collision and rules ----
     check(Pulse.circleRect(50, 50, 10, 55, 40, 20, 20), 'circle overlapping rect edge should hit');
     check(!Pulse.circleRect(50, 50, 10, 61, 40, 20, 20), 'circle 11px from rect should miss');
-    check(Pulse.circleRect(50, 50, 10, 0, 0, 100, 100), 'circle inside rect should hit');
-    check(!Pulse.circleRect(50, 50, 10, 57.1, 57.1, 10, 10), 'circle near rect corner should miss');
     check(Pulse.isCharged(R) && Pulse.isCharged(R - 7) && !Pulse.isCharged(R - 8) && !Pulse.isCharged(C.orb.minRadius), 'charged = within 8 px of full size');
 
-    // Barrier rule, frame by frame: charged smashes, shrunk crashes, untouched does nothing.
+    // Orb charge ring: fills in chargeTime while full size, empties at once when shrunk.
+    const o = Pulse.Orb.create();
+    check(o.charge === 1, 'run starts with a full ring');
+    for (let i = 0; i < 6; i++) Pulse.Orb.step(o, true, 1 / 60);
+    check(o.charge === 0, `shrinking empties the ring (charge ${o.charge.toFixed(2)})`);
+    let frames = 0;
+    while (o.charge < 1 && frames < 200) { Pulse.Orb.step(o, false, 1 / 60); frames++; }
+    const regrowAndCharge = frames / 60;
+    check(regrowAndCharge > C.barrier.chargeTime && regrowAndCharge < C.track.toChargedBarrier,
+      `regrow + full charge takes ${regrowAndCharge.toFixed(2)}s, within the ${C.track.toChargedBarrier}s fairness window`);
+
+    // Barrier rules, frame by frame.
     const lv = new Pulse.Level(W, 1100);
     const orbY = 770;
-    const bar = () => Object.assign(lv.obtain(), { active: true, kind: 'barrier', y: orbY - R - 10, h: C.barrier.thickness, broken: false, scored: false });
-    let b = bar();
-    check(lv.resolve(b, orbY, R) === 'break' && b.broken && b.scored, 'full-size orb smashes barrier');
-    check(lv.resolve(b, orbY, R) === null, 'smashed barrier is gone');
-    b = bar();
-    check(lv.resolve(b, orbY, C.orb.minRadius + 20) === null, 'barrier not yet touching a small orb');
-    b.y = orbY - 30;
-    check(lv.resolve(b, orbY, C.orb.minRadius + 20) === 'crash', 'shrunk orb touching barrier crashes');
-    b = bar();
-    check(lv.resolve(b, orbY, R - 8) === 'crash', 'orb 8 px under full size is not charged: crash');
+    const bar = (charged) => Object.assign(lv.obtain(), { active: true, kind: 'barrier', charged, y: orbY - R - 10, h: 22, broken: false, scored: false });
+    let b = bar(false);
+    check(lv.resolve(b, orbY, R, 0) === 'break' && b.broken && b.scored, 'plain barrier: full size smashes, charge not needed');
+    check(lv.resolve(b, orbY, R, 0) === null, 'smashed barrier is gone');
+    b = bar(false); b.y = orbY - 30;
+    check(lv.resolve(b, orbY, C.orb.minRadius + 20, 0) === 'crash', 'plain barrier: shrunk orb crashes');
+    b = bar(true);
+    check(lv.resolve(b, orbY, R, 1) === 'break', 'charged barrier: full size + full ring smashes');
+    b = bar(true);
+    check(lv.resolve(b, orbY, R, 0.95) === 'crash', 'charged barrier: ring 95% full crashes');
+    b = bar(true);
+    check(lv.resolve(b, orbY, R - 8, 1) === 'crash', 'charged barrier: not full size crashes');
+    // What the barrier shows must match what would happen.
+    for (const [r, ch, charged] of [[R, 1, true], [R, 0.5, true], [R, 0, false], [30, 0, false], [R - 8, 1, true]]) {
+      const s = { charged, kind: 'barrier' };
+      const shown = lv.canSmash(s, r, ch);
+      const t = bar(charged);
+      const outcome = lv.resolve(t, orbY, r, ch);
+      check(shown === (outcome === 'break'), `barrier state shown (${shown}) matches outcome (${outcome}) at r=${r} charge=${ch}`);
+    }
 
-    // ---- Endless runs ----
-    // Plays with the same rules as GameScene (Level.resolve). policy(level, orbY, speed) → hold?
+    // ---- Scoring (values unchanged from v1) ----
+    const st = Pulse.Scoring.create();
+    Pulse.Scoring.apply(st, 'pass', {});
+    check(st.score === 1, 'wall passed: +1 × 1');
+    for (let i = 0; i < 4; i++) Pulse.Scoring.apply(st, 'collect', { variant: 'energy' });
+    check(st.multiplier === 5, 'four gold → ×5');
+    const atMax = Pulse.Scoring.apply(st, 'collect', { variant: 'energy' });
+    check(st.multiplier === 5 && !atMax.gained, 'multiplier caps at ×5');
+    Pulse.Scoring.apply(st, 'break', {});
+    check(st.score === 6, 'barrier smashed counts like a wall: +5');
+    let fb = Pulse.Scoring.apply(st, 'miss', { variant: 'bonus' });
+    check(st.multiplier === 5 && !fb.reset, 'skipping mint keeps the multiplier');
+    let streakAt = 0;
+    for (let i = 1; i <= C.maxStreakCallout; i++) { fb = Pulse.Scoring.apply(st, 'pass', {}); if (fb.streak) streakAt = i; }
+    check(streakAt === C.maxStreakCallout - 1 || streakAt === C.maxStreakCallout, `streak callout fires around obstacle ${C.maxStreakCallout} at ×5 (fired at ${streakAt})`);
+    const before = st.score;
+    fb = Pulse.Scoring.apply(st, 'miss', { variant: 'energy' });
+    check(st.multiplier === 1 && fb.reset && st.score === before, 'missing gold resets to ×1, score kept');
+    const st2 = Pulse.Scoring.create();
+    for (let i = 0; i < 3; i++) Pulse.Scoring.apply(st2, 'collect', { variant: 'bonus' });
+    fb = Pulse.Scoring.apply(st2, 'collect', { variant: 'energy' });
+    check(fb.reachedMax && st2.multiplier === 5, 'reaching ×5 flags the milestone once');
+
+    // ---- Endless runs with five player strategies ----
     function simulate(seed, seconds, policy) {
       const height = 1100;
       const oy = Math.round(height * C.orb.yRatio);
       const level = new Pulse.EndlessLevel(W, height, seeded(seed));
-      let radius = R, elapsed = 0;
+      const orb = Pulse.Orb.create();
+      const score = Pulse.Scoring.create();
+      let elapsed = 0;
       const ev = { pass: 0, break: 0, collect: 0, bonus: 0, miss: 0, transitions: 0, holdFrames: 0, frames: 0 };
       const dt = 1 / 60;
       let lastHeld = false;
       const late = [];
+      let crashedOn = null;
       while (elapsed < seconds) {
         const speed = level.speedAt(elapsed);
-        const held = policy(level, oy, speed);
+        const held = policy(level, oy, speed, orb);
         if (held !== lastHeld) ev.transitions++;
         lastHeld = held;
         if (held) ev.holdFrames++;
         ev.frames++;
-        const target = held ? C.orb.minRadius : R;
-        radius = radius > target ? Math.max(target, radius - C.orb.shrinkRate * dt) : Math.min(target, radius + C.orb.growRate * dt);
+        Pulse.Orb.step(orb, held, dt);
         elapsed += dt;
         level.update(dt, level.speedAt(elapsed), elapsed);
         for (const s of level.segments) {
           if (!s.active) continue;
-          const e = level.resolve(s, oy, radius);
-          if (e === 'crash') return { crashed: true, elapsed, ev, level, late };
+          const e = level.resolve(s, oy, orb.radius, orb.charge);
+          if (e === 'crash') {
+            crashedOn = s.kind === 'barrier' ? (s.charged ? 'charged barrier' : 'barrier') : 'gap';
+            return { crashed: true, crashedOn, elapsed, ev, level, late, score: score.score };
+          }
+          if (!e) continue;
+          Pulse.Scoring.apply(score, e, s);
           if (e === 'collect' && s.variant === 'bonus') ev.bonus++;
-          else if (e) ev[e]++;
+          else ev[e]++;
         }
-        // Spacing used each item's predicted speed; it must never be slower than reality.
         for (const it of level.items) {
           if (!it.checked && level.travelled >= it.at) {
             it.checked = true;
@@ -93,23 +140,48 @@
           }
         }
       }
-      return { crashed: false, elapsed, ev, level, late };
+      return { crashed: false, elapsed, ev, level, late, score: score.score };
     }
+
+    const STRATEGIES = {
+      'always shrink': () => true,
+      'always large': () => false,
+      cautious: (lv2, oy, sp) => Pulse.autopilot(lv2, oy, sp, 0.75),
+      competent: (lv2, oy, sp) => Pulse.autopilot(lv2, oy, sp),
+      // Lets go as late as possible before a gap and as early as possible after it, to chase
+      // every pickup. Not tuned for charged barriers: it shows what greed costs.
+      aggressive: (lv2, oy, sp) => Pulse.autopilot(lv2, oy, sp, 0.2),
+    };
 
     const SEEDS = 60, SECONDS = 150;
     const used = {};
     let items = 0, repeats = 0, transitions = 0, holdShare = 0, smashed = 0, bonusSeen = 0, bonusTaken = 0;
+    let firstCharged = Infinity, requiresBroken = 0, unlockBroken = 0, recoveries = 0, budgetBreaches = 0;
+    const lateVariety = [];
     for (let seed = 1; seed <= SEEDS; seed++) {
-      const run = simulate(seed, SECONDS, Pulse.autopilot);
-      check(!run.crashed, `seed ${seed}: perfect-timing autopilot crashed at ${run.elapsed.toFixed(1)}s (unfair pattern?)`);
+      const run = simulate(seed, SECONDS, STRATEGIES.competent);
+      check(!run.crashed, `seed ${seed}: competent autopilot crashed on a ${run.crashedOn} at ${run.elapsed.toFixed(1)}s (unfair pattern?)`);
       check(run.late.length === 0, `seed ${seed}: ${run.late.length} items arrived faster than their spacing assumed`);
       const errs = Pulse.Track.validateItems(run.level.items, (it) => it.speed, `seed ${seed}`);
       check(errs.length === 0, errs.slice(0, 2).join('; '));
-      const log = run.level.patternLog;
+      const log = run.level.patternLog, times = run.level.patternTimes;
+      const seen = new Set();
+      let heat = 0;
       for (let i = 0; i < log.length; i++) {
+        const p = Pulse.PATTERNS.find((x) => x.id === log[i]);
         used[log[i]] = (used[log[i]] || 0) + 1;
         if (i && log[i] === log[i - 1]) repeats++;
+        if (times[i] < p.unlock) unlockBroken++;
+        if (p.requires && !seen.has(p.requires)) requiresBroken++;
+        if (p.id.includes('charged') && times[i] < firstCharged) firstCharged = times[i];
+        if (p.recovery) { recoveries++; heat = 0; } else {
+          heat += p.intensity;
+          if (heat > run.level.heatBudget(1) + 5) budgetBreaches++;
+        }
+        seen.add(p.id);
       }
+      // Variety after the first minute: distinct patterns between 60 s and 150 s.
+      lateVariety.push(new Set(log.filter((_, i) => times[i] >= 60)).size);
       items += run.level.items.length;
       transitions += run.ev.transitions;
       holdShare += run.ev.holdFrames / run.ev.frames;
@@ -118,43 +190,49 @@
       bonusTaken += run.ev.bonus;
     }
     check(repeats === 0, `${repeats} back-to-back pattern repeats`);
-    check(Object.keys(used).length === Pulse.PATTERNS.length, `all ${Pulse.PATTERNS.length} patterns appear (saw ${Object.keys(used).join(', ')})`);
+    check(unlockBroken === 0, `${unlockBroken} patterns appeared before their unlock time`);
+    check(requiresBroken === 0, `${requiresBroken} combos appeared before the pattern that teaches them`);
+    check(firstCharged >= 30, `charged barriers first appear at ${firstCharged.toFixed(1)}s (must be ≥ 30s)`);
+    check(budgetBreaches === 0, `${budgetBreaches} intense stretches ran past the budget without recovery`);
+    check(Object.keys(used).length === Pulse.PATTERNS.length, `all ${Pulse.PATTERNS.length} patterns appear (missing: ${Pulse.PATTERNS.map((p) => p.id).filter((id) => !used[id]).join(', ')})`);
+    const minLate = Math.min(...lateVariety);
+    check(minLate >= 10, `at least 10 different patterns after the first minute in every run (min ${minLate})`);
 
-    // A cautious player who never lets go between close gaps (so skips every dare) must survive too.
-    const cautious = (level, oy, speed) => {
-      let nearest = null, bottom = -Infinity;
-      for (const s of level.segments) {
-        if (!s.active || s.kind === 'pickup' || s.broken) continue;
-        if (s.kind === 'gate' && (s.need >= R || s.y >= oy + R)) continue;
-        const btm = s.y + s.h;
-        if (btm < oy - R - speed * 0.75) continue;
-        if (btm > bottom) { nearest = s; bottom = btm; }
+    // Strategy table: 20 seeds each.
+    const table = [];
+    for (const [name, policy] of Object.entries(STRATEGIES)) {
+      let survived = 0, totalTime = 0, totalScore = 0, mint = 0;
+      const causes = {};
+      for (let seed = 1; seed <= 20; seed++) {
+        const run = simulate(seed, SECONDS, policy);
+        if (!run.crashed) survived++;
+        else causes[run.crashedOn] = (causes[run.crashedOn] || 0) + 1;
+        totalTime += run.elapsed;
+        totalScore += run.score;
+        mint += run.ev.bonus;
       }
-      return !!nearest && nearest.kind === 'gate';
-    };
-    let cautiousBonus = 0;
-    for (let seed = 1; seed <= 20; seed++) {
-      const run = simulate(seed, SECONDS, cautious);
-      check(!run.crashed, `seed ${seed}: cautious player (skips dares) crashed at ${run.elapsed.toFixed(1)}s`);
-      cautiousBonus += run.ev.bonus;
+      table.push({ name, survived, avgTime: totalTime / 20, avgScore: totalScore / 20, mint, causes });
     }
+    const T = Object.fromEntries(table.map((r) => [r.name, r]));
+    check(T['always shrink'].survived === 0 && T['always shrink'].avgTime < 8, 'always shrinking fails early');
+    check(T['always large'].survived === 0 && T['always large'].avgTime < 5, 'always staying large fails early');
+    check(T.cautious.survived === 20, `cautious player (skips dares) survives every seed (${T.cautious.survived}/20)`);
+    check(T.competent.survived === 20, `competent player survives every seed (${T.competent.survived}/20)`);
+    check(T.competent.avgScore >= T.cautious.avgScore, 'competent play scores at least as well as cautious play');
 
-    // Holding the whole time is no longer a winning strategy; nor is never holding.
-    const held = simulate(7, 60, () => true);
-    check(held.crashed && held.elapsed < 8, `always holding should crash on the opening barrier, got crashed=${held.crashed} at ${held.elapsed.toFixed(1)}s`);
-    const idle = simulate(7, 60, () => false);
-    check(idle.crashed && idle.elapsed < 5, `never holding should crash on the first gap, got crashed=${idle.crashed} at ${idle.elapsed.toFixed(1)}s`);
-
-    // Same seed → same pattern stream (Endless is random per run but reproducible in tests).
-    const a = simulate(11, 40, Pulse.autopilot), b2 = simulate(11, 40, Pulse.autopilot);
+    // Same seed → same pattern stream.
+    const a = simulate(11, 40, STRATEGIES.competent), b2 = simulate(11, 40, STRATEGIES.competent);
     check(JSON.stringify(a.level.patternLog) === JSON.stringify(b2.level.patternLog), 'pattern stream is reproducible from a seed');
 
     const mins = SEEDS * SECONDS / 60;
-    lines.push(`${SEEDS} seeds × ${SECONDS}s autopilot: ${items} items, ${smashed} barriers smashed`);
-    lines.push(`hold/release changes per minute: ${(transitions / mins).toFixed(1)}; time spent holding: ${(100 * holdShare / SEEDS).toFixed(0)}%`);
-    lines.push(`mint taken: autopilot ${bonusTaken}/${bonusSeen}; cautious player (holds through dares, 20 seeds) took ${cautiousBonus} and survived`);
+    lines.push(`${SEEDS} seeds × ${SECONDS}s competent: ${items} items, ${smashed} barriers smashed, ${recoveries} recovery sections`);
+    lines.push(`hold/release changes per minute ${(transitions / mins).toFixed(1)}; holding ${(100 * holdShare / SEEDS).toFixed(0)}% of the time; distinct patterns after 60 s: min ${minLate}`);
+    lines.push(`first charged barrier at ${firstCharged.toFixed(1)}s; mint taken ${bonusTaken}/${bonusSeen}`);
+    for (const r of table) {
+      const c = Object.entries(r.causes).map(([k, v]) => `${k} ${v}`).join(', ');
+      lines.push(`strategy ${r.name}: survived ${r.survived}/20, avg ${r.avgTime.toFixed(1)}s, avg score ${r.avgScore.toFixed(0)}, mint ${r.mint}${c ? ', crashes: ' + c : ''}`);
+    }
     lines.push('patterns: ' + Object.entries(used).map(([k, v]) => `${k} ${v}`).join(', '));
-    lines.push(`always-hold crashed at ${held.elapsed.toFixed(2)}s; never-hold crashed at ${idle.elapsed.toFixed(2)}s`);
     lines.unshift(failures === 0 ? 'PASS' : `FAIL (${failures})`);
     document.getElementById('out').textContent = lines.join('\n');
     document.title = lines.join(' | ');

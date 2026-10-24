@@ -16,6 +16,8 @@
 //                                  `shift` widens the gap right (+) or left (-), visual only;
 //                                  `length` makes it a tunnel you must hold through
 //     { type: 'barrier', space }   full-width cyan barrier: smash it at full size
+//     { type: 'barrier', space, charged: true }  charged barrier: also needs a full charge ring,
+//                                  i.e. the orb must have been full size for 0.3 s
 //     { type: 'energy', space }    gold energy pair; counts toward stars
 //     { type: 'bonus', space }     mint bonus pair; tighter timing, optional, extra only
 //
@@ -26,12 +28,12 @@
 // every stage for required fields, fairness and that the autopilot can finish it.
 Pulse.STAGES = [
   {
-    // Shrink basics: easy and tighter gaps, gold between them, then a first hold-through
-    // (two gaps too close to let go between).
+    // Learn the rules: shrink for gaps, then barriers introduced on their own (you're already
+    // big), then after a gap with plenty of time, then one short combination.
     id: 's1-first-pulse',
     name: 'First Pulse',
     sector: { id: 'sector-1', name: 'Sector 1' },
-    intro: 'Hold anywhere to shrink. Release to grow and catch gold.',
+    intro: 'Hold to shrink through gaps. Release to grow, catch gold and smash cyan barriers.',
     speed: { start: 220, end: 240 },
     visual: { background: 'bg_stage1_first_pulse', ticks: 'bg_stage1_ticks', bgSpeed: 0.22, tickSpeed: 0.5 },
     exit: { type: 'finish', runout: 360 },
@@ -41,53 +43,59 @@ Pulse.STAGES = [
       { type: 'gate', space: 240, need: 48 },
       { type: 'energy', space: 220 },
       { type: 'gate', space: 240, need: 46 },
-      { type: 'gate', space: 300, need: 76 },
       { type: 'energy', space: 200 },
+      // First barrier: alone, and you're already full size.
+      { type: 'barrier', space: 320 },
+      { type: 'energy', space: 200 },
+      { type: 'gate', space: 260, need: 46 },
+      // Then after a gap, with plenty of time to let go.
+      { type: 'barrier', space: 320 },
+      { type: 'energy', space: 200 },
+      // One short combination: hold through two gaps, then let go for a barrier.
       { type: 'gate', space: 240, need: 44 },
-      { type: 'energy', space: 200 },
-      { type: 'gate', space: 220, need: 42 },
-      // Hold through: two gaps back to back.
-      { type: 'gate', space: 160, need: 46 },
-      { type: 'energy', space: 220 },
-      { type: 'gate', space: 220, need: 44 },
       { type: 'gate', space: 150, need: 44 },
+      { type: 'barrier', space: 300 },
       { type: 'energy', space: 200 },
     ],
   },
   {
-    // Barriers: the opposite demand. First alone (you're already big), then after a gap
-    // (let go in time), then alternating squeeze/smash at a steady beat.
+    // Build rhythm: squeeze/smash at a steady beat, then the charged barrier: first alone
+    // (you're already charged), then after a gap with a generous lead, then in short combos.
     id: 's2-find-the-rhythm',
     name: 'Find the Rhythm',
     sector: { id: 'sector-1', name: 'Sector 1' },
-    intro: 'Cyan barriers shatter only at full size. Shrink for gaps, grow for barriers.',
+    intro: 'Keep the beat. Double-edged barriers need a full charge ring: let go early.',
     speed: { start: 260, end: 300 },
     visual: { background: 'bg_stage2_find_rhythm', ticks: 'bg_stage2_ticks', bgSpeed: 0.3, tickSpeed: 0.65 },
     exit: { type: 'finish', runout: 360 },
     items: [
-      { type: 'barrier', space: 420 },
-      { type: 'energy', space: 220 },
-      { type: 'gate', space: 260, need: 50, shift: 60 },
-      { type: 'barrier', space: 300 },
+      { type: 'gate', space: 420, need: 50, shift: 60 },
+      { type: 'barrier', space: 260 },
+      { type: 'gate', space: 250, need: 46, shift: -60 },
       { type: 'energy', space: 200 },
-      { type: 'gate', space: 240, need: 46, shift: -60 },
-      { type: 'barrier', space: 280 },
-      { type: 'gate', space: 280, need: 46, shift: 70 },
-      { type: 'energy', space: 220 },
-      { type: 'barrier', space: 200 },
-      { type: 'gate', space: 250, need: 44, shift: -70 },
-      { type: 'energy', space: 200 },
-      // The rhythm run: squeeze, smash, squeeze, smash.
-      { type: 'barrier', space: 120 },
-      { type: 'gate', space: 240, need: 44, shift: 60 },
+      { type: 'barrier', space: 140 },
+      // The beat: squeeze, smash, squeeze.
+      { type: 'gate', space: 240, need: 46, shift: 60 },
       { type: 'barrier', space: 230 },
-      { type: 'gate', space: 230, need: 46, shift: -60 },
+      { type: 'gate', space: 230, need: 44, shift: -60 },
+      { type: 'energy', space: 210 },
+      // First charged barrier: alone; staying big fills the ring.
+      { type: 'barrier', space: 360, charged: true },
+      { type: 'energy', space: 200 },
+      { type: 'gate', space: 250, need: 46, shift: 60 },
+      // After a gap: let go early so the ring fills.
+      { type: 'barrier', space: 360, charged: true },
+      { type: 'gate', space: 250, need: 44, shift: -60 },
+      { type: 'energy', space: 200 },
+      { type: 'barrier', space: 140 },
+      { type: 'gate', space: 250, need: 44, shift: 60 },
+      { type: 'barrier', space: 320, charged: true },
       { type: 'energy', space: 210 },
     ],
   },
   {
-    // Combinations, faster: quick release into a barrier, hold-throughs, a long hold (tunnel),
-    // and two mint dares where holding through is the safe choice.
+    // Mastery: combinations of everything, a long hold that ends in a charged barrier, and two
+    // optional mint dares where holding through is the safe choice.
     id: 's3-controlled-overload',
     name: 'Controlled Overload',
     sector: { id: 'sector-1', name: 'Sector 1' },
@@ -101,17 +109,18 @@ Pulse.STAGES = [
       { type: 'energy', space: 200 },
       { type: 'gate', space: 260, need: 42, shift: -60 },
       { type: 'gate', space: 170, need: 40, shift: 70 },
-      { type: 'barrier', space: 280 },
+      { type: 'barrier', space: 380, charged: true },
       { type: 'gate', space: 270, need: 40, shift: -70 },
       // Mint dare: a quick release between two gaps.
       { type: 'bonus', space: 190 },
       { type: 'gate', space: 190, need: 38, shift: 60 },
       { type: 'energy', space: 240 },
       { type: 'barrier', space: 160 },
-      // Long hold.
+      // Long hold, recovery gold, then a charged barrier: don't stay small out of habit.
       { type: 'gate', space: 270, need: 38, length: 220 },
       { type: 'energy', space: 240 },
-      { type: 'gate', space: 250, need: 36, shift: -80 },
+      { type: 'barrier', space: 200, charged: true },
+      { type: 'gate', space: 270, need: 36, shift: -80 },
       { type: 'barrier', space: 260 },
       { type: 'gate', space: 270, need: 36, shift: 80 },
       { type: 'barrier', space: 260 },
@@ -120,7 +129,7 @@ Pulse.STAGES = [
       { type: 'bonus', space: 190 },
       { type: 'gate', space: 190, need: 34, shift: 60 },
       { type: 'energy', space: 240 },
-      { type: 'barrier', space: 160 },
+      { type: 'barrier', space: 160, charged: true },
       { type: 'gate', space: 270, need: 36, shift: -70 },
       { type: 'energy', space: 240 },
     ],

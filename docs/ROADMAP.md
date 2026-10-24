@@ -25,7 +25,10 @@
 - [x] Integrate Gemini's v2.0 asset pack (`feature/pulse-art-v2`)
 - [x] Phone check of the new art (producer: looks good)
 - [x] Gameplay variety v1: barriers, Endless patterns, stage redesign ([GAMEPLAY_VARIETY.md](GAMEPLAY_VARIETY.md))
-- [ ] Phone playtest of gameplay variety
+- [x] Phone playtest of gameplay variety (producer: genuinely fun)
+- [x] Gameplay evolution v2: charged barriers, combo sequences, multiplier feedback ([GAMEPLAY_EVOLUTION.md](GAMEPLAY_EVOLUTION.md))
+- [ ] Phone playtest of gameplay evolution v2
+- [ ] Barrier and charge-ring art from Gemini
 - [ ] Playtest with 3–5 people against the targets in [PULSE_PROTOTYPE.md](PULSE_PROTOTYPE.md)
 
 ## Later / Ideas

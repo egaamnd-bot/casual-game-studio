@@ -28,14 +28,18 @@ Pulse.CONFIG = {
   gate: { thickness: 36, maxShift: 70 },
 
   // Full-width cyan barrier: smashed if the orb is charged (near full size), fatal if shrunk.
-  barrier: { thickness: 22 },
+  // A *charged* barrier (thicker, double-edged) also needs a full charge ring: the orb must
+  // have stayed at full size for `chargeTime` seconds before impact.
+  barrier: { thickness: 22, chargedThickness: 30, chargeTime: 0.3 },
 
   // Fairness: minimum clear time (s) to switch size between two demands, used by
   // Pulse.Track.validateItems for campaign stages and Endless patterns alike.
   track: {
     minWallSpace: 40, // px between any two walls/barriers, for readability
+    minMixedSpace: 80, // px between a gap wall and a barrier, so the two kinds read apart
     toSmall: 0.35, // grown (or start) → must be shrunk for a gate
     toBarrier: 0.32, // shrunk → must be charged for a barrier
+    toChargedBarrier: 0.62, // shrunk → regrown AND fully charged (0.32 + 0.3 charge time)
     toEnergy: 0.32, // shrunk → charged for gold
     energyToSmall: 0.32, // gold → shrunk again
     bonusTime: 0.22, // either side of a mint bonus: it's the risky option
@@ -56,6 +60,8 @@ Pulse.CONFIG = {
   },
 
   multiplierMax: 5,
+  // Feedback only (no points): call out every Nth obstacle cleared while at the max multiplier.
+  maxStreakCallout: 10,
   // Cosmetic near-miss effect when the clearance left around the orb is at most this many px.
   nearMissMargin: 8,
   restartLockMs: 380,
