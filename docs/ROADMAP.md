@@ -21,8 +21,9 @@
 - [x] Producer phone QA of the prototype (8/8 checks passed)
 - [x] Approve the art direction (Kinetic Vector / Precision Cyber-Grid)
 - [x] Campaign system v1: data-driven stages, 3 stages, stars, skins, save data ([CAMPAIGN.md](CAMPAIGN.md))
-- [ ] Phone playtest of the campaign
-- [ ] Integrate Gemini's v2.0 asset pack (separate branch)
+- [x] Phone playtest of the campaign (producer: works well)
+- [x] Integrate Gemini's v2.0 asset pack (`feature/pulse-art-v2`)
+- [ ] Phone check of the new art
 - [ ] Playtest with 3–5 people against the targets in [PULSE_PROTOTYPE.md](PULSE_PROTOTYPE.md)
 
 ## Later / Ideas

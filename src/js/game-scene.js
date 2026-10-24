@@ -28,14 +28,17 @@
       this.save = Pulse.Save.load();
       this.skin = Pulse.Skins.selected(this.save);
       this.best = this.save.endless.best;
+      let visual = Pulse.Assets.ENDLESS_VISUAL;
       if (this.mode === 'campaign') {
         this.stage = Pulse.STAGES[this.stageIndex];
         this.level = new Pulse.Campaign.CampaignLevel(this.W, this.H, this.stage);
-        this.edgeColor = this.stage.visual && this.stage.visual.wallEdge;
+        visual = this.stage.visual || visual;
       } else {
         this.level = new Pulse.Level(this.W, this.H);
-        this.edgeColor = null;
       }
+      // Sprites when Gemini's assets loaded; otherwise the code-drawn shapes in render.js.
+      this.view = Pulse.Assets.ok ? new Pulse.SpriteView(this, visual, this.skin) : null;
+      this.nearMisses = 0;
 
       this.radius = C.orb.radius;
       this.score = 0;
@@ -47,8 +50,9 @@
       this.ringT = 1;
       this.test = window.PULSE_TEST || null;
 
-      this.world = this.add.graphics();
+      this.world = this.add.graphics().setDepth(3);
       this.overlay = this.add.graphics().setDepth(15);
+      this.overlayImages = [];
       this.createHud();
       this.createButtons();
 
@@ -92,11 +96,11 @@
       const UI = Pulse.UI;
       const cx = this.W / 2;
       const campaign = this.mode === 'campaign';
-      this.pauseBtn = UI.button(this, 52, this.hudTop, 64, 64, 'II', () => this.pause(), { size: 26 });
+      this.pauseBtn = UI.iconButton(this, 52, this.hudTop, 64, 'ui_btn_icon_pause_up', 'II', () => this.pause());
       this.backBtn = UI.button(this, cx, this.H - 80, 300, 70, campaign ? 'Stages' : 'Menu', () => this.leave());
       this.retryBtn = UI.button(this, cx, this.H - 170, 300, 70, 'Retry', () => this.canAct() && this.startRun());
       this.nextBtn = UI.button(this, cx, this.H - 260, 300, 70, 'Next stage', () => this.canAct() && this.nextStage(),
-        { edge: T.wallEdge });
+        { edge: T.wallEdge, primary: 'mint' });
     }
 
     canAct() {
@@ -115,6 +119,8 @@
       for (const t of [this.titleText, this.subText, this.hintText, this.detailText]) t.setVisible(false);
       this.titleText.setFontSize(88);
       this.overlay.clear();
+      for (const img of this.overlayImages) img.destroy();
+      this.overlayImages.length = 0;
 
       if (state === 'ready') {
         if (campaign) {
@@ -142,7 +148,7 @@
         show(this.titleText, 'Stage clear', T.text);
         // Dim the frozen play field so the results and buttons read cleanly over it.
         this.overlay.fillStyle(T.background, 0.82).fillRect(0, 0, this.W, this.H);
-        Pulse.Render.stars(this.overlay, this.W / 2, this.titleText.y + 80, 26, r.stars, 3);
+        Pulse.UI.stars(this, this.overlay, this.W / 2, this.titleText.y + 80, 26, r.stars, 3, this.overlayImages, 17);
         const lines = [`Energy ${this.energy}/${this.level.track.energyTotal}`];
         if (this.level.track.bonusTotal) lines[0] += ` · Bonus ${this.bonus}/${this.level.track.bonusTotal}`;
         if (r.record.bestStars > r.stars) lines.push(`Best ${r.record.bestStars} stars`);
@@ -271,6 +277,7 @@
             s.taken = true;
             s.resolved = true;
             this.ringT = 0;
+            if (this.view) this.view.collect(s);
             if (campaign) {
               if (s.variant === 'bonus') this.bonus++;
               else this.energy++;
@@ -304,6 +311,7 @@
             this.updateHud();
           }
           Pulse.Sfx.play('pass');
+          this.checkNearMiss(s, r);
         }
       }
 
@@ -318,6 +326,7 @@
       }
       if (this.test && this.test.onCrash) this.test.onCrash(this.elapsed, this.score);
       Pulse.Sfx.play('crash');
+      if (this.view) this.view.crash();
       this.cameras.main.shake(220, 0.012);
       this.cameras.main.flash(120, 255, 93, 108);
       this.setState('over');
@@ -334,6 +343,14 @@
       this.setState('complete');
     }
 
+    // Cosmetic only: flashes a graze arc when the orb squeezed past a wall edge with little room.
+    // It reads state after scoring is done and never touches score, stars or the multiplier.
+    checkNearMiss(s, r) {
+      if (s.need - r > C.nearMissMargin) return;
+      this.nearMisses++;
+      if (this.view) this.view.nearMiss(this.orbX - s.gapL <= s.gapR - this.orbX ? -1 : 1, r);
+    }
+
     popup(str, color) {
       this.tweens.killTweensOf(this.popupText);
       this.popupText.setText(str).setColor(color).setAlpha(1).setPosition(this.orbX, this.orbY - C.orb.radius - 30);
@@ -343,15 +360,19 @@
     draw() {
       const g = this.world;
       g.clear();
-      Pulse.Render.background(g, this.W, this.H, this.scroll);
-
       const dimmed = !this.canCollect();
-      const segs = this.level.segments;
-      for (let i = 0; i < segs.length; i++) {
-        const s = segs[i];
-        if (!s.active || s.y > this.H || s.y + s.h < -40) continue;
-        if (s.kind === 'pickup') Pulse.Render.pickup(g, s, this.orbX, dimmed);
-        else Pulse.Render.walls(g, s, this.W, this.edgeColor);
+
+      if (this.view) {
+        this.view.render(this.level, this.scroll, dimmed, g);
+      } else {
+        Pulse.Render.background(g, this.W, this.H, this.scroll);
+        const segs = this.level.segments;
+        for (let i = 0; i < segs.length; i++) {
+          const s = segs[i];
+          if (!s.active || s.y > this.H || s.y + s.h < -40) continue;
+          if (s.kind === 'pickup') Pulse.Render.pickup(g, s, this.orbX, dimmed);
+          else Pulse.Render.walls(g, s, this.W);
+        }
       }
 
       if (this.mode === 'campaign') {
@@ -362,8 +383,12 @@
         }
       }
 
-      Pulse.Render.orb(g, this.orbX, this.orbY, this.radius, this.state === 'over', this.skin);
-      if (this.ringT < 1) Pulse.Render.collectRing(g, this.orbX, this.orbY, this.ringT);
+      if (this.view) {
+        this.view.renderOrb(this.radius, this.state === 'over');
+      } else {
+        Pulse.Render.orb(g, this.orbX, this.orbY, this.radius, this.state === 'over', this.skin);
+        if (this.ringT < 1) Pulse.Render.collectRing(g, this.orbX, this.orbY, this.ringT);
+      }
     }
 
     // Test-only autopilot: shrinks for any wall it cannot fit through, otherwise stays big.

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse asset tests</title>
+  <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
+</head>
+<body>
+  <script>
+    // Checks Gemini's v2.0 asset pack as the game actually loads it: every file loads, every
+    // frame the code uses exists, stage backgrounds are known, each scene opens and each skin
+    // renders without errors, and sprite sizes match the gameplay sizes.
+    // In Chrome/Edge, open with --allow-file-access-from-files (file:// loading), or serve the repo.
+    try { localStorage.clear(); } catch (e) {}
+    window.PULSE_ASSET_BASE = '../src/';
+    window.PULSE_TEST = { autoStart: false };
+    const errors = [];
+    window.addEventListener('error', (ev) => errors.push(ev.message));
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script src="../src/js/render.js"></script>
+  <script src="../src/js/ui.js"></script>
+  <script src="../src/js/assets.js"></script>
+  <script src="../src/js/sprite-view.js"></script>
+  <script src="../src/js/game-scene.js"></script>
+  <script src="../src/js/menu-scenes.js"></script>
+  <script src="../src/js/main.js"></script>
+  <script>
+    const C = Pulse.CONFIG;
+    const A = Pulse.ART;
+    const fails = [];
+    const notes = [];
+    const check = (ok, msg) => { if (!ok) fails.push(msg); };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const active = () => window.__pulseGame.scene.getScenes(true)[0];
+    const near = (a, b) => Math.abs(a - b) < 0.6;
+
+    async function run() {
+      for (let i = 0; i < 50 && !active(); i++) await wait(100);
+      await wait(500);
+      check(Pulse.Assets.ok === true, `assets ok (missing: ${(Pulse.Assets.missingList || []).join(', ')})`);
+      check(Pulse.Assets.failed.length === 0, `load errors: ${Pulse.Assets.failed.join(', ')}`);
+      check(active().scene.key === 'menu', 'boot opens the menu');
+      let frames = 0;
+      const req = Pulse.Assets.requiredFrames();
+      for (const k of Object.keys(req)) frames += req[k].length;
+      notes.push(`${frames} required frames present`);
+
+      for (const stage of Pulse.STAGES) {
+        check(stage.visual && Pulse.Assets.IMAGES.includes(stage.visual.background) && Pulse.Assets.IMAGES.includes(stage.visual.ticks),
+          `${stage.id}: background images are known`);
+      }
+      for (const key of ['anim_orb_gold', 'anim_orb_mint', ...Pulse.SKINS.map((s) => `anim_arcs_${s.id}`)]) {
+        const anim = active().anims.get(key);
+        check(anim && anim.frames.length === 4, `animation ${key} has 4 frames`);
+      }
+
+      // Menus.
+      active().scene.start('stages'); await wait(400);
+      check(active().scene.key === 'stages', 'stage select opens');
+
+      // Gameplay in every stage and Endless, every skin: sizes match gameplay.
+      const runs = Pulse.STAGES.map((s, i) => ({ mode: 'campaign', stageIndex: i })).concat([{ mode: 'endless' }]);
+      for (let k = 0; k < runs.length; k++) {
+        const save = Pulse.Save.load();
+        save.skins.unlocked = Pulse.SKINS.map((s) => s.id);
+        save.skins.selected = Pulse.SKINS[k % Pulse.SKINS.length].id;
+        Pulse.Save.write(save);
+        active().scene.start('game', runs[k]); await wait(400);
+        const g = active();
+        check(g.view && g.skin.id === save.skins.selected, `run ${k}: sprite view with skin ${save.skins.selected}`);
+        g.test = { bot: true };
+        g.startRun();
+        await wait(3000);
+        check(g.state === 'playing', `run ${k}: still playing after 3s with autopilot`);
+        // Orb art edge equals the collision radius at full size.
+        g.radius = C.orb.radius; g.draw();
+        check(near(g.view.body.displayWidth / 2 * (A.orbBodyRadius / 64), C.orb.radius), `run ${k}: orb art radius = ${C.orb.radius}`);
+        g.radius = C.orb.minRadius; g.draw();
+        check(near(g.view.core.displayWidth / 2 * (A.orbShrunkRadius / 38), C.orb.minRadius), `run ${k}: shrunk art radius = ${C.orb.minRadius}`);
+        const gates = g.level.segments.filter((s) => s.active && s._vis && s._vis.kind === 'gate' && s._vis.parts[1].visible);
+        if (gates.length) {
+          const s = gates[0];
+          const [, capL, capR] = s._vis.parts;
+          check(Math.abs(capL.x + A.capReach * A.base - s.gapL) < 1 && Math.abs(capR.x + (64 - A.capReach) * A.base - s.gapR) < 1,
+            `run ${k}: wall art edges match collision gap`);
+          check(Math.abs(capL.y + A.wallBandTop * A.base - s.y) < 1, `run ${k}: wall art band aligned with collision`);
+        }
+      }
+
+      // Cosmetic near miss: forcing one must not change score.
+      const g = active();
+      const before = g.score;
+      const fakeGate = { need: g.radius + 2, gapL: g.orbX - g.radius - 2, gapR: g.orbX + 80 };
+      g.checkNearMiss(fakeGate, g.radius);
+      check(g.score === before && g.nearMisses >= 1, 'near-miss effect does not change score');
+
+      check(errors.length === 0, `page errors: ${errors.join(' | ')}`);
+      document.title = (fails.length ? `FAIL ${fails.length}: ${fails.join(' | ')}` : 'PASS asset tests') + ' | ' + notes.join(' | ');
+    }
+    run().catch((e) => { document.title = 'ERROR ' + e.message; });
+  </script>
+</body>
+</html>

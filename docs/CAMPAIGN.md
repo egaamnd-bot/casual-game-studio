@@ -107,7 +107,7 @@ The tests prove the stages are valid, fair and completable. They don't prove the
 
 ## Known Limitations
 
-- All visuals are still placeholders. Gemini's v2.0 asset pack arrived during this work and will be integrated in a separate branch (see the PR description).
+- Visuals: Gemini's v2.0 art is integrated on `feature/pulse-art-v2` (see ART_BIBLE.md). This branch alone still uses shapes.
 - No haptics, music, mute or settings.
 - The Android back button still closes the app; there's no in-app back handling.
 - Stage pacing numbers are first guesses.

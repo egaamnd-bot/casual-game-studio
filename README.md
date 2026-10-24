@@ -49,7 +49,7 @@ casual-game-studio/
 │   ├── DECISIONS.md     # Log of approved decisions
 │   └── ROADMAP.md       # Milestones and current focus
 ├── scripts/build.mjs    # Copies src/ into dist/ for Capacitor (runs in CI)
-├── src/                 # The game (index.html + js/)
+├── src/                 # The game (index.html, js/, assets/ = Gemini's atlases and backgrounds)
 ├── tests/               # Browser test pages
 ├── capacitor.config.json
 ├── package.json

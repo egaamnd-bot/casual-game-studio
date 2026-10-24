@@ -7,14 +7,15 @@
 //   intro     one-line guidance shown before the stage starts
 //   speed     { start, end } forward speed, interpolated linearly over the stage's length
 //   stars     optional { two, three } share of energy pairs needed (defaults in config.js)
-//   visual    optional { wallEdge } colour overrides for the placeholder renderer
+//   visual    optional { background, ticks, bgSpeed, tickSpeed } background image keys (assets.js)
+//             and their scroll speed relative to the walls
 //   exit      { type: 'finish', runout } finish line `runout` px after the last item
 //   items     ordered list; each item's `space` is the clear distance from the previous item:
 //     { type: 'gate',  space, need, shift }  wall with a gap. `need` = clearance on the tight
 //                                            side of the orb's path; `shift` widens the gap
 //                                            right (+) or left (-), moving where the gap sits
 //     { type: 'energy', space }              energy pair; counts toward stars
-//     { type: 'bonus',  space }              bonus diamond pair; tighter timing, extra only
+//     { type: 'bonus',  space }              bonus energy pair (mint); tighter timing, extra only
 //
 // To add a stage: append an object here with a new id. Tests in tests/campaign.html check
 // every stage for required fields, fairness and that the autopilot can finish it.
@@ -25,6 +26,7 @@ Pulse.STAGES = [
     sector: { id: 'sector-1', name: 'Sector 1' },
     intro: 'Hold anywhere to shrink. Release to grow and catch energy.',
     speed: { start: 220, end: 240 },
+    visual: { background: 'bg_stage1_first_pulse', ticks: 'bg_stage1_ticks', bgSpeed: 0.22, tickSpeed: 0.5 },
     exit: { type: 'finish', runout: 360 },
     items: [
       { type: 'gate', space: 420, need: 76, shift: 0 },
@@ -50,6 +52,7 @@ Pulse.STAGES = [
     sector: { id: 'sector-1', name: 'Sector 1' },
     intro: 'Gaps now shift left and right. Watch the tight edge.',
     speed: { start: 260, end: 300 },
+    visual: { background: 'bg_stage2_find_rhythm', ticks: 'bg_stage2_ticks', bgSpeed: 0.3, tickSpeed: 0.65 },
     exit: { type: 'finish', runout: 360 },
     items: [
       // Gentle examples first: one shift at a time, with room to breathe.
@@ -81,8 +84,9 @@ Pulse.STAGES = [
     id: 's3-controlled-overload',
     name: 'Controlled Overload',
     sector: { id: 'sector-1', name: 'Sector 1' },
-    intro: 'Everything you learned, faster. Diamonds are risky bonus energy.',
+    intro: 'Everything you learned, faster. Green hexagons are risky bonus energy.',
     speed: { start: 300, end: 400 },
+    visual: { background: 'bg_stage3_overload', ticks: 'bg_stage3_ticks', bgSpeed: 0.38, tickSpeed: 0.8 },
     exit: { type: 'finish', runout: 420 },
     items: [
       { type: 'gate', space: 420, need: 46, shift: 60 },

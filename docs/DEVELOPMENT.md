@@ -33,7 +33,9 @@ No local install is needed. Game code lives in `src/` as plain JavaScript (no bu
 ## Testing
 
 - **Automated tests:** plain HTML test pages in `tests/`. Open each in a desktop browser; the tab title shows PASS/FAIL or the result. Details: [PULSE_PROTOTYPE.md](PULSE_PROTOTYPE.md#testing)
+  - `tests/assets.html`: Gemini's asset pack loads, every used frame exists, art lines up with collision sizes
   - `tests/campaign.html`: campaign stages, stars, skins, save data
+  - Pages that load the game's images need Chrome/Edge started with `--allow-file-access-from-files` when opened as local files. `scene.html?noassets=1` and `gameplay.html?noassets=1` test the shape fallback
   - `tests/scene.html`: the real game driven by simulated input (touch release, pause, retry, saving)
   - `tests/logic.html`: collision and fairness of the Endless obstacle generator
   - `tests/gameplay.html?bot=1&seconds=60`: the real game played by an autopilot

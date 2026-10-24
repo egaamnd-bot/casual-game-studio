@@ -58,6 +58,8 @@ Pulse.CONFIG = {
   },
 
   multiplierMax: 5,
+  // Cosmetic near-miss effect when the clearance left around the orb is at most this many px.
+  nearMissMargin: 8,
   restartLockMs: 380,
   maxFrameSeconds: 0.05,
 };

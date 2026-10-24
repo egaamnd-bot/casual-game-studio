@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>Pulse scene tests</title>
-  <style>html, body { margin: 0; height: 100%; background: #0f1328; overflow: hidden; }</style>
+  <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
 </head>
 <body>
   <script>
@@ -11,7 +11,12 @@
     // retry lock, pickup dimming, campaign save rules and Endless best-score preservation.
     // Results go into the page title. Needs internet for Phaser (CDN).
     try { localStorage.clear(); localStorage.setItem('pulse.best', '77'); } catch (e) {}
-    window.PULSE_TEST = { autoStart: true, bot: false, mode: 'campaign', stageIndex: 0 };
+    // ?noassets=1 runs the same checks with the code-drawn shapes instead of sprites.
+    window.PULSE_ASSET_BASE = '../src/';
+    window.PULSE_TEST = {
+      autoStart: true, bot: false, mode: 'campaign', stageIndex: 0,
+      noAssets: new URLSearchParams(location.search).get('noassets') === '1',
+    };
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
   <script src="../src/js/config.js"></script>
@@ -23,6 +28,8 @@
   <script src="../src/js/skins.js"></script>
   <script src="../src/js/render.js"></script>
   <script src="../src/js/ui.js"></script>
+  <script src="../src/js/assets.js"></script>
+  <script src="../src/js/sprite-view.js"></script>
   <script src="../src/js/game-scene.js"></script>
   <script src="../src/js/menu-scenes.js"></script>
   <script src="../src/js/main.js"></script>
@@ -86,13 +93,22 @@
       check(s.state === 'playing', 'tap resumes after pause button');
 
       // Pickup dimming: wait until a pickup is on screen, then hold.
+      const sprites = !!s.view;
+      check(sprites === !window.PULSE_TEST.noAssets, `renderer is ${sprites ? 'sprites' : 'shapes'} as requested`);
+      const pickupSprites = () => sprites
+        ? s.view.free.pickup.concat(s.level.segments.filter((g) => g._vis && g._vis.kind === 'pickup').map((g) => g._vis))
+          .flatMap((v) => v.parts.map((p) => p.orb)).filter((o) => o.visible)
+        : [];
+      // Wait until a pickup is actually on screen.
+      const pickupVisible = () => s.level.segments.some((g) => g.active && g.kind === 'pickup' && !g.taken && g.y > 0 && g.y < s.orbY - 40);
+      for (let i = 0; i < 100 && !pickupVisible(); i++) await wait(100);
+      check(pickupVisible(), 'a pickup scrolls onto the screen');
       dimLog.length = 0;
-      await wait(1500);
-      down(cx, cy); await wait(400);
-      const shrunkDraws = dimLog.slice(-5);
+      down(cx, cy); await wait(300);
+      const shrunkDraws = sprites ? pickupSprites().map((o) => o.alpha === C.pickup.dimAlpha) : dimLog.slice(-5);
       up(cx, cy); await wait(400);
-      const fullDraws = dimLog.slice(-5);
-      check(shrunkDraws.length > 0 && shrunkDraws.every((d) => d === true), 'pickups dimmed while shrunk');
+      const fullDraws = sprites ? pickupSprites().map((o) => o.alpha === 1 ? false : true) : dimLog.slice(-5);
+      check(shrunkDraws.length > 0 && shrunkDraws.every((d) => d === true), 'pickups dimmed to 45% while shrunk');
       check(fullDraws.length > 0 && fullDraws.every((d) => d === false), 'pickups at full opacity when grown');
 
       // Crash (no input): no completion recorded, next stage stays locked, retry lock.

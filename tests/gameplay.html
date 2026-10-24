@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>Pulse gameplay test</title>
-  <style>html, body { margin: 0; height: 100%; background: #0f1328; overflow: hidden; }</style>
+  <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
 </head>
 <body>
   <script>
@@ -14,7 +14,11 @@
     const params = new URLSearchParams(location.search);
     const seconds = Number(params.get('seconds') || 30);
     if (params.get('fresh') === '1') { try { localStorage.clear(); } catch (e) {} }
+    // Assets load from ../src/. In Chrome/Edge a file:// page needs --allow-file-access-from-files
+    // for that; ?noassets=1 forces the code-drawn shapes instead.
+    window.PULSE_ASSET_BASE = '../src/';
     window.PULSE_TEST = {
+      noAssets: params.get('noassets') === '1',
       bot: params.get('bot') === '1',
       autoStart: params.get('start') !== '0',
       mode: params.get('mode') || 'endless',
@@ -28,7 +32,12 @@
     };
     // ?open=stages (with start=0) jumps to a menu screen, for screenshots.
     if (params.get('open')) {
-      setTimeout(() => window.__pulseGame.scene.getScenes(true)[0].scene.start(params.get('open')), 300);
+      const openWhenReady = () => {
+        const active = window.__pulseGame && window.__pulseGame.scene.getScenes(true)[0];
+        if (active && active.scene.key === 'menu') active.scene.start(params.get('open'));
+        else setTimeout(openWhenReady, 100);
+      };
+      setTimeout(openWhenReady, 100);
     }
     setTimeout(() => {
       if (document.title.startsWith('CRASH') || document.title.startsWith('COMPLETE')) return;
@@ -48,6 +57,8 @@
   <script src="../src/js/skins.js"></script>
   <script src="../src/js/render.js"></script>
   <script src="../src/js/ui.js"></script>
+  <script src="../src/js/assets.js"></script>
+  <script src="../src/js/sprite-view.js"></script>
   <script src="../src/js/game-scene.js"></script>
   <script src="../src/js/menu-scenes.js"></script>
   <script src="../src/js/main.js"></script>
