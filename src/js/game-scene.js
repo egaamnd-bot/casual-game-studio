@@ -140,6 +140,8 @@
         const r = this.result;
         this.titleText.setFontSize(64);
         show(this.titleText, 'Stage clear', T.text);
+        // Dim the frozen play field so the results and buttons read cleanly over it.
+        this.overlay.fillStyle(T.background, 0.82).fillRect(0, 0, this.W, this.H);
         Pulse.Render.stars(this.overlay, this.W / 2, this.titleText.y + 80, 26, r.stars, 3);
         const lines = [`Energy ${this.energy}/${this.level.track.energyTotal}`];
         if (this.level.track.bonusTotal) lines[0] += ` · Bonus ${this.bonus}/${this.level.track.bonusTotal}`;

@@ -26,6 +26,10 @@
         document.title = `COMPLETE in ${elapsed.toFixed(1)}s energy ${energy} bonus ${bonus} stars ${stars}`;
       },
     };
+    // ?open=stages (with start=0) jumps to a menu screen, for screenshots.
+    if (params.get('open')) {
+      setTimeout(() => window.__pulseGame.scene.getScenes(true)[0].scene.start(params.get('open')), 300);
+    }
     setTimeout(() => {
       if (document.title.startsWith('CRASH') || document.title.startsWith('COMPLETE')) return;
       const s = window.__pulseScene;

@@ -16,14 +16,17 @@
   const scenes = [Pulse.MenuScene, Pulse.StageSelectScene, Pulse.GameScene];
   if (test && test.autoStart) scenes.unshift(scenes.pop());
 
-  new Phaser.Game({
+  const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: document.body,
     backgroundColor: Pulse.THEME.backgroundCss,
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: C.width, height },
     input: { activePointers: 3 },
+    // Sounds come from src/js/sfx.js; Phaser's own audio engine is unused for now.
+    audio: { noAudio: true },
     scene: scenes,
     // Headless test browsers barely run requestAnimationFrame, so test pages use timers.
     fps: test ? { forceSetTimeOut: true, target: 60 } : undefined,
   });
+  if (test) window.__pulseGame = game;
 })();

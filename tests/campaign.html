@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse campaign tests</title>
+</head>
+<body>
+  <pre id="out">running…</pre>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script>
+    // Campaign, stars, skins and save-data tests. No Phaser needed.
+    // Open in a browser; the page title becomes "PASS ..." or "FAIL ...".
+    const C = Pulse.CONFIG;
+    const R = C.orb.radius;
+    const W = C.width;
+    const lines = [];
+    let failures = 0, checks = 0;
+    function check(ok, message) {
+      checks++;
+      if (!ok) { failures++; if (failures <= 40) lines.push('FAIL ' + message); }
+    }
+    const fresh = () => Pulse.Save.defaults();
+
+    // In-memory stand-in for localStorage.
+    function memoryStorage(initial) {
+      const data = Object.assign({}, initial);
+      return {
+        data,
+        getItem: (k) => (k in data ? data[k] : null),
+        setItem: (k, v) => { data[k] = String(v); },
+      };
+    }
+
+    // Plays a stage with the same orb rules as GameScene. policy(level, orbY) → hold?
+    function play(stage, policy, height) {
+      height = height || 1100;
+      const orbY = Math.round(height * C.orb.yRatio);
+      const level = new Pulse.Campaign.CampaignLevel(W, height, stage);
+      let radius = R, frames = 0, energy = 0, bonus = 0;
+      const dt = 1 / 60;
+      while (frames < 60 * 300) {
+        const target = policy(level, orbY) ? C.orb.minRadius : R;
+        radius = radius > target ? Math.max(target, radius - C.orb.shrinkRate * dt) : Math.min(target, radius + C.orb.growRate * dt);
+        frames++;
+        level.update(dt, level.speedAt());
+        for (const s of level.segments) {
+          if (!s.active) continue;
+          if (s.kind === 'pickup') {
+            if (!s.resolved && level.touchesPickup(s, orbY, radius)) {
+              s.resolved = s.taken = true;
+              if (s.variant === 'bonus') bonus++; else energy++;
+            }
+            continue;
+          }
+          if (level.hitsWall(s, C.orb.x, orbY, radius)) return { crashed: true, completed: false, frames, energy, bonus, travelled: level.travelled };
+        }
+        if (level.finishY() >= orbY) return { crashed: false, completed: true, frames, energy, bonus, travelled: level.travelled };
+      }
+      return { crashed: false, completed: false, frames, energy, bonus, travelled: level.travelled };
+    }
+
+    // Same autopilot as GameScene.botWantsHold.
+    function bot(level, orbY) {
+      const look = level.speedAt() * 0.28;
+      for (const s of level.segments) {
+        if (!s.active || s.kind === 'pickup') continue;
+        if (s.y + s.h > orbY - R - look && s.y < orbY + R && s.need < R) return true;
+      }
+      return false;
+    }
+
+    // ---- Stage definitions ----
+    const ids = new Set();
+    check(Pulse.STAGES.length === 3, `expected 3 stages, found ${Pulse.STAGES.length}`);
+    Pulse.STAGES.forEach((stage, i) => {
+      const errors = Pulse.Campaign.validate(stage, W);
+      check(errors.length === 0, `stage ${i} invalid: ${errors.join('; ')}`);
+      check(!ids.has(stage.id), `duplicate stage id ${stage.id}`);
+      ids.add(stage.id);
+      const track = Pulse.Campaign.compile(stage, W);
+      check(track.finishAt > 0 && Number.isFinite(track.finishAt), `stage ${stage.id}: finite finish`);
+      check(track.energyTotal > 0, `stage ${stage.id}: has energy`);
+      for (let k = 1; k < track.items.length; k++) check(track.items[k].at > track.items[k - 1].at, `stage ${stage.id}: items ordered`);
+    });
+    const [s1, s2, s3] = Pulse.STAGES;
+    check(s1.items.every((it) => it.type !== 'bonus' && (it.type !== 'gate' || !it.shift)), 'stage 1 has no bonus or shifted gaps');
+    check(s1.items.filter((it) => it.type === 'gate').every((it) => it.need >= 42), 'stage 1 gaps are generous (need ≥ 42)');
+    check(s2.items.some((it) => it.shift > 0) && s2.items.some((it) => it.shift < 0), 'stage 2 alternates gap sides');
+    check(s3.speed.end > s3.speed.start && s3.speed.start >= s2.speed.end, 'stage 3 is faster and accelerates');
+    check(s3.items.some((it) => it.type === 'bonus'), 'stage 3 has bonus pickups');
+    check(s3.items.length > s2.items.length, 'stage 3 is the longest sequence');
+
+    // validate() rejects bad data.
+    const bad = (mutate) => { const s = JSON.parse(JSON.stringify(s1)); mutate(s); return Pulse.Campaign.validate(s, W); };
+    check(bad((s) => delete s.id).length > 0, 'missing id is rejected');
+    check(bad((s) => { s.exit = null; }).length > 0, 'missing exit is rejected');
+    check(bad((s) => { s.items = []; }).length > 0, 'empty items are rejected');
+    check(bad((s) => { s.items[2].need = 20; }).length > 0, 'unfair narrow gap is rejected');
+    check(bad((s) => { s.items[1].space = 60; }).length > 0, 'pickup too close to wall is rejected');
+    check(bad((s) => { s.items[5].space = 120; }).length > 0, 'walls too close together are rejected');
+    check(bad((s) => { s.items[0].type = 'laser'; }).length > 0, 'unknown item type is rejected');
+    check(bad((s) => { s.stars = { two: 0.9, three: 0.6 }; }).length > 0, 'inverted star thresholds are rejected');
+    check(Pulse.Campaign.validate(null, W).length > 0, 'null stage is rejected');
+
+    // ---- Playback: completable, reachable, deterministic ----
+    Pulse.STAGES.forEach((stage) => {
+      const track = Pulse.Campaign.compile(stage, W);
+      for (const h of [860, 1100, 1240]) {
+        const run = play(stage, bot, h);
+        check(run.completed, `${stage.id} @${h}px: autopilot should finish (crashed=${run.crashed})`);
+        check(run.energy === track.energyTotal, `${stage.id} @${h}px: all energy reachable (${run.energy}/${track.energyTotal})`);
+      }
+      const a = play(stage, bot), b = play(stage, bot);
+      check(JSON.stringify(a) === JSON.stringify(b), `${stage.id}: playback is deterministic`);
+      check(JSON.stringify(Pulse.Campaign.compile(stage, W).items) === JSON.stringify(track.items), `${stage.id}: compile is deterministic`);
+      const idle = play(stage, () => false);
+      check(idle.crashed && !idle.completed, `${stage.id}: no input must crash`);
+      const hold = play(stage, () => true);
+      check(hold.energy === 0 && hold.bonus === 0, `${stage.id}: always shrunk collects nothing`);
+      const secs = a.frames / 60;
+      lines.push(`${stage.id}: ${secs.toFixed(1)}s, energy ${a.energy}/${track.energyTotal}, bonus ${a.bonus}/${track.bonusTotal}, speed ${stage.speed.start}→${stage.speed.end}`);
+    });
+
+    // ---- Stars ----
+    const cs = Pulse.Campaign.computeStars;
+    const st = { stars: { two: 0.6, three: 0.9 } };
+    check(cs(st, false, 10, 10) === 0, 'crash awards 0 stars');
+    check(cs(st, true, 0, 10) === 1, 'completion alone = 1 star');
+    check(cs(st, true, 5, 10) === 1, '50% = 1 star');
+    check(cs(st, true, 6, 10) === 2, 'exactly 60% = 2 stars');
+    check(cs(st, true, 8, 10) === 2, '80% = 2 stars');
+    check(cs(st, true, 9, 10) === 3, 'exactly 90% = 3 stars');
+    check(cs(st, true, 10, 10) === 3, '100% = 3 stars');
+    check(cs(st, true, 0, 0) === 3, 'no energy in stage: completion = 3 stars');
+    check(cs(st, true, 1, 1) === 3 && cs(st, true, 0, 1) === 1, 'single energy: all or nothing');
+    // 7 energy: 60% → ceil(4.2) = 5 needed, 90% → ceil(6.3) = 7 needed.
+    check(cs(st, true, 4, 7) === 1 && cs(st, true, 5, 7) === 2, '7 energy: 2 stars needs 5');
+    check(cs(st, true, 6, 7) === 2 && cs(st, true, 7, 7) === 3, '7 energy: 3 stars needs 7');
+    check(cs({}, true, 6, 10) === 2, 'defaults apply when stage has no stars field');
+    check(cs({ stars: { three: 1 } }, true, 9, 10) === 2, 'per-stage threshold overrides default');
+
+    // ---- Progress, unlocks, replay ----
+    let save = fresh();
+    check(Pulse.Campaign.isUnlocked(save, 0) && !Pulse.Campaign.isUnlocked(save, 1), 'only stage 1 unlocked at start');
+    let r = Pulse.Campaign.recordCompletion(save, s1.id, 2);
+    check(r.unlockedNext === s2, 'first completion unlocks stage 2');
+    check(Pulse.Campaign.isUnlocked(save, 1) && !Pulse.Campaign.isUnlocked(save, 2), 'stage 3 still locked');
+    r = Pulse.Campaign.recordCompletion(save, s1.id, 1);
+    check(save.campaign.stages[s1.id].bestStars === 2 && r.bestStars === 2, 'replay with fewer stars keeps best');
+    check(r.unlockedNext === null, 'replay does not re-announce unlock');
+    r = Pulse.Campaign.recordCompletion(save, s1.id, 3);
+    check(save.campaign.stages[s1.id].bestStars === 3, 'replay with more stars raises best');
+    check(Pulse.Campaign.totalStars(save) === 3, 'total stars derived from records');
+    save.campaign.stages['unknown-stage'] = { completed: true, bestStars: 3 };
+    check(Pulse.Campaign.totalStars(save) === 3, 'records for unknown stages do not count');
+
+    // ---- Skins ----
+    save = fresh();
+    const solar = Pulse.Skins.byId('solar-flare'), prism = Pulse.Skins.byId('void-prism'), retro = Pulse.Skins.byId('retro-green');
+    check(solar.unlockStars === 3 && prism.unlockStars === 6 && retro.unlockStars === 9, 'skin thresholds 3/6/9');
+    check(!Pulse.Skins.select(save, 'solar-flare'), 'locked skin cannot be selected');
+    r = Pulse.Campaign.recordCompletion(save, s1.id, 2);
+    check(r.newSkins.length === 0 && !Pulse.Skins.isUnlocked(save, solar), '2 stars: Solar Flare still locked');
+    r = Pulse.Campaign.recordCompletion(save, s2.id, 1);
+    check(r.newSkins.length === 1 && r.newSkins[0] === solar, '3 stars unlocks Solar Flare exactly once');
+    r = Pulse.Campaign.recordCompletion(save, s2.id, 1);
+    check(r.newSkins.length === 0, 'unlock is not repeated');
+    check(Pulse.Skins.select(save, 'solar-flare') && Pulse.Skins.selected(save) === solar, 'unlocked skin can be selected');
+    Pulse.Campaign.recordCompletion(save, s1.id, 3);
+    Pulse.Campaign.recordCompletion(save, s2.id, 3);
+    check(Pulse.Skins.isUnlocked(save, prism) && !Pulse.Skins.isUnlocked(save, retro), '6 stars unlocks Void Prism only');
+    r = Pulse.Campaign.recordCompletion(save, s3.id, 3);
+    check(r.newSkins[0] === retro, '9 stars unlocks Retro Green');
+    for (const skin of Pulse.SKINS) {
+      check(Object.keys(skin).sort().join() === 'colors,id,name,unlockStars', `${skin.id}: skin has colours only (no gameplay fields)`);
+    }
+
+    // ---- Save data ----
+    const S = Pulse.Save;
+    let mem = memoryStorage();
+    check(JSON.stringify(S.load(mem)) === JSON.stringify(fresh()), 'empty storage loads defaults');
+    mem = memoryStorage({ 'pulse.best': '42' });
+    let loaded = S.load(mem);
+    check(loaded.endless.best === 42, 'prototype best score (pulse.best) is migrated');
+    S.write(loaded, mem);
+    check(JSON.parse(mem.data['pulse.save.v1']).endless.best === 42 && mem.data['pulse.best'] === '42', 'write keeps both keys');
+    mem = memoryStorage({ 'pulse.save.v1': '{not json', 'pulse.best': '17' });
+    loaded = S.load(mem);
+    check(loaded.endless.best === 17, 'malformed save falls back without losing legacy best');
+    check(mem.data['pulse.save.corrupt'] === '{not json', 'malformed save is kept as a backup');
+    mem = memoryStorage({ 'pulse.save.v1': JSON.stringify({ endless: { best: 5 } }), 'pulse.best': '30' });
+    check(S.load(mem).endless.best === 30, 'higher legacy best wins');
+    mem = memoryStorage({ 'pulse.save.v1': JSON.stringify({ endless: { best: 50 } }), 'pulse.best': '30' });
+    check(S.load(mem).endless.best === 50, 'higher saved best wins');
+    loaded = S.sanitize({ endless: { best: 'x' }, campaign: { stages: { a: { bestStars: 7 }, b: null, c: { bestStars: -2 } } }, skins: { selected: 5, unlocked: ['void-prism', 3] } });
+    check(loaded.endless.best === 0, 'non-numeric best becomes 0');
+    check(loaded.campaign.stages.a.bestStars === 3 && loaded.campaign.stages.a.completed, 'stars clamped to 3 and imply completion');
+    check(!('b' in loaded.campaign.stages) && loaded.campaign.stages.c.bestStars === 0, 'bad stage records dropped or clamped');
+    check(loaded.skins.selected === 'classic' && loaded.skins.unlocked.join() === 'classic,void-prism', 'bad skin fields cleaned');
+    check(S.sanitize('garbage').version === 1 && S.sanitize(null).endless.best === 0, 'non-object saves become defaults');
+    check(Pulse.Skins.selected(S.sanitize({ skins: { selected: 'retro-green' } })).id === 'classic', 'selected locked skin falls back to Classic');
+    check(Pulse.Skins.selected(S.sanitize({ skins: { selected: 'nope' } })).id === 'classic', 'unknown skin falls back to Classic');
+    const throwing = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
+    check(S.load(throwing).version === 1, 'blocked storage loads defaults');
+    S.write(fresh(), throwing);
+    check(true, 'blocked storage write does not throw');
+    mem = memoryStorage();
+    save = S.load(mem);
+    Pulse.Campaign.recordCompletion(save, s1.id, 3);
+    Pulse.Skins.select(save, 'solar-flare');
+    S.write(save, mem);
+    loaded = S.load(mem);
+    check(loaded.campaign.stages[s1.id].bestStars === 3 && Pulse.Skins.selected(loaded).id === 'solar-flare', 'progress and skin survive a save/load round trip');
+
+    lines.unshift(`${failures === 0 ? 'PASS' : 'FAIL'} ${checks - failures}/${checks} checks`);
+    document.getElementById('out').textContent = lines.join('\n');
+    document.title = lines.join(' | ');
+  </script>
+</body>
+</html>
