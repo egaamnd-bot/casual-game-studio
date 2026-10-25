@@ -8,7 +8,7 @@
 |------|-------|------|
 | Music loops | `MENU_THEME` (68.6 s), `WORLD_1_GAMEPLAY` (76.8 s), `WORLD_2_GAMEPLAY` (79.4 s), `WORLD_3_GAMEPLAY` (82.3 s) | 5.6 MB |
 | Stings | `STAGE_CLEAR` (4.5 s), `GAME_OVER` (4.0 s), `WORLD_TRANSITION` (4.8 s), `MAX_MULTIPLIER_STING` (2.0 s) | 0.26 MB |
-| Sound effects | 31 files, 0.06–0.49 s | 0.19 MB |
+| Sound effects | 39 files (31 v4 + 8 v5 rhythm pack), 0.06–0.49 s | 0.24 MB |
 
 - **Format:** all files are OGG Vorbis, 44.1 kHz, in `src/assets/audio/`. I checked durations and formats from the file headers.
 - **Not shipped:** the pack's WAV masters and `OST_Preview_Medley`. They're in the original zip; the WAVs would add about 4 MB for no audible gain.

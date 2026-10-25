@@ -113,8 +113,20 @@
     return spec.amp * Math.sin(TAU * ((beat - arriveBeat) / spec.beats + spec.phase));
   }
 
+  // The live gap of a moving gate: { off, half } = centre offset and half-width.
+  //   slide    the whole gap swings side to side (see motionOffset); half-width is fixed.
+  //   breathe  the gap stays centred and opens and closes (a pinch): half-width goes from `base`
+  //            (tightest, at phase 0 = on arrival) up to base + amp and back.
+  function motionShape(spec, beat, arriveBeat) {
+    if (spec.kind === 'breathe') {
+      const u = (beat - arriveBeat) / spec.beats + spec.phase;
+      return { off: 0, half: spec.base + (spec.amp * (1 - Math.cos(TAU * u))) / 2 };
+    }
+    return { off: motionOffset(spec, beat, arriveBeat), half: spec.half };
+  }
+
   // Fastest the obstacle's edge moves (px/s) at the given tempo.
-  const motionRate = (spec, bpm) => (spec.amp * TAU) / (spec.beats * beatSeconds(bpm));
+  const motionRate = (spec, bpm) => (spec.amp * (spec.kind === 'breathe' ? Math.PI : TAU)) / (spec.beats * beatSeconds(bpm));
 
   // ---- Audio sync ----
   // Signed distance (s) the music is ahead of the clock, accounting for the loop wrapping.
@@ -159,8 +171,54 @@
     },
   };
 
+  // ---- Groove: makes player sounds land on the music ----
+  // Gameplay never waits for these: the orb and every rule react instantly. Only the *sound* of an
+  // action is nudged (at most `window` seconds, never earlier) onto the nearest 16th-note of the
+  // music, so taps, pickups and smashes play in time with the track. If the music isn't aligned
+  // (muted, loading) or the next 16th is too far away, the sound plays at once.
+  const Groove = {
+    grid: 0.25, // beats: a 16th note
+    // Notes (semitones above the root) each world's pickups climb through: pentatonic-style, in
+    // the key of the world's track (F minor, C dorian, D harmonic minor).
+    SCALES: {
+      1: [0, 3, 5, 7, 10, 12],
+      2: [0, 2, 3, 7, 9, 12],
+      3: [0, 2, 3, 7, 8, 12],
+    },
+    // Roots (semitones) that put each world's pickup sound in its key.
+    ROOTS: { 1: 0, 2: -2, 3: 2 },
+
+    // Seconds to wait so a sound at the clock's current moment lands on the next grid line.
+    // `aligned` is false when the music isn't known to be in step with the clock.
+    delay(clock, aligned, maxDelay, grid) {
+      if (!aligned) return 0;
+      const g = (grid || Groove.grid) * beatSeconds(clock.bpm);
+      const t = Math.max(0, trackTime(clock));
+      const wait = Math.ceil(t / g - 1e-6) * g - t;
+      return wait <= maxDelay ? wait : 0;
+    },
+
+    // True when the clock is within `tolerance` seconds of a whole beat.
+    nearBeat(clock, tolerance) {
+      const b = beatSeconds(clock.bpm);
+      const t = Math.max(0, trackTime(clock));
+      const off = t % b;
+      return Math.min(off, b - off) <= tolerance;
+    },
+
+    // Playback rate for the nth pickup in a run: the notes climb the world's scale and then come
+    // back down, so a streak plays a little melody.
+    noteRate(world, step) {
+      const scale = Groove.SCALES[world] || Groove.SCALES[1];
+      const cycle = 2 * scale.length - 2; // up, then back down without repeating the ends
+      const i = Math.max(0, step) % cycle;
+      const note = scale[i < scale.length ? i : cycle - i];
+      return clamp(Math.pow(2, (note + (Groove.ROOTS[world] || 0)) / 12), 0.7, 2.2);
+    },
+  };
+
   Pulse.Rhythm = {
     TRACKS, beatSeconds, createClock, reset, retune, trackTime, beatAt, position, step, pulse,
-    profile, motionOffset, motionRate, audioError, seekTarget, OrbFx,
+    profile, motionOffset, motionShape, motionRate, audioError, seekTarget, OrbFx, Groove,
   };
 })();

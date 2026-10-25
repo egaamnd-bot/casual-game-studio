@@ -92,6 +92,7 @@
           err(`item ${n}: gap moves ${Pulse.Rhythm.motionRate(s, bpm).toFixed(0)} px/s, above the ${C.motion.maxRate} limit`);
         }
         if (it.need + (s && s.amp) > C.orb.x - C.wallMinWidth) err(`item ${n}: swing leaves the lane`);
+        if (s && s.kind !== undefined && s.kind !== 'slide' && s.kind !== 'breathe') err(`item ${n}: unknown motion kind`);
       }
     }
     if (errors.length) return errors;

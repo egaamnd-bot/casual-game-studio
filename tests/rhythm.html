@@ -182,9 +182,12 @@
             rec.minClear = Math.min(rec.minClear, clearL, clearR);
             const off = (s.gapL + s.gapR) / 2 - C.orb.x;
             rec.maxOff = Math.max(rec.maxOff, Math.abs(off));
-            if (rec.lastOff !== null) rec.rate = Math.max(rec.rate, Math.abs(off - rec.lastOff) / dt);
+            // Edge speed: how fast either wall edge moves (covers swinging and breathing alike).
+            if (rec.lastOff !== null) rec.rate = Math.max(rec.rate, Math.abs(s.gapL - rec.lastL) / dt, Math.abs(s.gapR - rec.lastR) / dt);
             rec.lastOff = off;
-            if (rec.atArrival === null && s.y + s.h >= orbY) rec.atArrival = { time: level.time, off };
+            rec.lastL = s.gapL;
+            rec.lastR = s.gapR;
+            if (rec.atArrival === null && s.y + s.h >= orbY) rec.atArrival = { time: level.time, off, half: (s.gapR - s.gapL) / 2 };
             hash = (hash * 31 + Math.round(off * 1000)) % 1000003;
           }
           if (s.kind === 'gate' || s.kind === 'barrier') {
@@ -232,7 +235,7 @@
         for (const key of Object.keys(a.slides)) {
           slideCount++;
           const r = a.slides[key];
-          const src = stage.items.find((it) => it.slide && it.slide.amp === r.slide.amp);
+          const src = stage.items.find((it) => it.slide && it.slide.amp === r.slide.amp && it.need === r.slide.base);
           const minNeed = C.orb.minRadius + C.fairMargin;
           check(r.minClear >= minNeed - 1e-6, `${stage.id}: gap never closes below the fair minimum (${r.minClear.toFixed(1)} px)`);
           check(r.minClear >= src.need - 1e-6, `${stage.id}: clearance never drops below the authored need ${src.need} (${r.minClear.toFixed(1)})`);
@@ -240,10 +243,16 @@
           check(r.rate <= C.motion.maxRate * 1.05 + 1, `${stage.id}: gap edge moves ${r.rate.toFixed(0)} px/s, within the ${C.motion.maxRate} limit`);
           check(r.rate <= C.orb.shrinkRate * 0.6, `${stage.id}: gap moves much slower than the orb can shrink`);
           // On arrival the gap is where the stage says it will be.
-          const want = Rh.motionOffset(r.slide, r.atArrival.time * bpm / 60, parseFloat(key));
-          check(near(r.atArrival.off, want, 1e-6), `${stage.id}: gap offset on arrival matches the motion function`);
-          const wantPhase = r.slide.amp * Math.sin(2 * Math.PI * (r.slide.phase));
-          check(near(r.atArrival.off, wantPhase, r.slide.amp * 0.12 + 1), `${stage.id}: gap is at its authored phase when it reaches the orb (${r.atArrival.off.toFixed(1)} vs ${wantPhase.toFixed(1)})`);
+          const want = Rh.motionShape(r.slide, r.atArrival.time * bpm / 60, parseFloat(key));
+          check(near(r.atArrival.off, want.off, 1e-6) && near(r.atArrival.half, want.half, 1e-6), `${stage.id}: gap on arrival matches the motion function`);
+          if (r.slide.kind === 'breathe') {
+            const wantHalf = r.slide.base + (r.slide.amp * (1 - Math.cos(2 * Math.PI * r.slide.phase))) / 2;
+            check(near(r.atArrival.half, wantHalf, r.slide.amp * 0.2 + 1), `${stage.id}: breathing gap is at its authored phase on arrival (${r.atArrival.half.toFixed(1)} vs ${wantHalf.toFixed(1)})`);
+            check(r.maxOff < 1e-6, `${stage.id}: a breathing gap stays centred`);
+          } else {
+            const wantPhase = r.slide.amp * Math.sin(2 * Math.PI * (r.slide.phase));
+            check(near(r.atArrival.off, wantPhase, r.slide.amp * 0.12 + 1), `${stage.id}: gap is at its authored phase when it reaches the orb (${r.atArrival.off.toFixed(1)} vs ${wantPhase.toFixed(1)})`);
+          }
         }
       }
       // Collision geometry always matches what is drawn: the walls are the gap edges, and the
@@ -278,6 +287,9 @@
       check(bad(Object.assign({}, gap, { slide: { amp: 60, beats: 4 } })), 'a swing faster than the rate limit is rejected');
       check(bad(Object.assign({}, gap, { need: 20, slide: { amp: 10, beats: 4 } })), 'a gap that closes below the fair minimum is rejected');
       check(bad(Object.assign({}, gap, { need: 230, slide: { amp: 20, beats: 8 } })), 'a swing that leaves the lane is rejected');
+      check(!bad(Object.assign({}, gap, { slide: { kind: 'breathe', amp: 12, beats: 4 } })), 'a sensible breathing gap is accepted');
+      check(bad(Object.assign({}, gap, { slide: { kind: 'breathe', amp: 80, beats: 2 } })), 'a breathing gap faster than the rate limit is rejected');
+      check(bad(Object.assign({}, gap, { slide: { kind: 'wobble', amp: 12, beats: 4 } })), 'an unknown motion kind is rejected');
       check(bad(Object.assign({}, gap, { length: 200, slide: { amp: 14, beats: 4 } })), 'tunnels cannot move');
       check(bad({ type: 'barrier', t: 0.6, slide: { amp: 14, beats: 4 }, beat: 1 }), 'only gaps can move');
     }
@@ -300,6 +312,44 @@
 
     // A level with no tempo (Endless) never moves anything.
     check(!new Pulse.Level(W, 1000).bpm, 'a level without a tempo has no moving gaps');
+
+    // ---- Groove: sounds land on the music, gameplay never waits ----
+    {
+      const G = Rh.Groove;
+      const c = Rh.createClock({ bpm: 125 }); // 16th note = 0.12 s
+      const at = (t) => { Rh.reset(c, 125); c.t = t; return c; };
+      check(near(G.delay(at(0.1), true, 0.07), 0.02, 1e-9), 'a sound 20 ms before a 16th note waits for it');
+      check(G.delay(at(0.13), true, 0.07) === 0, 'too far from the next 16th (110 ms): plays at once');
+      check(G.delay(at(0.12), true, 0.07) === 0 && G.delay(at(0), true, 0.07) === 0, 'a sound already on the grid is not delayed');
+      check(G.delay(at(0.1), false, 0.07) === 0, 'music not aligned (muted / loading): plays at once');
+      let worst = 0, early = false;
+      for (let t = 0; t < 8; t += 0.0137) {
+        const d = G.delay(at(t), true, 0.07);
+        worst = Math.max(worst, d);
+        if (d < 0) early = true;
+        // After the wait the sound is on a 16th-note line.
+        if (d > 0) { const k = (t + d) / 0.12; if (!near(k, Math.round(k), 1e-6)) early = true; }
+      }
+      check(!early && worst <= 0.07 + 1e-9, `sounds only ever wait (max ${(worst * 1000).toFixed(0)} ms) and land on the grid`);
+      for (const bpm of [112, 125, 133, 140]) {
+        const k = Rh.createClock({ bpm }); k.t = 0.05;
+        const d = G.delay(k, true, 1, 0.25);
+        check(near(((0.05 + d) / (60 / bpm * 0.25)) % 1, 0, 1e-6) || near(((0.05 + d) / (60 / bpm * 0.25)) % 1, 1, 1e-6), `${bpm} BPM: grid follows the tempo`);
+      }
+      check(G.nearBeat(at(0.05), 0.075) && G.nearBeat(at(0.48 - 0.05), 0.075) && !G.nearBeat(at(0.24), 0.075), 'nearBeat is symmetric around the beat');
+      // Pickup melody: climbs the world's scale then comes back, always in range.
+      for (const w of [1, 2, 3]) {
+        const notes = [];
+        for (let i = 0; i < 24; i++) notes.push(G.noteRate(w, i));
+        check(notes.every((r) => r >= 0.7 && r <= 2.2), `world ${w}: every melody note is in a clean pitch range`);
+        check(notes[1] > notes[0] && notes[5] > notes[4], `world ${w}: the melody climbs at first`);
+        check(near(notes[0], notes[10], 1e-9) && near(notes[3], notes[7], 1e-9), `world ${w}: the melody turns around and repeats`);
+        let leap = 0;
+        for (let i = 1; i < notes.length; i++) leap = Math.max(leap, Math.abs(12 * Math.log2(notes[i] / notes[i - 1])));
+        check(leap <= 5.01, `world ${w}: no leap larger than a fourth (${leap.toFixed(1)} semitones)`);
+      }
+      check(G.noteRate(1, -5) === G.noteRate(1, 0), 'a negative step is treated as the first note');
+    }
 
     // ---- Orb effects: never smaller than the collision circle ----
     {

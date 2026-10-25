@@ -78,9 +78,11 @@
       // Moving gap: `need` is the clearance at its tightest, so the gap is `amp` wider than that
       // when centred. It starts centred; Level.applyMotion moves it.
       const s = src.slide;
-      Pulse.setGap(item, src.need + s.amp, 0, width);
+      const breathe = s.kind === 'breathe';
+      Pulse.setGap(item, breathe ? src.need : src.need + s.amp, 0, width);
       item.need = src.need;
-      item.slide = { amp: s.amp, beats: s.beats, phase: s.phase || 0, half: src.need + s.amp };
+      item.slide = { kind: breathe ? 'breathe' : 'slide', amp: s.amp, beats: s.beats, phase: s.phase || 0,
+        half: breathe ? src.need : src.need + s.amp, base: src.need };
     } else if (src.type === 'gate') Pulse.setGap(item, src.need, src.shift || 0, width);
     if (src.type === 'barrier' && src.charged) item.charged = true;
     if (src.pattern) item.pattern = src.pattern;
@@ -188,10 +190,10 @@
       for (let i = 0; i < this.segments.length; i++) {
         const s = this.segments[i];
         if (!s.active || !s.slide) continue;
-        const off = Pulse.Rhythm.motionOffset(s.slide, beat, s.arriveBeat);
-        s.gapL = ox + off - s.slide.half;
-        s.gapR = ox + off + s.slide.half;
-        s.need = s.slide.half - Math.abs(off);
+        const m = Pulse.Rhythm.motionShape(s.slide, beat, s.arriveBeat);
+        s.gapL = ox + m.off - m.half;
+        s.gapR = ox + m.off + m.half;
+        s.need = m.half - Math.abs(m.off);
       }
     }
 
@@ -224,6 +226,7 @@
       seg.y = this.travelled - it.at - it.h;
       seg.pattern = it.pattern || null;
       seg.slide = it.slide || null;
+      seg.pinged = false;
       seg.arriveBeat = it.arriveBeat || 0;
       seg.minNeed = it.need; // tightest clearance over a moving gap's whole cycle
       // Segments are pooled: reset flags a previous use may have left (a recycled charged

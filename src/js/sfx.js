@@ -20,6 +20,7 @@
   const MAX_VOICES = 6;
   const RETRIGGER_MS = 35;
   const HOLD_LEVEL = 0.25;
+  const ACCENT_MIN_MS = 380;
 
   // Gameplay name → file (assets/audio/sfx/ unless `music`) and relative volume.
   const SFX = {
@@ -56,6 +57,19 @@
     toggle: { file: 'sfx_ui_settings_toggle' },
     pause: { file: 'sfx_ui_pause' },
     resume: { file: 'sfx_ui_resume' },
+    // v5 rhythm pack (docs/RHYTHM.md). The accents are chords in each world's key; the rest cue
+    // moving obstacles and phrases.
+    barrierReady: { file: 'sfx_barrier_charged_ready', gain: 0.75 },
+    approachCue: { file: 'sfx_obstacle_approach_cue', gain: 0.65 },
+    maxMultSfx: { file: 'sfx_multiplier_max_x5', gain: 0.9 },
+    slideLock: { file: 'sfx_obs_slide_lock', gain: 0.65 },
+    rotorWhoosh: { file: 'sfx_obs_rotor_whoosh', gain: 0.6 },
+    pulseBeat: { file: 'sfx_obs_pulse_beat', gain: 0.55 },
+    telegraphPing: { file: 'sfx_beat_telegraph_ping', gain: 0.6 },
+    accentW1: { file: 'sfx_accent_chord_w1', gain: 0.42 },
+    accentW2: { file: 'sfx_accent_chord_w2', gain: 0.42 },
+    accentW3: { file: 'sfx_accent_chord_w3', gain: 0.42 },
+    comboCadence: { file: 'sfx_combo_cadence_hit', gain: 0.55 },
   };
 
   // Fallback tones (the prototype's placeholder sounds), used when a file isn't loaded.
@@ -134,25 +148,30 @@
     osc.stop(now + tone.duration);
   }
 
-  function playBuffer(buf, gainValue, loop) {
+  // `rate` retunes the sound (1 = as recorded); `delay` starts it that many seconds from now.
+  function playBuffer(buf, gainValue, loop, rate, delay) {
     const ctx = state.ctx;
     const src = ctx.createBufferSource();
     src.buffer = buf;
     src.loop = !!loop;
+    if (rate && rate !== 1) src.playbackRate.value = rate;
     const gain = ctx.createGain();
     gain.gain.value = gainValue;
     src.connect(gain).connect(state.sfxGain);
-    src.start();
+    src.start(delay > 0 ? ctx.currentTime + delay : 0);
     return src;
   }
 
   const Sfx = {
-    play(name) {
+    // opts (all optional): rate = pitch factor, delay = seconds to wait (used to land a sound on
+    // the beat: see Pulse.Rhythm.Groove), gain = extra volume factor.
+    play(name, opts) {
       const ctx = state.ctx;
       if (!ctx || ctx.state !== 'running' || state.volumes.sfx <= 0) return false;
       const now = performance.now();
       if (now - (state.lastPlayed[name] || 0) < RETRIGGER_MS) return false;
       state.lastPlayed[name] = now;
+      const o = opts || {};
       const def = SFX[name];
       const buf = def && state.buffers[def.file];
       if (!buf) {
@@ -161,8 +180,20 @@
       }
       if (state.voices >= MAX_VOICES) return false;
       state.voices++;
-      const src = playBuffer(buf, def.gain === undefined ? 1 : def.gain, false);
+      const gain = (def.gain === undefined ? 1 : def.gain) * (o.gain === undefined ? 1 : o.gain);
+      const src = playBuffer(buf, gain, false, o.rate, o.delay);
       src.onended = () => { state.voices--; };
+      state.lastPlay = { name, rate: o.rate || 1, delay: o.delay || 0 }; // for tests and diagnostics
+      return true;
+    },
+
+    // The world's harmonic accent chord (docs/art/v5 brief 4.2): at most one per beat, so a run of
+    // pickups never muddies the mix.
+    playAccent(world, delay) {
+      const now = performance.now();
+      if (now - (state.lastAccentAt || 0) < ACCENT_MIN_MS) return false;
+      if (!this.play(world === 3 ? 'accentW3' : world === 2 ? 'accentW2' : 'accentW1', { delay })) return false;
+      state.lastAccentAt = now;
       return true;
     },
 
@@ -270,6 +301,17 @@
       const el = this.element();
       if (!el || el.paused) return;
       this.fadeTo(0, ms === undefined ? 250 : ms, () => el.pause());
+    },
+
+    // A brief dip so a big hit (charged smash, max multiplier) cuts through the track.
+    pulseDuck() {
+      if (this.level !== 1 || !this.el || this.el.paused) return;
+      this.level = 0.72;
+      this.fadeTo(this.targetVolume(), 40);
+      clearTimeout(this.duckTimer);
+      this.duckTimer = setTimeout(() => {
+        if (this.level === 0.72) { this.level = 1; this.fadeTo(this.targetVolume(), 220); }
+      }, 160);
     },
 
     // Quieter music behind the pause screen.

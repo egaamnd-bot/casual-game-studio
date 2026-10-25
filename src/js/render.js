@@ -28,6 +28,64 @@ Pulse.Render = (function () {
     g.fillRect(seg.gapR, seg.y, 4, seg.h);
   }
 
+  // Trailer-style gap wall (comet look): dark hull, crimson rim and chevrons pointing at the gap,
+  // amber lines on the gap-facing edges (they mark exactly where the collision edge is). A moving
+  // gap also gets a dotted rail through it and small arrows showing which way it is swinging.
+  // Reads the live `gapL`/`gapR`, so what is drawn is always what collides.
+  function cometGate(g, seg, width, beat) {
+    const y = seg.y;
+    const h = seg.h;
+    const piece = (x0, x1, dir) => {
+      if (x1 - x0 < 2) return;
+      g.fillStyle(0x16060f, 0.94);
+      g.fillRect(x0, y, x1 - x0, h);
+      g.lineStyle(6, T.wallEdge, 0.14); // soft glow
+      g.strokeRect(x0, y, x1 - x0, h);
+      g.lineStyle(2, T.wallEdge, 0.95);
+      g.strokeRect(x0, y, x1 - x0, h);
+      g.lineStyle(2, T.wallEdge, 0.6);
+      g.beginPath();
+      const cy = y + h / 2;
+      const hh = h / 2 - 7;
+      // Chevrons, closest to the gap first, pointing toward it.
+      const edge = dir > 0 ? x1 : x0;
+      for (let x = edge - dir * 12; dir > 0 ? x > x0 + 6 : x < x1 - 6; x -= dir * 15) {
+        g.moveTo(x - dir * 6, cy - hh);
+        g.lineTo(x, cy);
+        g.lineTo(x - dir * 6, cy + hh);
+      }
+      g.strokePath();
+    };
+    piece(0, seg.gapL, 1);
+    piece(seg.gapR, width, -1);
+    g.fillStyle(T.gapEdge, 1);
+    g.fillRect(seg.gapL - 3, y, 3, h);
+    g.fillRect(seg.gapR, y, 3, h);
+    if (seg.slide) {
+      const cy = y + h / 2;
+      g.fillStyle(T.gapEdge, 0.55);
+      for (let x = 10; x < width; x += 20) g.fillRect(x, cy - 1, 8, 2);
+      // Arrows beside the gap showing where it goes next: a swinging gap points the way it is
+      // heading; a breathing gap points inward (closing, amber) or outward (opening, mint).
+      const u = (beat - seg.arriveBeat) / seg.slide.beats + seg.slide.phase;
+      const mid = (seg.gapL + seg.gapR) / 2;
+      const breathe = seg.slide.kind === 'breathe';
+      const dir = breathe ? (Math.sin(2 * Math.PI * u) <= 0 ? 1 : -1) : (Math.cos(2 * Math.PI * u) >= 0 ? 1 : -1);
+      g.lineStyle(2, breathe && dir < 0 ? T.bonus : T.gapEdge, 0.9);
+      g.beginPath();
+      for (const side of breathe ? [-1, 1] : [1]) {
+        const heading = breathe ? -side * dir : dir; // breathe: toward the gap while closing
+        for (let k = 0; k < 2; k++) {
+          const ax = breathe ? mid + side * (seg.slide.half + 16 + k * 9) : mid + dir * (seg.slide.half + 16 + k * 9);
+          g.moveTo(ax - heading * 4, cy - 6);
+          g.lineTo(ax + heading * 2, cy);
+          g.lineTo(ax - heading * 4, cy + 6);
+        }
+      }
+      g.strokePath();
+    }
+  }
+
   // Tunnel body for the sprite renderer (its edges and lane guide are sprites).
   function tunnelBody(g, seg, width) {
     g.fillStyle(T.wall, 1);
@@ -168,5 +226,5 @@ Pulse.Render = (function () {
     for (let i = 0; i < max; i++) star(g, x0 + i * step, y, r, i < count);
   }
 
-  return { background, walls, tunnelBody, barrier, chargeRing, pickup, finishLine, orb, collectRing, progressBar, star, stars };
+  return { background, walls, cometGate, tunnelBody, barrier, chargeRing, pickup, finishLine, orb, collectRing, progressBar, star, stars };
 })();

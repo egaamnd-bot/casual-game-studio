@@ -72,6 +72,17 @@ Pulse.CONFIG = {
     pulseSharpness: 3, // how quickly the beat pulse eases out
   },
 
+  // Trailer look (docs/RHYTHM.md): a round glowing sphere with a comet tail, crimson chevron walls,
+  // a darker field. `enabled: false` returns to the v4 octagon-orb and sprite-wall look.
+  comet: {
+    enabled: true,
+    tailBase: 2.0, // tail length = this × radius ...
+    tailPerSpeed: 0.62, // ... + this × speed (px/s), scaled down while the orb is shrunk
+    nodes: 10, // pooled sparkle nodes behind the orb (never more)
+    nodeIntervalMs: 28,
+    backdropAlpha: 0.5, // dims the v4 background so the sphere and walls pop
+  },
+
   // Moving obstacles (see Pulse.Rhythm.motionOffset). The gap moves, but even at its tightest it
   // still leaves the same clearance a static gap of that `need` would.
   motion: {

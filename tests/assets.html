@@ -100,9 +100,13 @@
         check(g.state === 'playing', `run ${k}: still playing after 3s with autopilot`);
         // Orb art edge equals the collision radius at full size.
         g.radius = C.orb.radius; g.draw();
-        check(near(g.view.body.displayWidth / 2 * (A.orbBodyRadius / 64), C.orb.radius), `run ${k}: orb art radius = ${C.orb.radius}`);
+        // (Comet look: the round disc is the orb; it is drawn at exactly the collision radius across the lane and never shorter along it.)
+        const body = g.view.comet ? g.view.cometBody : null;
+        check(body ? near(body.displayWidth / 2, C.orb.radius) && body.displayHeight >= body.displayWidth - 0.01
+          : near(g.view.body.displayWidth / 2 * (A.orbBodyRadius / 64), C.orb.radius), `run ${k}: orb art radius = ${C.orb.radius}`);
         g.radius = C.orb.minRadius; g.draw();
-        check(near(g.view.core.displayWidth / 2 * (A.orbShrunkRadius / 38), C.orb.minRadius), `run ${k}: shrunk art radius = ${C.orb.minRadius}`);
+        check(body ? near(body.displayWidth / 2, C.orb.minRadius) && body.displayHeight >= body.displayWidth - 0.01
+          : near(g.view.core.displayWidth / 2 * (A.orbShrunkRadius / 38), C.orb.minRadius), `run ${k}: shrunk art radius = ${C.orb.minRadius}`);
         const gates = g.level.segments.filter((s) => s.active && s._vis && s._vis.kind === 'gate' && s._vis.parts[1].visible);
         if (gates.length) {
           const s = gates[0];
@@ -144,7 +148,7 @@
       view.renderChargeRing(true, 0.5, R);
       check(view.chargeRing.frame.name === 'charge_ring_state_b_step_03', 'charge ring: 50% shows step 3 of 4');
       view.renderChargeRing(true, 1, R);
-      check(view.chargeRing.frame.name === 'charge_ring_state_c_full' && view.chargeBurst.visible, 'charge ring: full state with burst');
+      check(view.chargeRing.frame.name === 'charge_ring_state_c_full' && (view.comet ? view.cometEcho.visible : view.chargeBurst.visible), 'charge ring: full state with burst');
       view.renderChargeRing(false, 1, R);
       check(!view.chargeRing.visible, 'charge ring hidden when no charged barrier is on screen');
 
