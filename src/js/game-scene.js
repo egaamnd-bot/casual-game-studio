@@ -60,6 +60,14 @@
       this.wasHeld = false;
       this.lastCharge = 1;
 
+      // Rhythm: the run clock (stepped only while playing, so pause/retry need no special cases)
+      // and the cosmetic orb stretch. The music follows the clock, never the other way round.
+      this.clock = Pulse.Rhythm.createClock({ bpm: this.trackBpm() });
+      this.fx = Pulse.Rhythm.OrbFx.create(); // the springy drawn orb (cosmetic; the rules read orbState)
+      this.syncIn = 0;
+      this.seeks = 0;
+      this.noteStep = 0;
+      this.cleared = 0;
       this.orbState = Pulse.Orb.create();
       this.scoring = Pulse.Scoring.create();
       this.score = 0;
@@ -108,6 +116,53 @@
       return t < 30 ? 'WORLD_1_GAMEPLAY' : t < 60 ? 'WORLD_2_GAMEPLAY' : 'WORLD_3_GAMEPLAY';
     }
 
+    // Tempo of the track now playing (campaign: the stage's; Endless: the current world's).
+    trackBpm() {
+      if (this.mode === 'campaign') return this.stage.bpm || this.stage.world.bpm;
+      return Pulse.Rhythm.TRACKS[this.musicTrack()].bpm;
+    }
+
+    // ---- Sound that lands on the music (Pulse.Rhythm.Groove). Gameplay is never delayed: only the
+    // sound waits, at most maxDelay s, for the next 16th note, and only while the music is
+    // known to be in step with the run clock. ----
+    aligned() {
+      return this.state === 'playing' && Pulse.Music.position(this.playingTrack) !== null;
+    }
+
+    sfx(name, maxDelay, extra) {
+      const delay = C.groove.enabled && maxDelay > 0 ? Pulse.Rhythm.Groove.delay(this.clock, this.aligned(), maxDelay) : 0;
+      return Pulse.Sfx.play(name, Object.assign({ delay }, extra));
+    }
+
+    // The world's key: 1, 2 or 3 (Endless follows the track that is playing).
+    worldIndex() {
+      if (this.mode === 'campaign') return this.stage.world.index;
+      const t = this.playingTrack || this.musicTrack();
+      return t === 'WORLD_3_GAMEPLAY' ? 3 : t === 'WORLD_2_GAMEPLAY' ? 2 : 1;
+    }
+
+    // A chord in the world's key under a pickup or smash that lands close to a beat.
+    accent() {
+      if (!this.aligned() || !Pulse.Rhythm.Groove.nearBeat(this.clock, 0.075)) return;
+      Pulse.Sfx.playAccent(this.worldIndex(), Pulse.Rhythm.Groove.delay(this.clock, true, 0.07));
+    }
+
+    // Keeps the streamed music on the run clock. Checked twice a second; the music is only moved
+    // when it has drifted by more than the tolerance (start-up latency, a long pause). No-op
+    // while muted, loading or cross-fading (Music.position returns null).
+    syncMusic(dt) {
+      this.syncIn -= dt;
+      if (this.syncIn > 0) return;
+      this.syncIn = 0.5;
+      if (this.seeks >= C.groove.maxSeeks) return; // seeking is audible: only for real drift, and a stream that won't seek is left alone
+      const Rh = Pulse.Rhythm;
+      const target = Rh.seekTarget(Rh.trackTime(this.clock), Pulse.Music.position(this.playingTrack), Pulse.Music.loopLength());
+      if (target !== null) {
+        this.seeks++;
+        Pulse.Music.seek(target);
+      }
+    }
+
     worldOpener() {
       return this.mode === 'campaign' && Pulse.STAGES.findIndex((s) => s.world === this.stage.world) === this.stageIndex;
     }
@@ -154,6 +209,12 @@
       this.tweens.add({ targets: this.hintText, alpha: 0.35, duration: 650, yoyo: true, repeat: -1 });
 
       this.popupText = UI.text(this, this.orbSX, this.orbSY, '', 26, T.textAccent, true).setAlpha(0).setDepth(10);
+
+      // Trailer-style hint card at the top of the lane (stages list hints with run-time windows).
+      this.hintCard = this.add.graphics().setDepth(11).setVisible(false);
+      this.hintTitle = UI.text(this, SW / 2, 100, '', 28, T.text, true).setDepth(12).setVisible(false);
+      this.hintSub = UI.text(this, SW / 2, 126, '', 13, T.textDim).setDepth(12).setVisible(false);
+      this.hintShown = null;
 
       // Read-ahead aid: a charged barrier is coming from the right.
       if (Pulse.Assets.ok) {
@@ -297,7 +358,15 @@
       this.popupText.setAlpha(0);
       Pulse.Sfx.play('start');
       this.playingTrack = this.musicTrack();
+      Pulse.Rhythm.reset(this.clock, this.trackBpm());
+      this.noteStep = 0;
+      this.cleared = 0;
+      this.syncIn = 0.25;
+      this.seeks = 0;
+      // The music that was playing on the ready screen restarts so beat 1 lines up with the run.
+      const continuing = Pulse.Music.position(this.playingTrack) !== null;
       Pulse.Music.play(this.playingTrack);
+      if (continuing) Pulse.Music.seek(0);
       if (this.view) this.view.spawn();
       this.setState('playing');
     }
@@ -308,6 +377,7 @@
       if (this.state === 'ready') this.startRun();
       else if (this.state === 'paused') {
         Pulse.Sfx.play('resume');
+        this.syncIn = 0; // the music kept playing under the pause screen: realign at once
         this.setState('playing');
       } else if (this.state === 'over' && this.canAct()) this.startRun();
     }
@@ -369,8 +439,68 @@
       }
 
       if (this.state === 'playing') this.step(dt);
+      else if (this.state === 'ready') {
+        // The idle orb breathes and pings to the beat while it waits for the first tap.
+        const tick = Pulse.Rhythm.step(this.clock, dt);
+        if (tick.beats > 0 && this.view) this.view.beatEcho(this.radius, tick.bars > 0);
+      }
       if (this.ringT < 1) this.ringT = Math.min(1, this.ringT + dt * 3);
+      this.updateOrbFx(dt);
+      this.updateHintCard();
       this.draw();
+    }
+
+    // Cosmetic orb animation: the glow breathes on the beat and the body stretches along the
+    // direction of travel while it changes size. Rules only ever read orbState, never this.
+    // The hint card fades in and out over each hint's window of run time.
+    updateHintCard() {
+      const hints = this.mode === 'campaign' && this.stage.hints;
+      const playing = this.state === 'playing' || this.state === 'paused';
+      const h = hints && playing && hints.find((x) => this.elapsed >= x.from && this.elapsed <= x.to);
+      if (!h) {
+        if (this.hintShown) {
+          this.hintShown = null;
+          this.hintCard.clear().setVisible(false);
+          this.hintTitle.setVisible(false);
+          this.hintSub.setVisible(false);
+        }
+        return;
+      }
+      const a = Math.min(1, (this.elapsed - h.from) / 0.3, (h.to - this.elapsed) / 0.3);
+      if (this.hintShown !== h) {
+        this.hintShown = h;
+        this.hintTitle.setText(h.title);
+        this.hintSub.setText(h.sub);
+        const w = Math.max(this.hintTitle.width, this.hintSub.width) + 56;
+        const cx = this.SW / 2;
+        this.hintCard.clear();
+        this.hintCard.fillStyle(0x0b0f19, 0.8).fillRoundedRect(cx - w / 2, 80, w, 62, 6);
+        this.hintCard.lineStyle(2, 0x00f0ff, 0.9).strokeRoundedRect(cx - w / 2, 80, w, 62, 6);
+        this.hintCard.lineStyle(2, T.danger, 0.9).lineBetween(cx - w / 2 + 14, 141, cx - w / 2 + 70, 141);
+      }
+      this.hintCard.setVisible(true).setAlpha(Math.max(0, a));
+      this.hintTitle.setVisible(true).setAlpha(Math.max(0, a));
+      this.hintSub.setVisible(true).setAlpha(Math.max(0, a));
+    }
+
+    // The drawn orb follows the collision radius through springs (Pulse.Rhythm.OrbFx): it eases
+    // into a shrink, pops slightly past full size on release, stretches while changing size and
+    // pulses when it is rewarded. It is only ever drawn at least as big as the collision circle.
+    updateOrbFx(dt) {
+      const Rh = Pulse.Rhythm;
+      const squeeze = this.state === 'playing' && this.level.segments.some((s) =>
+        s.active && s.kind === 'gate' && s.y < this.orbY + this.radius && s.y + s.h > this.orbY - this.radius);
+      const v = Rh.OrbFx.step(this.fx, this.radius, dt, squeeze);
+      const calm = this.state === 'over' || this.state === 'paused';
+      const phase = calm ? 1 : Rh.position(this.clock).phase;
+      const base = Rh.OrbFx.scales(phase, 0);
+      this.orbFx = { radius: v.radius, glow: base.glow * (1 + v.pop), along: v.along, across: v.across, pop: v.pop, shrink: v.shrink, grow: v.grow, phase };
+      if (this.view && this.view.beatPulse) this.view.beatPulse(phase, calm);
+    }
+
+    // A reward makes the orb pulse once (pickup small, smash larger).
+    reward(amount) {
+      Pulse.Rhythm.OrbFx.kick(this.fx, amount);
     }
 
     // Shrink: short "start" + soft looping hum; release: "expand".
@@ -378,11 +508,12 @@
       if (held === this.wasHeld) return;
       this.wasHeld = held;
       if (held) {
-        Pulse.Sfx.play('shrinkStart');
+        this.sfx('shrinkStart', C.groove.inputDelay); // input sounds are immediate
         Pulse.Sfx.startHold();
       } else {
         Pulse.Sfx.stopHold();
-        Pulse.Sfx.play('expand');
+        this.sfx('expand', C.groove.inputDelay);
+        if (this.view) this.view.releaseRipple(this.radius);
       }
     }
 
@@ -403,9 +534,15 @@
       const track = this.musicTrack();
       if (track !== this.playingTrack) {
         this.playingTrack = track;
+        Pulse.Rhythm.retune(this.clock, this.trackBpm()); // Endless moves to the next world's tempo
         Pulse.Music.play(track);
+        this.seeks = 0;
       }
+      const tick = Pulse.Rhythm.step(this.clock, dt);
+      if (tick.beats > 0 && this.view) this.view.beatEcho(this.radius, tick.bars > 0); // the orb pings on every beat, harder on the bar
+      this.syncMusic(dt);
       const speed = this.level.speedAt(this.elapsed);
+      this.speedNow = speed; // the comet tail grows with speed
       this.scroll += speed * dt * 0.5;
       this.level.update(dt, speed, this.elapsed);
 
@@ -441,12 +578,16 @@
             this.popup(`x${this.multiplier}`, color);
           }
           if (fb.gained) this.bumpMultiplier();
-          Pulse.Sfx.play(s.variant === 'bonus' ? 'bonusPickup' : 'pickup');
-          if (fb.gained && !fb.reachedMax) Pulse.Sfx.play('multUp');
+          // Each pickup in a run is the next note of the world's scale, landing on the 16th note.
+          this.sfx(s.variant === 'bonus' ? 'bonusPickup' : 'pickup', C.groove.eventDelay, { rate: Pulse.Rhythm.Groove.noteRate(this.worldIndex(), this.noteStep++) });
+          this.accent();
+          this.reward(s.variant === 'bonus' ? 4.5 : 3.2);
+          if (fb.gained && !fb.reachedMax) this.sfx('multUp', C.groove.eventDelay);
           this.updateHud();
         } else if (event === 'miss') {
           // Skipping gold resets the Endless multiplier; skipping a mint bonus doesn't, so
           // declining a risky bonus is always a safe choice.
+          if (s.variant !== 'bonus') this.noteStep = 0; // a missed gold ends the pickup melody
           if (fb.reset) {
             this.popup('x1', T.textDim);
             Pulse.Sfx.play('multiplierLost');
@@ -455,17 +596,42 @@
         } else {
           // 'pass' (wall cleared) or 'break' (barrier smashed): both count as an obstacle.
           if (!campaign) this.updateHud();
+          // Every 8 obstacles in a row, a short rising cadence on the next beat.
+          if (++this.cleared % 8 === 0) {
+            Pulse.Sfx.play('comboCadence', { delay: Pulse.Rhythm.Groove.delay(this.clock, this.aligned(), 0.25, 1) });
+          }
           if (fb.streak) {
             this.popup(`×${C.multiplierMax} streak ${fb.streak}`, T.textAccent);
             Pulse.Sfx.play('streak');
           }
           if (event === 'break') {
-            Pulse.Sfx.play(s.charged ? 'chargedSmash' : 'smash');
+            this.sfx(s.charged ? 'chargedSmash' : 'smash', C.groove.eventDelay);
+            this.accent();
+            this.reward(s.charged ? 7 : 4.5);
+            if (s.charged) {
+              Pulse.Music.pulseDuck();
+              this.cameras.main.shake(110, 0.004); // a small punch: only the big hit gets one
+            }
             if (this.view) this.view.smash(s);
           } else {
-            Pulse.Sfx.play('pass');
+            this.sfx('pass', C.groove.eventDelay);
             this.checkNearMiss(s, r);
           }
+        }
+      }
+
+      // A sonar ping two beats before a moving gap reaches the orb, so it can be heard coming.
+      const beat = Pulse.Rhythm.position(this.clock).beat;
+      for (let i = 0; i < segs.length; i++) {
+        const s = segs[i];
+        if (s.active && (s.slide || s.ring) && !s.pinged && s.arriveBeat - beat <= 2) {
+          s.pinged = true;
+          if (s.arriveBeat - beat > 0) this.sfx('telegraphPing', C.groove.eventDelay);
+        }
+        // A ring whooshes as the orb meets its front arc, on the beat the stage was built for.
+        if (s.active && s.ring && !s.whooshed && this.level.time >= s.ring.tf) {
+          s.whooshed = true;
+          Pulse.Sfx.play('rotorWhoosh');
         }
       }
 
@@ -494,6 +660,7 @@
       this.crashReason = GameScene.crashReason(seg, this.radius, this.orbState.charge);
       if (this.test && this.test.onCrash) this.test.onCrash(this.elapsed, this.score);
       this.endHold();
+      this.noteStep = 0;
       Pulse.Sfx.play(seg && seg.kind === 'barrier' && seg.charged ? 'chargedFail' : 'crash');
       Pulse.Music.stop(150);
       Pulse.Sfx.play('gameOver');
@@ -546,6 +713,9 @@
     // Feedback only: reaching the maximum multiplier gets one restrained flourish.
     milestone() {
       Pulse.Sfx.play('milestone');
+      this.reward(8);
+      Pulse.Sfx.play('maxMultSfx');
+      Pulse.Music.pulseDuck();
       if (this.view) this.view.milestone();
       else this.ringT = 0;
     }
@@ -596,6 +766,7 @@
           if (!s.active || s.y > this.H || s.y + s.h < -40) continue;
           if (s.kind === 'pickup') Pulse.Render.pickup(g, s, this.orbX, dimmed);
           else if (s.kind === 'barrier') Pulse.Render.barrier(g, s, this.W, canSmash(s));
+          else if (s.ring) Pulse.Render.ring(g, s, this.level.time);
           else Pulse.Render.walls(g, s, this.W);
         }
       }
@@ -607,7 +778,9 @@
       else if (this.chargeRingShown) Pulse.Render.chargeRing(g, this.orbX, this.orbY, this.radius, this.orbState.charge);
       if (this.state === 'playing') this.chargeSounds();
 
-      this.warnShown = active && this.chargedComing();
+      const warn = active && this.chargedComing();
+      if (warn && !this.warnShown && this.state === 'playing') this.sfx('approachCue', C.groove.eventDelay); // a charged barrier is coming
+      this.warnShown = warn;
       if (this.warnIcon) this.warnIcon.setVisible(this.warnShown);
 
       if (this.mode === 'campaign') {
@@ -619,9 +792,9 @@
       }
 
       if (this.view) {
-        this.view.renderOrb(this.radius, this.state === 'over');
+        this.view.renderOrb(this.radius, this.state === 'over', this.orbFx);
       } else {
-        Pulse.Render.orb(g, this.orbX, this.orbY, this.radius, this.state === 'over', this.skin);
+        Pulse.Render.orb(g, this.orbX, this.orbY, this.radius, this.state === 'over', this.skin, this.orbFx);
         if (this.ringT < 1) Pulse.Render.collectRing(g, this.orbX, this.orbY, this.ringT);
       }
     }

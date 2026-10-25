@@ -35,19 +35,34 @@
   const charged = (t) => ({ type: 'barrier', charged: true, t });
   const gold = (t) => ({ type: 'energy', t });
   const mint = (t) => ({ type: 'bonus', t });
+  // Moving gap: the gap swings `amp` px either side of the lane centre every `beats` beats.
+  // `need` is the clearance at its tightest. `phase` (0..1 of the swing) is where it is when it
+  // reaches the orb: 0 = passing through the middle, 0.25 / 0.75 = at an end of its swing.
+  const slide = (need, t, amp, beats, phase) => ({ type: 'gate', need, t, slide: { amp, beats, phase: phase || 0 } });
+  // Breathing gap (pinch): stays centred and opens and closes every `beats` beats. `need` is the
+  // clearance at its tightest, `amp` how much wider it opens. `phase` 0 = tightest as it reaches the orb.
+  const breathe = (need, t, amp, beats, phase) => ({ type: 'gate', need, t, slide: { kind: 'breathe', amp, beats, phase: phase || 0 } });
+  // Rotating ring: a ring centred on the lane with one opening. It turns half a revolution while the
+  // orb is inside it, so the opening is at the front when the orb meets the front arc and at the rear when
+  // it meets the rear arc. need = the biggest orb that always fits through the opening; dir = 1
+  // clockwise, -1 anticlockwise; beats = how long the half turn takes (default 2). Must use on().
+  const ring = (need, t, dir, beats) => ({ type: 'gate', need, t, ring: { dir: dir || 1, beats: beats || 2 } });
+  // Beat-aligns an item: it reaches the orb on a multiple of `sub` beats (default every beat).
+  // Only ever delays an item, so the clear time is never shorter than written.
+  const on = (item, sub) => Object.assign(item, { beat: sub || 1 });
 
   // Gemini v4 worlds: backgrounds, intro banner, and music track (assets/audio/music/).
   Pulse.WORLDS = [
     {
-      index: 1, id: 'world-1', name: 'Neon Circuit', music: 'WORLD_1_GAMEPLAY', banner: 'bg_world1_intro_banner',
+      index: 1, id: 'world-1', name: 'Neon Circuit', music: 'WORLD_1_GAMEPLAY', bpm: 125, banner: 'bg_world1_intro_banner',
       visual: { background: 'bg_world1_far', mid: 'bg_world1_mid', rail: 'bg_world1_fg_rail', bgSpeed: 0.22, midSpeed: 0.4, railSpeed: 0.5 },
     },
     {
-      index: 2, id: 'world-2', name: 'Chromatic Overdrive', music: 'WORLD_2_GAMEPLAY', banner: 'bg_world2_intro_banner',
+      index: 2, id: 'world-2', name: 'Chromatic Overdrive', music: 'WORLD_2_GAMEPLAY', bpm: 133, banner: 'bg_world2_intro_banner',
       visual: { background: 'bg_world2_far', mid: 'bg_world2_mid', rail: 'bg_world2_fg_rail', bgSpeed: 0.3, midSpeed: 0.5, railSpeed: 0.65 },
     },
     {
-      index: 3, id: 'world-3', name: 'Pulse Collapse', music: 'WORLD_3_GAMEPLAY', banner: 'bg_world3_intro_banner',
+      index: 3, id: 'world-3', name: 'Pulse Collapse', music: 'WORLD_3_GAMEPLAY', bpm: 140, banner: 'bg_world3_intro_banner',
       visual: { background: 'bg_world3_far', mid: 'bg_world3_mid', rail: 'bg_world3_fg_rail', bgSpeed: 0.38, midSpeed: 0.6, railSpeed: 0.8 },
     },
   ];
@@ -61,6 +76,10 @@
       intro: 'Hold anywhere to shrink through gaps. Release to grow and catch gold.',
       teaches: 'Shrinking through gaps and releasing to collect gold. No barriers.',
       speed: { start: 200, end: 220 }, exit: RUNOUT,
+      hints: [
+        { from: 0.4, to: 4.2, title: 'ONE TOUCH.', sub: 'HOLD TO SHRINK  ·  RELEASE TO GROW' },
+        { from: 4.8, to: 9.5, title: 'MASTER THE TIMING.', sub: 'SLIP THROUGH GAPS  ·  COLLECT THE GOLD' },
+      ],
       items: [
         wide(1.4), gold(0.6),
         gap(50, 0.75), gold(0.65), gap(48, 0.75), gold(0.65),
@@ -73,6 +92,7 @@
       intro: 'Cyan barriers shatter only at full size. Let go before you reach them.',
       teaches: 'Standard barriers: first alone while already big, then after a gap with lots of time.',
       speed: { start: 220, end: 240 }, exit: RUNOUT,
+      hints: [{ from: 0.4, to: 4.5, title: 'SHATTER THE BARRIERS.', sub: 'FULL SIZE SMASHES CYAN  ·  SHRUNK CRASHES' }],
       items: [
         gap(48, 1.2), gold(0.6),
         bar(0.9), gold(0.5), // first barrier: you're already full size
@@ -84,26 +104,28 @@
     },
     {
       id: 's3-controlled-overload', name: 'Alternating Rhythm', world: W1,
-      intro: 'Shrink, smash, shrink, smash. Find the beat.',
-      teaches: 'Gaps and barriers alternating in short, readable sequences at a steady beat.',
+      intro: 'Shrink, smash, shrink, smash. Find the beat. Swaying gaps move with the music.',
+      teaches: 'Gaps and barriers alternating at a steady beat; first gently swaying (moving) gaps.',
       speed: { start: 240, end: 260 }, exit: RUNOUT,
+      hints: [{ from: 0.4, to: 4.5, title: 'FEEL THE BEAT.', sub: 'SWAYING GAPS MOVE WITH THE MUSIC' }],
       items: [
         gap(48, 1.1), bar(0.7), gap(46, 0.7), gold(0.55),
         bar(0.4), gap(46, 0.65), bar(0.6), gap(46, 0.6), gold(0.55),
-        bar(0.4), gap(44, 0.6), bar(0.6), gap(44, 0.6), gold(0.55),
-        bar(0.4), gold(0.4), gap(44, 0.6), gold(0.55),
+        bar(0.4), on(slide(44, 0.6, 14, 4, 0.25), 0.5), bar(0.6), gap(44, 0.6), gold(0.55), // first moving gap: gentle, nearly still as you cross
+        bar(0.4), gold(0.4), on(slide(44, 0.6, 14, 4, 0.75), 0.5), gold(0.55),
       ],
     },
     {
       id: 's4-split-decision', name: 'Split Decision', world: W1,
-      intro: 'Quicker switches. A short release between two gaps grabs the gold.',
+      intro: 'Quicker switches. A short release grabs the gold. Rings turn on the beat: shrink and fly through the opening.',
       teaches: 'Faster shrink/grow switches and gold dares (a short release between gaps).',
       speed: { start: 255, end: 280 }, exit: RUNOUT,
+      hints: [{ from: 0.4, to: 4.5, title: 'RINGS TURN ON THE BEAT.', sub: 'SHRINK  ·  FLY THROUGH THE OPENING' }, { from: 9.5, to: 13.5, title: 'EVERY SECOND COUNTS.', sub: 'QUICK RELEASES GRAB THE GOLD' }],
       items: [
         gap(46, 1.0), bar(0.55), gap(44, 0.55), gold(0.45), gap(44, 0.45), // first gold dare
-        bar(0.55), gap(44, 0.55), gold(0.42), gap(42, 0.45),
-        bar(0.55), gap(42, 0.55, 60), bar(0.5), gold(0.4),
-        gap(44, 0.5, -60), gold(0.42), gap(42, 0.45, 60), bar(0.5), gold(0.4),
+        bar(0.55), on(ring(44, 0.9, 1), 0.5), gold(0.5), gap(42, 0.45), // first rotating ring: alone, with room to read it
+        bar(0.55), on(slide(42, 0.55, 20, 4, 0.25), 0.5), bar(0.5), gold(0.4),
+        gap(44, 0.5, -60), gold(0.42), on(ring(42, 0.7, -1), 0.5), bar(0.5), gold(0.4), // second ring turns the other way
       ],
     },
 
@@ -118,7 +140,7 @@
         charged(1.0), gold(0.6), // first charged barrier: you're already full and charged
         gap(46, 0.8), charged(1.15), gold(0.5), // after a gap: let go early
         gap(44, 0.7), bar(0.55), gap(44, 0.55), gold(0.5),
-        charged(0.5), gap(44, 0.7, 60), charged(0.85), gold(0.5),
+        charged(0.5), on(slide(44, 0.7, 16, 4, 0.25), 0.5), charged(0.85), gold(0.5),
         gap(44, 0.6, -60), gold(0.55),
       ],
     },
@@ -130,8 +152,8 @@
       items: [
         gap(46, 1.0), gold(0.6),
         tunnel(46, 200, 0.9), gold(0.55), gold(0.3), // first tunnel: generous, then recovery
-        bar(0.45), gap(44, 0.6), tunnel(42, 280, 0.6), gold(0.45), bar(0.4),
-        gap(44, 0.55, 60), charged(0.8), gap(44, 0.5, -60), tunnel(42, 320, 0.25),
+        bar(0.45), on(breathe(44, 0.6, 10, 4, 0), 0.5), tunnel(42, 280, 0.6), gold(0.45), bar(0.4),
+        on(slide(44, 0.55, 18, 4, 0.25), 0.5), charged(0.8), gap(44, 0.5, -60), tunnel(42, 320, 0.25),
         gold(0.45), gold(0.3), bar(0.4), gold(0.4),
       ],
     },
@@ -142,9 +164,9 @@
       speed: { start: 290, end: 315 }, exit: RUNOUT,
       items: [
         gap(46, 1.0), gap(46, 0.32), gold(0.6), // first double: roomy
-        bar(0.5), gap(44, 0.6), gap(44, 0.24, 60), bar(0.5), gold(0.4),
-        gap(44, 0.6, -60), gap(42, 0.2), gap(42, 0.2, 60), gold(0.45), // triple
-        charged(0.75), gap(42, 0.5, -60), gap(42, 0.2), bar(0.5), gold(0.4),
+        bar(0.5), on(ring(44, 0.5, 1), 0.5), gap(44, 0.24, 60), bar(0.5), gold(0.4),
+        on(slide(44, 0.6, 20, 4, 0.75), 0.5), gap(42, 0.2), gap(42, 0.2, 60), gold(0.45), // triple
+        charged(0.75), on(slide(42, 0.5, 20, 4, 0.25), 0.5), gap(42, 0.2), bar(0.5), gold(0.4),
         gap(42, 0.55), gap(40, 0.18, 60), gold(0.45), bar(0.4), gold(0.4),
       ],
     },
@@ -157,7 +179,7 @@
         gap(46, 1.0), mint(0.34), gap(46, 0.34), gold(0.6), // first mint: roomy
         bar(0.55), gap(44, 0.65), mint(0.28), gap(44, 0.28), gold(0.5),
         charged(0.8), gap(44, 0.65, 60), mint(0.26), bar(0.26),
-        gap(42, 0.6, -60), gold(0.45), gap(42, 0.5), mint(0.24), gap(42, 0.24, 60),
+        on(ring(42, 0.75, -1), 0.5), gold(0.45), on(breathe(42, 0.5, 12, 4, 0), 0.5), mint(0.24), gap(42, 0.24, 60),
         gold(0.5), bar(0.45), gold(0.4),
       ],
     },
@@ -170,9 +192,9 @@
       speed: { start: 320, end: 360 }, exit: RUNOUT,
       items: [
         gap(44, 1.0), bar(0.42), gap(42, 0.42, 60), gold(0.38), charged(0.7),
-        gap(42, 0.42, -60), gap(42, 0.18), bar(0.42), gap(40, 0.42, 60), gold(0.36),
-        bar(0.3), gap(40, 0.42, -60), tunnel(40, 260, 0.2), gold(0.36), charged(0.7),
-        gap(40, 0.42, 60), mint(0.24), gap(40, 0.24), gold(0.4), bar(0.3),
+        on(ring(42, 0.5, 1), 0.5), gap(42, 0.18), bar(0.42), gap(40, 0.42, 60), gold(0.36),
+        bar(0.3), on(breathe(40, 0.42, 12, 4, 0), 0.5), tunnel(40, 260, 0.2), gold(0.36), charged(0.7),
+        on(ring(40, 0.45, -1), 0.5), mint(0.24), gap(40, 0.24), gold(0.4), bar(0.3),
         gap(40, 0.42, -60), gold(0.4),
       ],
     },
@@ -183,8 +205,8 @@
       speed: { start: 335, end: 365 }, exit: RUNOUT,
       items: [
         gap(40, 1.0), bar(0.36), gap(38, 0.38, 60), bar(0.35), gap(38, 0.38, -60), gold(0.35),
-        gap(36, 0.35), charged(0.65), gap(36, 0.38, 60), bar(0.35), gap(36, 0.38, -60), gold(0.35),
-        gap(34, 0.35), gap(34, 0.16, 60), charged(0.65), gap(34, 0.38, -60), gold(0.36),
+        gap(36, 0.35), charged(0.65), on(breathe(36, 0.38, 12, 4, 0), 0.5), bar(0.35), gap(36, 0.38, -60), gold(0.35),
+        on(ring(36, 0.4, 1), 0.5), gap(34, 0.16, 60), charged(0.65), gap(34, 0.38, -60), gold(0.36),
         bar(0.3), gap(36, 0.38), gold(0.36), bar(0.3), gold(0.3),
       ],
     },
@@ -194,10 +216,10 @@
       teaches: 'Every mechanic in combination, with a recovery section.',
       speed: { start: 345, end: 385 }, exit: RUNOUT,
       items: [
-        gap(42, 1.0), charged(0.7), gap(40, 0.42, 60), gap(40, 0.18), gold(0.38),
-        bar(0.3), gap(38, 0.42, -60), mint(0.24), gap(38, 0.24), gold(0.4),
+        gap(42, 1.0), charged(0.7), on(ring(40, 0.42, 1), 0.5), gap(40, 0.18), gold(0.38),
+        bar(0.3), on(breathe(38, 0.42, 12, 4, 0), 0.5), mint(0.24), gap(38, 0.24), gold(0.4),
         wide(0.5), gold(0.3), gold(0.3), // recovery
-        gap(38, 0.6, 60), charged(0.68), gap(36, 0.4, -60), gap(36, 0.16), bar(0.4),
+        gap(38, 0.6, 60), charged(0.68), on(ring(38, 0.4, -1), 0.5), gap(36, 0.16), bar(0.4),
         gap(36, 0.4, 60), mint(0.23), bar(0.26), gold(0.4),
         tunnel(36, 300, 0.45), gold(0.38), charged(0.42), gap(36, 0.42, -60), gold(0.4),
       ],
@@ -209,13 +231,13 @@
       speed: { start: 355, end: 410 }, exit: { type: 'finish', runout: 420 },
       items: [
         // Build-up
-        gap(42, 1.0), bar(0.42), gap(40, 0.42, 60), gold(0.36), charged(0.68),
-        gap(38, 0.4, -60), gap(38, 0.16), bar(0.38), gap(38, 0.4, 60), gold(0.36),
+        gap(42, 1.0), bar(0.42), on(breathe(40, 0.42, 12, 4, 0), 0.5), gold(0.36), charged(0.68),
+        on(slide(38, 0.4, 22, 4, 0.25), 0.5), gap(38, 0.16), bar(0.38), gap(38, 0.4, 60), gold(0.36),
         // Recovery
         wide(0.55), gold(0.3), gold(0.3), gold(0.3),
         // Final gauntlet
-        gap(36, 0.6, -60), bar(0.36), gap(36, 0.38, 60), charged(0.64),
-        gap(34, 0.38, -60), gap(34, 0.15), mint(0.23), gap(34, 0.23, 60), gold(0.36),
+        gap(36, 0.6, -60), bar(0.36), on(ring(36, 0.4, -1), 0.5), charged(0.66),
+        on(breathe(34, 0.38, 12, 4, 0), 0.5), gap(34, 0.15), mint(0.23), gap(34, 0.23, 60), gold(0.36),
         bar(0.3), tunnel(34, 340, 0.38), gold(0.36), charged(0.36),
         gap(34, 0.38, -60), bar(0.34), gap(34, 0.38, 60), gold(0.36),
         // Finale

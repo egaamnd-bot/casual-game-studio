@@ -8,8 +8,39 @@
   // (bottom) edge sits, measured in distance travelled; pickups have zero height.
   // Items give either `space` (px) or `t` (seconds of clear time before the item, converted
   // at the stage's top speed so the real time is never shorter than written).
-  function compile(stage, width) {
+  //
+  // Beat alignment: an item with `beat: n` (see `on()` in stages.js) is nudged later, never
+  // earlier, until it reaches the orb on a multiple of n beats of the stage's tempo, so clear
+  // times only ever grow. The speed ramp of such a stage is fixed to its unsnapped length
+  // (`speedLength`), so an item's arrival time is an exact function of its position. The orb
+  // sits at `height × orb.yRatio`, so the alignment holds on any screen length.
+  function compile(stage, width, height) {
+    const orbY = Math.round((height || C.rhythm.refLength) * C.orb.yRatio);
+    const bpm = stage.bpm || stage.world.bpm;
+    if (!stage.items.some((it) => it.beat)) return build(stage, width, orbY, bpm, null);
+    return build(stage, width, orbY, bpm, build(stage, width, orbY, bpm, null).finishAt);
+  }
+
+  // Ring geometry. The ring turns half a revolution in `beats` beats while the orb is inside it, so
+  // its radius is the distance the orb travels in that time (half of it each way), and the notch is
+  // widened just enough to let an orb of radius `need` through both arcs: the same geometry that
+  // Level.ringHit tests and the renderer draws.
+  function buildRing(item, need, prof, orbY, beatSec) {
+    const t = C.ring.thickness;
+    const nb = item.ring.beats * beatSec;
+    const df = item.at + orbY + t / 2; // travelled when the orb meets the front arc's centre line
+    const tf = prof.time(df);
+    const span = prof.dist(tf + nb) - df; // distance covered during the half turn
+    const omega = Math.PI / nb;
+    const alpha = Pulse.Rhythm.Ring.minAlpha(span / 2, t, omega, need, prof.speed(df), prof.speed(df + span)) + C.ring.margin;
+    item.ring = { dir: item.ring.dir, beats: item.ring.beats, R: span / 2, t, omega, tf, alpha };
+    item.h = span + t;
+  }
+
+  function build(stage, width, orbY, bpm, speedLength) {
     const items = [];
+    const prof = speedLength ? Pulse.Rhythm.profile(stage.speed.start, stage.speed.end, speedLength) : null;
+    const beatSec = Pulse.Rhythm.beatSeconds(bpm);
     let prevTop = 0;
     let prevType = 'start';
     for (let i = 0; i < stage.items.length; i++) {
@@ -17,6 +48,20 @@
       const space = src.space !== undefined ? src.space
         : Pulse.Track.spaceFor(prevType, src.type, src.t, stage.speed.end);
       const item = Pulse.Track.placeItem(Object.assign({}, src, { space }), prevTop, width);
+      if (prof) {
+        // A ring is aligned on the moment the orb meets the centre line of its front arc.
+        const lead = item.ring ? C.ring.thickness / 2 : 0;
+        const arrive = prof.time(item.at + orbY + lead);
+        if (src.beat) {
+          const grid = beatSec * src.beat;
+          const onGrid = Math.ceil(arrive / grid - 1e-6) * grid;
+          item.at = prof.dist(onGrid) - orbY - lead;
+          item.space = item.at - prevTop;
+        }
+        item.arrive = prof.time(item.at + orbY);
+        item.arriveBeat = item.arrive / beatSec;
+        if (item.ring) buildRing(item, src.need, prof, orbY, beatSec);
+      }
       item.index = i;
       items.push(item);
       prevTop = item.at + item.h;
@@ -25,7 +70,7 @@
     const finishAt = prevTop + stage.exit.runout;
     const energyTotal = items.filter((it) => it.type === 'energy').length;
     const bonusTotal = items.filter((it) => it.type === 'bonus').length;
-    return { stage, items, finishAt, energyTotal, bonusTotal };
+    return { stage, items, finishAt, speedLength: speedLength || finishAt, bpm, orbY, energyTotal, bonusTotal };
   }
 
   function speedAtDistance(stage, finishAt, travelled) {
@@ -55,11 +100,39 @@
       if (!ITEM_TYPES.includes(it.type)) err(`unknown item type "${it.type}"`);
       if (!(it.space > 0) && !(it.t >= 0)) err(`item ${stage.items.indexOf(it)} needs space > 0 or t >= 0`);
       if (it.type === 'gate' && !(typeof it.need === 'number')) err(`gate ${stage.items.indexOf(it)} needs a numeric need`);
+      if (it.ring) {
+        const n = stage.items.indexOf(it);
+        if (it.type !== 'gate' || it.length || it.slide) err(`item ${n}: a ring is a plain gate`);
+        if (!it.beat) err(`item ${n}: a ring must be beat-aligned (use on())`);
+        if (!(it.ring.beats === undefined || (it.ring.beats >= 1.5 && it.ring.beats <= 4))) err(`item ${n}: ring half-turn must take 1.5-4 beats`);
+      }
+      if (it.slide) {
+        const n = stage.items.indexOf(it);
+        const bpm = stage.bpm || stage.world.bpm;
+        const s = it.slide;
+        if (it.type !== 'gate' || it.length) err(`item ${n}: only plain gaps can move`);
+        if (!it.beat) err(`item ${n}: a moving gap must be beat-aligned (use on())`);
+        if (!(s.amp > 0) || !(s.beats >= C.motion.minBeats)) err(`item ${n}: slide needs amp > 0 and beats >= ${C.motion.minBeats}`);
+        else if (Pulse.Rhythm.motionRate(s, bpm) > C.motion.maxRate) {
+          err(`item ${n}: gap moves ${Pulse.Rhythm.motionRate(s, bpm).toFixed(0)} px/s, above the ${C.motion.maxRate} limit`);
+        }
+        if (it.need + (s && s.amp) > C.orb.x - C.wallMinWidth) err(`item ${n}: swing leaves the lane`);
+        if (s && s.kind !== undefined && s.kind !== 'slide' && s.kind !== 'breathe') err(`item ${n}: unknown motion kind`);
+      }
     }
     if (errors.length) return errors;
 
     const track = compile(stage, width);
-    return Pulse.Track.validateItems(track.items, (it) => speedAtDistance(stage, track.finishAt, it.at), stage.id);
+    for (const it of track.items) {
+      if (!it.ring) continue;
+      const r = it.ring;
+      const n = it.index;
+      if (r.R < C.ring.minRadius || r.R > C.ring.maxRadius) err(`item ${n}: ring radius ${r.R.toFixed(0)} px outside ${C.ring.minRadius}-${C.ring.maxRadius}`);
+      if (r.omega > C.ring.maxAngular) err(`item ${n}: ring turns ${r.omega.toFixed(2)} rad/s, above the ${C.ring.maxAngular} limit`);
+      if (r.alpha > C.ring.maxAlpha) err(`item ${n}: ring notch ${(r.alpha * 57.3).toFixed(0)} degrees half-width is too wide for the need`);
+    }
+    if (errors.length) return errors;
+    return Pulse.Track.validateItems(track.items, (it) => speedAtDistance(stage, track.speedLength, it.at), stage.id);
   }
 
   function starRules(stage) {
@@ -124,12 +197,13 @@
   class CampaignLevel extends Pulse.Level {
     constructor(width, height, stage) {
       super(width, height);
-      this.track = compile(stage, width);
+      this.track = compile(stage, width, height);
       this.items = this.track.items;
+      this.bpm = this.track.bpm; // moving obstacles follow the stage's tempo
     }
 
     speedAt() {
-      return speedAtDistance(this.track.stage, this.track.finishAt, this.travelled);
+      return speedAtDistance(this.track.stage, this.track.speedLength, this.travelled);
     }
 
     // Screen y of the finish line; the stage is complete once it reaches the orb.

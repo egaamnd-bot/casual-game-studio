@@ -31,7 +31,9 @@
 - [x] Landscape conversion with v3 art ([LANDSCAPE.md](LANDSCAPE.md))
 - [x] Phone playtest of the landscape build (producer: fun)
 - [x] 12-stage campaign, Gemini v4 worlds, skins, music and sound ([CAMPAIGN.md](CAMPAIGN.md), [AUDIO.md](AUDIO.md))
-- [ ] Phone playtest of the 12-stage campaign and audio
+- [x] Rhythm clock, beat-aligned stages and moving gaps, vertical slice (`feature/pulse-rhythm-motion`, [RHYTHM.md](RHYTHM.md))
+- [x] Game-feel pass (springy orb, eased tail, settled moving gaps) and the rotating ring obstacle ([RHYTHM.md](RHYTHM.md))
+- [ ] Phone playtest of the 12-stage campaign, audio, game feel and rings
 - [ ] Family-friendly monetization plan for approval ([MONETIZATION_FUTURE.md](MONETIZATION_FUTURE.md))
 - [ ] Playtest with 3–5 people against the targets in [PULSE_PROTOTYPE.md](PULSE_PROTOTYPE.md)
 

@@ -20,6 +20,7 @@
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
   <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
   <script src="../src/js/storage.js"></script>
   <script src="../src/js/sfx.js"></script>
   <script src="../src/js/level.js"></script>
@@ -93,6 +94,13 @@
       for (let t = 0; t < 80 && !(gateSeen && barrierSeen); t++) {
         await wait(100);
         for (const s of g.level.segments) {
+          // Comet look: gap walls are drawn from the live gap edges, not sprites. Check they sit on
+          // screen where the rules put them (screen x = SW - track y).
+          if (g.view.comet && s.active && s.kind === 'gate' && !s.ring && s.h === C.gate.thickness && s.y > 0 && s.y + s.h < g.H) {
+            const bandX = SW - (s.y + s.h / 2);
+            check(bandX > 0 && bandX < SW && s.gapL > 0 && s.gapR < C.width, `gate band on screen at x ${Math.round(bandX)} with its gap inside the lane`);
+            gateSeen = true;
+          }
           if (!s.active || !s._vis) continue;
           if (s.kind === 'gate' && s._vis.parts[1].visible && s.h === C.gate.thickness) {
             // Wall cap (gap edge) must appear where the rules put the gap: screen y = track x.

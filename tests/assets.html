@@ -19,6 +19,7 @@
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
   <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
   <script src="../src/js/storage.js"></script>
   <script src="../src/js/sfx.js"></script>
   <script src="../src/js/level.js"></script>
@@ -99,9 +100,14 @@
         check(g.state === 'playing', `run ${k}: still playing after 3s with autopilot`);
         // Orb art edge equals the collision radius at full size.
         g.radius = C.orb.radius; g.draw();
-        check(near(g.view.body.displayWidth / 2 * (A.orbBodyRadius / 64), C.orb.radius), `run ${k}: orb art radius = ${C.orb.radius}`);
+        // (Comet look: the round disc is the orb; it is never smaller than the collision circle, at most a few px bigger while it springs, and never shorter along travel.)
+        const body = g.view.comet ? g.view.cometBody : null;
+        const within = (rad) => body.displayWidth / 2 >= rad - 0.01 && body.displayWidth / 2 <= rad + Pulse.Rhythm.OrbFx.maxExtra + 0.01;
+        check(body ? within(C.orb.radius) && body.displayHeight >= body.displayWidth - 0.01
+          : near(g.view.body.displayWidth / 2 * (A.orbBodyRadius / 64), C.orb.radius), `run ${k}: orb art radius = ${C.orb.radius}`);
         g.radius = C.orb.minRadius; g.draw();
-        check(near(g.view.core.displayWidth / 2 * (A.orbShrunkRadius / 38), C.orb.minRadius), `run ${k}: shrunk art radius = ${C.orb.minRadius}`);
+        check(body ? within(C.orb.minRadius) && body.displayHeight >= body.displayWidth - 0.01
+          : near(g.view.core.displayWidth / 2 * (A.orbShrunkRadius / 38), C.orb.minRadius), `run ${k}: shrunk art radius = ${C.orb.minRadius}`);
         const gates = g.level.segments.filter((s) => s.active && s._vis && s._vis.kind === 'gate' && s._vis.parts[1].visible);
         if (gates.length) {
           const s = gates[0];
@@ -143,7 +149,7 @@
       view.renderChargeRing(true, 0.5, R);
       check(view.chargeRing.frame.name === 'charge_ring_state_b_step_03', 'charge ring: 50% shows step 3 of 4');
       view.renderChargeRing(true, 1, R);
-      check(view.chargeRing.frame.name === 'charge_ring_state_c_full' && view.chargeBurst.visible, 'charge ring: full state with burst');
+      check(view.chargeRing.frame.name === 'charge_ring_state_c_full' && (view.comet ? view.cometEcho.visible : view.chargeBurst.visible), 'charge ring: full state with burst');
       view.renderChargeRing(false, 1, R);
       check(!view.chargeRing.visible, 'charge ring hidden when no charged barrier is on screen');
 

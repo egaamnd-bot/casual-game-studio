@@ -20,6 +20,7 @@
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
   <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
   <script src="../src/js/storage.js"></script>
   <script src="../src/js/sfx.js"></script>
   <script src="../src/js/level.js"></script>
@@ -64,7 +65,8 @@
     Pulse.Render.pickup = function (g, seg, x, dimmed) { dimLog.push(dimmed); return origPickup.apply(this, arguments); };
 
     async function run() {
-      await wait(500);
+      for (let i = 0; i < 150 && !(scene() && scene().state === 'playing'); i++) await wait(100); // slow servers load assets late
+      await wait(300);
       const s = scene();
       check(s && s.mode === 'campaign' && s.state === 'playing', 'campaign stage starts');
       const cx = s.SW * 0.75, cy = s.SH / 2; // tap in the open lane ahead of the orb
@@ -92,6 +94,19 @@
       check(s.state === 'paused', 'pause button pauses');
       down(cx, cy); up(cx, cy); await wait(100);
       check(s.state === 'playing', 'tap resumes after pause button');
+
+      // Rhythm clock: runs only while playing, stays in step with the level, restarts on retry.
+      check(s.clock.bpm === Pulse.STAGES[0].world.bpm, `stage 1 clock runs at the world's tempo (${s.clock.bpm})`);
+      check(Math.abs(s.clock.t - s.level.time) < 1e-6, 'run clock and level clock agree');
+      s.pause(); const frozen = s.clock.t; await wait(300);
+      check(s.clock.t === frozen, 'run clock is frozen while paused');
+      down(cx, cy); up(cx, cy); await wait(300);
+      check(s.state === 'playing' && s.clock.t > frozen && Math.abs(s.clock.t - s.level.time) < 1e-6, 'run clock continues after resume');
+      check(s.orbFx && s.orbFx.glow >= 1 && s.orbFx.along >= 1 && s.orbFx.across >= 1 && s.orbFx.radius >= s.radius - 1e-9, 'orb effects never shrink the drawn orb');
+      check(s.radius === C.orb.radius, 'orb effects leave the collision radius alone');
+
+      // Input sounds are never delayed to the beat.
+      check(C.groove.inputDelay === 0, 'shrink and release sounds play at once');
 
       // Pickup dimming: wait until a pickup is on screen, then hold.
       const sprites = !!s.view;
@@ -122,6 +137,7 @@
       await wait(500);
       down(cx, cy); up(cx, cy); await wait(100);
       check(s.state === 'playing' && s.level.travelled < 200, 'tap after lock restarts from the beginning');
+      check(s.clock.t < 0.3 && s.level.time < 0.3, `retry restarts the run clock (t=${s.clock.t.toFixed(2)})`);
 
       // Completion with autopilot: recorded, unlocks next, legacy best untouched.
       s.test.bot = true;
@@ -150,10 +166,12 @@
       check(Pulse.Music.wanted === 'WORLD_2_GAMEPLAY', `endless moves to the World 2 track after 30 s (${Pulse.Music.wanted})`);
       e.elapsed = 65; e.step(1 / 60);
       check(Pulse.Music.wanted === 'WORLD_3_GAMEPLAY', `endless moves to the World 3 track after 60 s (${Pulse.Music.wanted})`);
+      check(e.clock.bpm === 140 && Pulse.Rhythm.trackTime(e.clock) < 0.1, `endless clock follows the track change (${e.clock.bpm} BPM)`);
       e.pause();
       check(e.state === 'paused' && Pulse.Music.level < 1, 'pause ducks the music');
+      check(Pulse.Music.holding === true, 'pause holds the music where it is, so resuming needs no seek');
       down(cx, cy); up(cx, cy); await wait(100);
-      check(e.state === 'playing' && Pulse.Music.level === 1, 'resume restores the music level');
+      check(e.state === 'playing' && Pulse.Music.level === 1 && Pulse.Music.holding === false, 'resume restores the music level and releases the hold');
       e.game.events.emit('hidden'); await wait(50);
       check(A().hidden && A().musicPaused && !A().holding, 'app in background: music paused, hum stopped');
       e.game.events.emit('visible'); await wait(50);
@@ -185,8 +203,8 @@
 
       document.title = (failures ? `FAIL ${failures}` : 'PASS scene tests') + (results.length ? ' | ' + results.join(' | ') : '');
     }
-    window.addEventListener('error', (ev) => { document.title = 'ERROR ' + ev.message; });
-    run().catch((err) => { document.title = 'ERROR ' + err.message; });
+    window.addEventListener('error', (ev) => { document.title = 'ERROR ' + ev.message + ' @ ' + String(ev.error && ev.error.stack).split('\n').slice(1, 3).join(' <- '); });
+    run().catch((err) => { document.title = 'ERROR ' + err.message + ' @ ' + String(err.stack).split('\n').slice(1, 3).join(' <- '); });
   </script>
 </body>
 </html>

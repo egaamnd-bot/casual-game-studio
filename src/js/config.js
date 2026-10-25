@@ -65,6 +65,46 @@ Pulse.CONFIG = {
     defaultStars: { two: 0.6, three: 0.9 },
   },
 
+  // Rhythm layer (rhythm.js). The music enhances the game; no action has to be on the beat.
+  rhythm: {
+    refLength: 960, // track length (16:9 screen width) used when a stage is compiled without a screen
+    syncTolerance: 0.15, // s: how far the music may drift from the run clock before it is re-aligned (seeking is audible, so only for real drift)
+    pulseSharpness: 3, // how quickly the beat pulse eases out
+  },
+
+  // Trailer look (docs/RHYTHM.md): a round glowing sphere with a comet tail, crimson chevron walls,
+  // a darker field. `enabled: false` returns to the v4 octagon-orb and sprite-wall look.
+  comet: {
+    enabled: true,
+    tailBase: 2.0, // tail length = this × radius ...
+    tailPerSpeed: 0.62, // ... + this × speed (px/s), scaled down while the orb is shrunk
+    nodes: 10, // pooled sparkle nodes behind the orb (never more)
+    nodeIntervalMs: 28,
+    backdropAlpha: 0.5, // dims the v4 background so the sphere and walls pop
+  },
+
+  // Sound timing (docs/RHYTHM.md). Input sounds (shrink, release) play the instant you touch: no
+  // beat quantising, so nothing ever feels late. Reward sounds (pickup, smash, pass) wait at most
+  // `eventDelay` s for the next 16th note. `enabled: false` plays everything at once.
+  groove: { enabled: true, inputDelay: 0, eventDelay: 0.04, maxSeeks: 4 },
+
+  // Rotating ring gate (see Pulse.Rhythm.Ring and docs/RHYTHM.md).
+  ring: {
+    thickness: 22,
+    margin: 0.07, // rad of extra notch beyond the exact minimum
+    maxAngular: 4.2, // rad/s: fastest the ring may turn
+    minRadius: 78,
+    maxRadius: 215,
+    maxAlpha: 1.9, // rad: widest notch half-angle, so the ring always reads as a ring
+  },
+
+  // Moving obstacles (see Pulse.Rhythm.motionOffset). The gap moves, but even at its tightest it
+  // still leaves the same clearance a static gap of that `need` would.
+  motion: {
+    maxRate: 100, // px/s: fastest a gap edge may move (the orb shrinks at 190)
+    minBeats: 2, // shortest period, so the swing is always readable
+  },
+
   multiplierMax: 5,
   // Feedback only (no points): call out every Nth obstacle cleared while at the max multiplier.
   maxStreakCallout: 10,

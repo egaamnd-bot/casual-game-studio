@@ -94,7 +94,209 @@
       this.chevron = scene.add.image(scene.orbSX, scene.orbSY, 'pulse_gameplay', 'fx_mult_up_chevron')
         .setScale(A.base).setDepth(10).setVisible(false);
 
+      this.comet = !!C.comet.enabled;
       this.setSkin(skin);
+      if (this.comet) this.initComet();
+    }
+
+    // ---- Trailer look: a round glowing sphere with a comet tail ----
+    // Procedural textures (no new art files): a soft glow, a crisp disc drawn at exactly the
+    // collision radius, a tapering tail, a ring for beat echoes and a small spark. Everything is
+    // white and tinted per skin. The disc is the collision circle; glow and tail only add to it.
+    makeCometTextures() {
+      const tex = this.scene.textures;
+      const make = (key, w, h, draw) => {
+        if (tex.exists(key)) return;
+        const t = tex.createCanvas(key, w, h);
+        draw(t.getContext(), w, h);
+        t.refresh();
+      };
+      make('comet_glow', 256, 256, (g, w, h) => {
+        const r = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+        r.addColorStop(0, 'rgba(255,255,255,0.95)');
+        r.addColorStop(0.22, 'rgba(255,255,255,0.45)');
+        r.addColorStop(0.5, 'rgba(255,255,255,0.16)');
+        r.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = r;
+        g.fillRect(0, 0, w, h);
+      });
+      make('comet_body', 128, 128, (g, w, h) => {
+        const r = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+        r.addColorStop(0, 'rgba(255,255,255,1)');
+        r.addColorStop(0.78, 'rgba(255,255,255,1)');
+        r.addColorStop(0.9, 'rgba(255,255,255,0.9)');
+        r.addColorStop(1, 'rgba(255,255,255,0.9)');
+        g.fillStyle = r;
+        g.beginPath();
+        g.arc(w / 2, h / 2, w / 2 - 0.5, 0, Math.PI * 2);
+        g.fill(); // the disc's edge is the collision radius
+      });
+      make('comet_tail', 64, 256, (g, w, h) => {
+        for (let y = 0; y < h; y++) {
+          const u = y / h;
+          const half = (w / 2) * Math.pow(1 - u, 0.85);
+          g.fillStyle = `rgba(255,255,255,${(0.85 * Math.pow(1 - u, 1.7)).toFixed(3)})`;
+          g.fillRect(w / 2 - half, y, half * 2, 1);
+        }
+      });
+      make('comet_ring', 128, 128, (g, w, h) => {
+        g.strokeStyle = 'rgba(255,255,255,1)';
+        g.lineWidth = 3;
+        g.beginPath();
+        g.arc(w / 2, h / 2, w / 2 - 3, 0, Math.PI * 2);
+        g.stroke();
+      });
+      make('comet_dot', 32, 32, (g, w, h) => {
+        const r = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+        r.addColorStop(0, 'rgba(255,255,255,1)');
+        r.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = r;
+        g.fillRect(0, 0, w, h);
+      });
+    }
+
+    initComet() {
+      const sc = this.scene;
+      this.makeCometTextures();
+      const x = sc.orbX;
+      const y = sc.orbY;
+      for (const img of [this.ring, this.body, this.core, this.arcs]) img.setVisible(false);
+      this.cometTail = this.add(sc.add.image(x, y, 'comet_tail').setOrigin(0.5, 0).setBlendMode('ADD'), 4.2);
+      this.cometStreak = this.add(sc.add.image(x, y, 'comet_tail').setOrigin(0.5, 0).setBlendMode('ADD'), 4.3);
+      this.cometGlow = this.add(sc.add.image(x, y, 'comet_glow').setBlendMode('ADD'), 4.6);
+      this.cometBody = this.add(sc.add.image(x, y, 'comet_body'), 5);
+      this.cometCore = this.add(sc.add.image(x, y, 'comet_body'), 5.05);
+      this.cometEcho = this.add(sc.add.image(x, y, 'comet_ring').setBlendMode('ADD').setVisible(false), 4.8);
+      this.cometRipple = this.add(sc.add.image(x, y, 'comet_ring').setBlendMode('ADD').setVisible(false), 4.9);
+      this.cometRing = this.add(sc.add.graphics(), 5.2);
+      // Pooled sparks behind the orb: a fixed ring buffer, so nothing is ever allocated in play.
+      this.nodes = [];
+      for (let i = 0; i < C.comet.nodes; i++) {
+        const n = this.add(sc.add.image(x, y, 'comet_dot').setBlendMode('ADD').setVisible(false), 4.5);
+        n.age = 1e9;
+        this.nodes.push(n);
+      }
+      this.nodeNext = 0;
+      this.nodeClock = 0;
+      this.lastRender = 0;
+      // Quieter backdrop and neon lane rails, as in the trailer.
+      const a = C.comet.backdropAlpha;
+      this.bg.setAlpha(a);
+      this.midTop.setAlpha(0.5 * a);
+      this.midBottom.setAlpha(0.5 * a);
+      const SW = sc.SW;
+      const SH = sc.SH;
+      const rails = this.rails = sc.add.graphics().setDepth(1.5);
+      for (const [w, al] of [[12, 0.1], [5, 0.25], [2, 0.9]]) {
+        rails.lineStyle(w, 0x1e6bff, al);
+        rails.lineBetween(0, 6, SW, 6);
+        rails.lineBetween(0, SH - 6, SW, SH - 6);
+      }
+    }
+
+    // The orb colour moves from its normal to its shrunk tint as it gets small.
+    cometColor(t, dead) {
+      if (dead) return T.danger;
+      const c = this.skin.colors;
+      const mix = (a, b) => {
+        const ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255;
+        const br = (b >> 16) & 255, bg = (b >> 8) & 255, bb = b & 255;
+        return (Math.round(ar + (br - ar) * t) << 16) | (Math.round(ag + (bg - ag) * t) << 8) | Math.round(ab + (bb - ab) * t);
+      };
+      return mix(c.orb, c.shrunk);
+    }
+
+    // The whole rail and backdrop breathe with the beat (quietly: it is a pulse, not a strobe).
+    beatPulse(phase, calm) {
+      if (!this.comet) return;
+      const k = calm ? 0 : Pulse.Rhythm.pulse(phase, 3);
+      this.rails.setAlpha(0.78 + 0.22 * k);
+      this.bg.setAlpha(C.comet.backdropAlpha * (1 + 0.1 * k));
+    }
+
+    // Draws the comet from the collision radius (`radius`, authoritative) and the springy visual
+    // model `f` (Pulse.Rhythm.OrbFx): the disc is f.radius, which is never below the collision
+    // radius; the tail and glow follow it through springs so they trail and recover smoothly.
+    renderComet(radius, dead, f) {
+      const sc = this.scene;
+      const Rh = Pulse.Rhythm;
+      const x = sc.orbX;
+      const y = sc.orbY;
+      const now = sc.time.now;
+      const dtms = Math.min(50, Math.max(0, now - (this.lastRender || now)));
+      const dt = dtms / 1000;
+      this.lastRender = now;
+      const vr = Math.min(radius + Pulse.Rhythm.OrbFx.maxExtra, Math.max(radius, f.radius || radius)); // what is drawn: never smaller than what collides, at most a few px bigger
+      this.drawnRadius = vr;
+      const t = Math.min(1, Math.max(0, (C.orb.radius - radius) / (C.orb.radius - C.orb.minRadius)));
+      const col = this.cometColor(t, dead);
+      const speed = sc.speedNow || 200;
+      const k = C.comet;
+      // Tail: longer the faster you go, shorter while shrunk, stretched a little while shrinking
+      // (streamlined) and eased in and out by a spring so it trails the orb instead of snapping.
+      const target = (k.tailBase * vr + k.tailPerSpeed * speed * (0.4 + 0.6 * (vr / C.orb.radius))) * (1 + 0.22 * (f.shrink || 0));
+      if (!this.tailLen) this.tailLen = Rh.createSpring(target);
+      const len = Math.max(8, Rh.springStep(this.tailLen, target, dt, 4.5, 0.75));
+      const beat = Rh.position(sc.clock).beat;
+      const sway = (dead ? 0 : 0.03) * Math.sin(beat * Math.PI); // the tail lilts once per two beats
+      const wide = (2 * vr * 0.92) / 64;
+      const show = !dead;
+      this.cometTail.setVisible(show).setPosition(x, y).setTint(col).setAlpha(0.8).setRotation(sway)
+        .setScale(wide * f.glow, len / 256);
+      this.cometStreak.setVisible(show).setPosition(x, y).setTint(this.skin.colors.core).setAlpha(0.7).setRotation(sway * 0.6)
+        .setScale(wide * 0.4, (len * 0.62) / 256);
+      this.cometGlow.setVisible(true).setPosition(x, y).setTint(col).setAlpha(dead ? 0.5 : 0.55 + 0.25 * (f.pop || 0))
+        .setScale((vr * 2.7 * f.glow) / 256);
+      // The disc is at least the collision radius across the lane; stretch only adds.
+      const d = (2 * vr) / 128;
+      this.cometBody.setPosition(x, y).setTint(col).setScale(d * f.across, d * f.along);
+      this.cometCore.setPosition(x, y).setTint(0xffffff).setAlpha(dead ? 0 : 0.9).setScale(d * 0.46);
+      // Sparks: shed behind the orb more often the faster it goes, drifting back with the world,
+      // spreading a little sideways and easing out as they fade.
+      this.nodeClock += dtms;
+      const interval = k.nodeIntervalMs * Math.min(2, 260 / Math.max(120, speed));
+      if (show && this.nodeClock >= interval) {
+        this.nodeClock = 0;
+        const n = this.nodes[this.nodeNext++ % this.nodes.length];
+        n.age = 0;
+        n.px = x + (Math.random() - 0.5) * vr * 0.7;
+        n.py = y + vr * 0.35;
+        n.vx = (n.px - x) * 2.2 + (Math.random() - 0.5) * 24;
+        n.sz = vr / 56;
+        n.setTint(col);
+      }
+      for (const n of this.nodes) {
+        n.age += dtms;
+        const life = n.age / 300;
+        if (life >= 1) {
+          n.setVisible(false);
+          continue;
+        }
+        n.py += speed * (0.55 + 0.3 * life) * dt;
+        n.px += n.vx * dt;
+        n.vx *= Math.pow(0.05, dt); // drag
+        const fade = 1 - life * life;
+        n.setVisible(true).setPosition(n.px, n.py).setAlpha(0.7 * fade).setScale(n.sz * (0.95 - 0.8 * life));
+      }
+    }
+    // Beat echo (every beat) and release ripple: round rings, cosmetic only.
+    beatEcho(radius, big) {
+      if (!this.comet) return;
+      const s = radius / 64;
+      this.ringPulse(this.cometEcho, s * 1.02, s * (big ? 1.7 : 1.45), 280, 0.55);
+    }
+
+    releaseRipple(radius) {
+      if (!this.comet) return;
+      const s = radius / 64;
+      this.ringPulse(this.cometRipple, s * 0.9, s * 1.9, 240, 0.8);
+    }
+
+    ringPulse(img, from, to, ms, alpha) {
+      const sc = this.scene;
+      sc.tweens.killTweensOf(img);
+      img.setVisible(true).setPosition(sc.orbX, sc.orbY).setTint(this.cometColor(0, false)).setAlpha(alpha).setScale(from);
+      sc.tweens.add({ targets: img, scale: to, alpha: 0, duration: ms, ease: 'Cubic.easeOut' });
     }
 
     // Adds a gameplay object to the track-space layer, keeping draw order by depth.
@@ -106,6 +308,7 @@
     }
 
     setSkin(skin) {
+      this.skin = skin;
       const s = skin.sprite;
       this.ring.setTexture(s.atlas, `${s.prefix}ring`);
       this.body.setTexture(s.atlas, `${s.prefix}normal`);
@@ -133,11 +336,17 @@
         const onScreen = s.y < H && s.y + s.h > -60;
         if (s.kind === 'barrier') {
           this.placeBarrier(this.acquire(s, 'barrier'), s, onScreen && !s.broken, canSmash ? canSmash(s) : !dimmed);
+        } else if (s.kind === 'gate' && s.ring) {
+          this.release(s); // rotating ring: drawn from the same numbers the collision test uses
+          if (onScreen) Pulse.Render.ring(wallGraphics, s, level.time);
         } else if (s.kind === 'gate' && s.h > C.gate.thickness) {
           // Tunnel (long hold): body drawn in the wall palette, edges and lane guide from the atlas.
           const v = this.acquire(s, 'tunnel');
           this.placeTunnel(v, s, onScreen);
           if (onScreen) Pulse.Render.tunnelBody(wallGraphics, s, this.scene.W);
+        } else if (s.kind === 'gate' && this.comet) {
+          this.release(s); // trailer look: gap walls are drawn, not sprites
+          if (onScreen) Pulse.Render.cometGate(wallGraphics, s, this.scene.W, level.bpm ? (level.time * level.bpm) / 60 : 0, s.y + s.h < this.scene.orbY - 10);
         } else if (s.kind === 'gate') {
           this.placeGate(this.acquire(s, 'gate'), s, onScreen);
         } else {
@@ -296,15 +505,23 @@
       this.finish.setVisible(visible).setPosition(0, y - 6 * FINISH_SCALE);
     }
 
-    renderOrb(radius, dead) {
+    // `fx` (Pulse.Rhythm.OrbFx.scales) is cosmetic: the glow ring breathes on the beat and the
+    // body stretches along the direction of travel. All its scales are >= 1, so the drawn orb
+    // always covers the collision circle (radius), which fx never changes.
+    renderOrb(radius, dead, fx) {
       const R = C.orb.radius;
+      const f = fx || { glow: 1, along: 1, across: 1 };
+      if (this.comet) {
+        this.renderComet(radius, dead, f);
+        return;
+      }
       const t = Math.min(1, Math.max(0, (R - radius) / (R - C.orb.minRadius)));
       const bodyScale = radius / A.orbBodyRadius;
       const coreScale = radius / A.orbShrunkRadius;
-      this.body.setScale(bodyScale).setAlpha(1 - 0.85 * t);
-      this.ring.setScale(bodyScale).setAlpha(0.9);
-      this.core.setScale(coreScale).setAlpha(t);
-      this.arcs.setScale(coreScale).setAlpha(0.9 * t);
+      this.body.setScale(bodyScale * f.across, bodyScale * f.along).setAlpha(1 - 0.85 * t);
+      this.ring.setScale(bodyScale * f.glow).setAlpha(0.9);
+      this.core.setScale(coreScale * f.across, coreScale * f.along).setAlpha(t);
+      this.arcs.setScale(coreScale * f.across, coreScale * f.along).setAlpha(0.9 * t);
       for (const img of [this.body, this.ring, this.core, this.arcs]) {
         if (dead) img.setTint(T.danger);
         else img.clearTint();
@@ -316,6 +533,7 @@
     // barrier is on screen.
     renderChargeRing(visible, charge, radius) {
       const ring = this.chargeRing;
+      if (this.comet) this.cometRing.clear();
       if (!visible) {
         ring.setVisible(false);
         this.wasFull = charge >= 1;
@@ -333,10 +551,23 @@
         ring.setFrame('charge_ring_state_c_full').setAlpha(1);
         if (!this.wasFull) {
           this.wasFull = true;
-          this.pulse(this.chargeBurst, scale * 0.85, scale * 1.35, 200);
+          if (this.comet) this.ringPulse(this.cometEcho, radius / 64, (radius / 64) * 1.6, 200, 0.9);
+          else this.pulse(this.chargeBurst, scale * 0.85, scale * 1.35, 200);
         }
       }
       this.ringFrame = ring.frame.name;
+      if (this.comet) {
+        // Same rule feedback, drawn as a round ring to match the sphere (the sprite state above is kept for tests).
+        ring.setVisible(false);
+        // The drawn charge eases up toward the real charge and drops at once when it is lost, so the
+        // ring never shows more charge than the rules have (it can lag a few frames behind a fill).
+        const dt = Math.min(0.05, (this.scene.game.loop.delta || 16) / 1000);
+        if (charge < this.dispCharge || this.dispCharge === undefined) this.dispCharge = charge;
+        else this.dispCharge += (charge - this.dispCharge) * (1 - Math.exp(-dt * 30));
+        if (charge >= 1 && this.dispCharge > 0.985) this.dispCharge = 1;
+        const drawn = Math.min(radius + Pulse.Rhythm.OrbFx.maxExtra, Math.max(radius, this.drawnRadius || radius));
+        Pulse.Render.chargeRing(this.cometRing, this.scene.orbX, this.scene.orbY, drawn, this.dispCharge);
+      }
     }
 
     // One-shot expanding fade on an effect image.
@@ -370,6 +601,10 @@
 
     // Run start: the orb materializes (v4 effect).
     spawn() {
+      if (this.comet) {
+        this.ringPulse(this.cometRipple, 0.4, 2.0, 380, 0.9);
+        return;
+      }
       if (!this.spawnFx) this.spawnFx = this.add(this.scene.add.image(0, 0, 'pulse_gameplay', 'fx_orb_spawn_materialize').setBlendMode('ADD'), 6);
       this.pulse(this.spawnFx, A.base * 1.6, A.base * 0.9, 320);
     }
