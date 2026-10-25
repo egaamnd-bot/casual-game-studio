@@ -10,7 +10,7 @@ Build an original, enjoyable casual game for a broad age range, with a realistic
 
 ## Status
 
-🚧 **In development.** A landscape, one-touch arcade game with Campaign (3 stages) and Endless modes, built with Gemini's v3 art ([docs/LANDSCAPE.md](docs/LANDSCAPE.md)), charged barriers and combo patterns ([docs/GAMEPLAY_EVOLUTION.md](docs/GAMEPLAY_EVOLUTION.md)). See [docs/DECISIONS.md](docs/DECISIONS.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
+🚧 **In development.** A landscape, one-touch arcade game with a **12-stage campaign** across three worlds ([docs/CAMPAIGN.md](docs/CAMPAIGN.md)) and Endless mode, Gemini's v4 art, six cosmetic skins and an original synthwave soundtrack ([docs/AUDIO.md](docs/AUDIO.md)). Landscape layout: [docs/LANDSCAPE.md](docs/LANDSCAPE.md). Mechanics: [docs/GAMEPLAY_EVOLUTION.md](docs/GAMEPLAY_EVOLUTION.md). See [docs/DECISIONS.md](docs/DECISIONS.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Team
 

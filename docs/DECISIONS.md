@@ -6,6 +6,9 @@ Add new entries at the top.
 
 | # | Date | Decision | Approved by | Link |
 |---|------|----------|-------------|------|
+| 13 | 2026-10-25 | Monetization **after** gameplay and content are polished. Target audience: children and teens with general appeal, which means Google Play Families requirements apply. Nothing implemented. | Human Producer | [MONETIZATION_FUTURE.md](MONETIZATION_FUTURE.md) |
+| 12 | 2026-10-25 | Campaign expands to **12 stages** (3 worlds × 4); balanced priority across gameplay, content and reliability; electronic/synthwave music. Original three stage ids, stars, unlock order and saves preserved. | Human Producer | [CAMPAIGN.md](CAMPAIGN.md) |
+| 11 | 2026-10-25 | Integrate Gemini's v4.0 art and audio pack: three worlds, two new cosmetic skins (12★ / 15★), original synthwave music and sound effects | Human Producer | [AUDIO.md](AUDIO.md) |
 | 10 | 2026-10-25 | Integrate Gemini's v3.0 asset pack (charged barriers, charge ring, effects, landscape backgrounds and UI), with art scaled to the tested gameplay sizes | Human Producer | [LANDSCAPE.md](LANDSCAPE.md) |
 | 9 | 2026-10-25 | **Orientation: landscape.** Obstacles travel right to left, orb toward the left, landscape HUD and menus, Android locked to landscape. Gameplay mechanics, difficulty, scoring, charge duration, collision, stage ids, stars, unlocks and saves unchanged. Replaces the portrait layout. | Human Producer | [LANDSCAPE.md](LANDSCAPE.md) |
 | 8 | 2026-10-25 | Integrate Gemini's v2.0 asset pack by **scaling the art to the current tested gameplay sizes** (no collision or timing changes). Keep existing scoring (no +100/+250 values). Gold = standard energy, mint = bonus. | Human Producer | [ART_BIBLE.md](ART_BIBLE.md) |

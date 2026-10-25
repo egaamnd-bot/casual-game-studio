@@ -55,13 +55,28 @@
       notes.push(`${frames} required frames present`);
 
       for (const stage of Pulse.STAGES) {
-        const v = stage.visual;
+        const v = stage.world.visual;
         check(v && ['background', 'mid', 'rail'].every((k) => Pulse.Assets.IMAGES.includes(v[k])),
-          `${stage.id}: landscape background images are known`);
+          `${stage.id}: world background images are known`);
+        check(Pulse.Assets.IMAGES.includes(stage.world.banner), `${stage.id}: world banner is known`);
       }
       for (const key of ['anim_orb_gold', 'anim_orb_mint', ...Pulse.SKINS.map((s) => `anim_arcs_${s.id}`)]) {
         const anim = active().anims.get(key);
         check(anim && anim.frames.length === 4, `animation ${key} has 4 frames`);
+      }
+
+      // Audio: every effect and sting decodes; every music track the game asks for exists.
+      await Pulse.Audio.loading;
+      const st = Pulse.Audio.status();
+      check(st.buffers === st.expected && st.failed.length === 0, `audio decoded ${st.buffers}/${st.expected} (failed: ${st.failed.join(', ')})`);
+      notes.push(`${st.buffers} sounds decoded`);
+      const tracks = new Set(['MENU_THEME', ...Pulse.WORLDS.map((w) => w.music), 'WORLD_1_GAMEPLAY', 'WORLD_2_GAMEPLAY', 'WORLD_3_GAMEPLAY']);
+      for (const t of tracks) {
+        const ok = await fetch(`../src/assets/audio/music/${t}.ogg`).then((r) => r.ok && r.arrayBuffer()).then((b) => b && b.byteLength > 100000).catch(() => false);
+        check(ok, `music track ${t} present`);
+      }
+      for (let i = 0; i < Pulse.STAGES.length; i++) {
+        check(active().textures.exists(Pulse.Assets.stageCardKey(i)), `stage card plate ${Pulse.Assets.stageCardKey(i)} loaded`);
       }
 
       // Menus.

@@ -1,0 +1,405 @@
+{
+  "project": "PULSE",
+  "version": "4.0.0",
+  "recommendedFormat": {
+    "music": "OGG Vorbis (.ogg) for all streaming background tracks; WAV masters (.wav) also included for short stings",
+    "sfx": "OGG Vorbis (.ogg) for general WebAudio playback; 16-bit 44.1kHz PCM WAV (.wav) masters included for zero-latency critical cues"
+  },
+  "mixAndPolyphonyGuidance": {
+    "musicMasterVolume": 0.55,
+    "sfxMasterVolume": 0.85,
+    "shrinkLoopVolume": 0.25,
+    "maxSimultaneousSfx": 6,
+    "mobileAudioUnlockStrategy": "Call scene.sound.unlock() and resume WebAudio AudioContext inside the first pointerdown event handler; listen to game.events 'blur'/'hidden' to pause active music loops and 'focus'/'visible' to resume."
+  },
+  "hookMappingToExistingSfxJs": {
+    "start": "sfx_ui_retry",
+    "pass": "sfx_obstacle_gate_pass",
+    "pickup": "sfx_pickup_gold",
+    "bonusPickup": "sfx_pickup_mint_bonus",
+    "multiplierLost": "sfx_charge_cancelled",
+    "crash": "sfx_player_death_collision",
+    "chargedFail": "sfx_barrier_charged_fail",
+    "milestone": "sfx_multiplier_max_x5",
+    "smash": "sfx_barrier_smash_ordinary",
+    "chargedSmash": "sfx_barrier_smash_charged",
+    "complete": "sfx_stage_finish_line",
+    "select": "sfx_ui_button_tap"
+  },
+  "musicTracks": [
+    {
+      "id": "MENU_THEME",
+      "filename": "audio/music/MENU_THEME.ogg",
+      "format": "ogg",
+      "bpm": 112,
+      "durationSeconds": 68.57,
+      "loop": true,
+      "loopStartSeconds": 0.0,
+      "loopEndSeconds": 68.5714,
+      "intendedUse": "Main Menu, Mode Selection, Campaign World/Stage Selection, and Skin Picker loop"
+    },
+    {
+      "id": "WORLD_1_GAMEPLAY",
+      "filename": "audio/music/WORLD_1_GAMEPLAY.ogg",
+      "format": "ogg",
+      "bpm": 125,
+      "durationSeconds": 76.8,
+      "loop": true,
+      "loopStartSeconds": 0.0,
+      "loopEndSeconds": 76.8,
+      "intendedUse": "World 1 (Neon Circuit) Stages 1\u20134 and initial Endless Mode loop"
+    },
+    {
+      "id": "WORLD_2_GAMEPLAY",
+      "filename": "audio/music/WORLD_2_GAMEPLAY.ogg",
+      "format": "ogg",
+      "bpm": 133,
+      "durationSeconds": 79.4,
+      "loop": true,
+      "loopStartSeconds": 0.0,
+      "loopEndSeconds": 79.3985,
+      "intendedUse": "World 2 (Chromatic Overdrive) Stages 5\u20138 and mid-intensity Endless Mode loop"
+    },
+    {
+      "id": "WORLD_3_GAMEPLAY",
+      "filename": "audio/music/WORLD_3_GAMEPLAY.ogg",
+      "format": "ogg",
+      "bpm": 140,
+      "durationSeconds": 82.29,
+      "loop": true,
+      "loopStartSeconds": 0.0,
+      "loopEndSeconds": 82.2857,
+      "intendedUse": "World 3 (Pulse Collapse) Stages 9\u201312 and high-intensity Endless Mode loop"
+    },
+    {
+      "id": "STAGE_CLEAR",
+      "filename": "audio/music/STAGE_CLEAR.ogg",
+      "wavMaster": "audio/music/STAGE_CLEAR.wav",
+      "format": "ogg+wav",
+      "bpm": 125,
+      "durationSeconds": 4.5,
+      "loop": false,
+      "intendedUse": "Stage completion victory sting"
+    },
+    {
+      "id": "GAME_OVER",
+      "filename": "audio/music/GAME_OVER.ogg",
+      "wavMaster": "audio/music/GAME_OVER.wav",
+      "format": "ogg+wav",
+      "bpm": 110,
+      "durationSeconds": 4.0,
+      "loop": false,
+      "intendedUse": "Restrained, encouraging Game Over sting"
+    },
+    {
+      "id": "WORLD_TRANSITION",
+      "filename": "audio/music/WORLD_TRANSITION.ogg",
+      "wavMaster": "audio/music/WORLD_TRANSITION.wav",
+      "format": "ogg+wav",
+      "bpm": 128,
+      "durationSeconds": 4.8,
+      "loop": false,
+      "intendedUse": "World introduction & stage-to-stage transition sting"
+    },
+    {
+      "id": "MAX_MULTIPLIER_STING",
+      "filename": "audio/music/MAX_MULTIPLIER_STING.ogg",
+      "wavMaster": "audio/music/MAX_MULTIPLIER_STING.wav",
+      "format": "ogg+wav",
+      "bpm": 128,
+      "durationSeconds": 2.0,
+      "loop": false,
+      "intendedUse": "Reaching \u00d75 maximum multiplier celebration accent"
+    },
+    {
+      "id": "OST_PREVIEW_MEDLEY",
+      "filename": "audio/music/OST_Preview_Medley.ogg",
+      "format": "ogg",
+      "bpm": "112-140",
+      "durationSeconds": 32.0,
+      "loop": false,
+      "intendedUse": "Human review demo medley showcasing MENU, WORLD 1, WORLD 2, and WORLD 3 themes"
+    }
+  ],
+  "soundEffects": [
+    {
+      "id": "sfx_player_shrink_start",
+      "category": "Player",
+      "oggFile": "audio/sfx/sfx_player_shrink_start.ogg",
+      "wavMaster": "audio/sfx/sfx_player_shrink_start.wav",
+      "durationSeconds": 0.14,
+      "loop": false,
+      "intendedEvent": "Orb shrink start (touch hold down)"
+    },
+    {
+      "id": "sfx_player_shrink_loop",
+      "category": "Player",
+      "oggFile": "audio/sfx/sfx_player_shrink_loop.ogg",
+      "wavMaster": "audio/sfx/sfx_player_shrink_loop.wav",
+      "durationSeconds": 0.4,
+      "loop": true,
+      "intendedEvent": "Subtle continuous compressed-orb plasma hum while holding"
+    },
+    {
+      "id": "sfx_player_expand",
+      "category": "Player",
+      "oggFile": "audio/sfx/sfx_player_expand.ogg",
+      "wavMaster": "audio/sfx/sfx_player_expand.wav",
+      "durationSeconds": 0.15,
+      "loop": false,
+      "intendedEvent": "Orb expand on touch release"
+    },
+    {
+      "id": "sfx_charge_start_fill",
+      "category": "Player",
+      "oggFile": "audio/sfx/sfx_charge_start_fill.ogg",
+      "wavMaster": "audio/sfx/sfx_charge_start_fill.wav",
+      "durationSeconds": 0.3,
+      "loop": false,
+      "intendedEvent": "Charge ring begins filling over 0.30s"
+    },
+    {
+      "id": "sfx_charge_complete",
+      "category": "Player",
+      "oggFile": "audio/sfx/sfx_charge_complete.ogg",
+      "wavMaster": "audio/sfx/sfx_charge_complete.wav",
+      "durationSeconds": 0.315,
+      "loop": false,
+      "intendedEvent": "Charge ring reaches 100% locked state"
+    },
+    {
+      "id": "sfx_charge_cancelled",
+      "category": "Player",
+      "oggFile": "audio/sfx/sfx_charge_cancelled.ogg",
+      "wavMaster": "audio/sfx/sfx_charge_cancelled.wav",
+      "durationSeconds": 0.14,
+      "loop": false,
+      "intendedEvent": "Charge ring cancelled early by shrinking"
+    },
+    {
+      "id": "sfx_obstacle_gate_pass",
+      "category": "Obstacles",
+      "oggFile": "audio/sfx/sfx_obstacle_gate_pass.ogg",
+      "wavMaster": "audio/sfx/sfx_obstacle_gate_pass.wav",
+      "durationSeconds": 0.1,
+      "loop": false,
+      "intendedEvent": "Ordinary squeeze gate passed cleanly"
+    },
+    {
+      "id": "sfx_barrier_charged_ready",
+      "category": "Obstacles",
+      "oggFile": "audio/sfx/sfx_barrier_charged_ready.ogg",
+      "wavMaster": "audio/sfx/sfx_barrier_charged_ready.wav",
+      "durationSeconds": 0.23,
+      "loop": false,
+      "intendedEvent": "Charged barrier switches from Locked Red to Armed Cyan"
+    },
+    {
+      "id": "sfx_barrier_smash_ordinary",
+      "category": "Obstacles",
+      "oggFile": "audio/sfx/sfx_barrier_smash_ordinary.ogg",
+      "wavMaster": "audio/sfx/sfx_barrier_smash_ordinary.wav",
+      "durationSeconds": 0.24,
+      "loop": false,
+      "intendedEvent": "Ordinary cyan barrier smashed"
+    },
+    {
+      "id": "sfx_barrier_smash_charged",
+      "category": "Obstacles",
+      "oggFile": "audio/sfx/sfx_barrier_smash_charged.ogg",
+      "wavMaster": "audio/sfx/sfx_barrier_smash_charged.wav",
+      "durationSeconds": 0.38,
+      "loop": false,
+      "intendedEvent": "Charged cyan barrier smashed at 100% charge"
+    },
+    {
+      "id": "sfx_barrier_charged_fail",
+      "category": "Obstacles",
+      "oggFile": "audio/sfx/sfx_barrier_charged_fail.ogg",
+      "wavMaster": "audio/sfx/sfx_barrier_charged_fail.wav",
+      "durationSeconds": 0.36,
+      "loop": false,
+      "intendedEvent": "Failed/unsafe collision against a Locked Charged Barrier"
+    },
+    {
+      "id": "sfx_obstacle_approach_cue",
+      "category": "Obstacles",
+      "oggFile": "audio/sfx/sfx_obstacle_approach_cue.ogg",
+      "wavMaster": "audio/sfx/sfx_obstacle_approach_cue.wav",
+      "durationSeconds": 0.19,
+      "loop": false,
+      "intendedEvent": "Subtle radar double-pip cue for upcoming Charged Barrier"
+    },
+    {
+      "id": "sfx_player_death_collision",
+      "category": "Obstacles",
+      "oggFile": "audio/sfx/sfx_player_death_collision.ogg",
+      "wavMaster": "audio/sfx/sfx_player_death_collision.wav",
+      "durationSeconds": 0.44,
+      "loop": false,
+      "intendedEvent": "Lethal collision / run-ending crash"
+    },
+    {
+      "id": "sfx_stage_finish_line",
+      "category": "Obstacles",
+      "oggFile": "audio/sfx/sfx_stage_finish_line.ogg",
+      "wavMaster": "audio/sfx/sfx_stage_finish_line.wav",
+      "durationSeconds": 0.44,
+      "loop": false,
+      "intendedEvent": "Crossing the campaign stage finish line"
+    },
+    {
+      "id": "sfx_pickup_gold",
+      "category": "Pickups",
+      "oggFile": "audio/sfx/sfx_pickup_gold.ogg",
+      "wavMaster": "audio/sfx/sfx_pickup_gold.wav",
+      "durationSeconds": 0.2,
+      "loop": false,
+      "intendedEvent": "Gold standard energy pickup collected"
+    },
+    {
+      "id": "sfx_pickup_mint_bonus",
+      "category": "Pickups",
+      "oggFile": "audio/sfx/sfx_pickup_mint_bonus.ogg",
+      "wavMaster": "audio/sfx/sfx_pickup_mint_bonus.wav",
+      "durationSeconds": 0.272,
+      "loop": false,
+      "intendedEvent": "Mint bonus energy pickup collected"
+    },
+    {
+      "id": "sfx_multiplier_increase",
+      "category": "Score",
+      "oggFile": "audio/sfx/sfx_multiplier_increase.ogg",
+      "wavMaster": "audio/sfx/sfx_multiplier_increase.wav",
+      "durationSeconds": 0.235,
+      "loop": false,
+      "intendedEvent": "Score multiplier increased (+1x)"
+    },
+    {
+      "id": "sfx_multiplier_max_x5",
+      "category": "Score",
+      "oggFile": "audio/sfx/sfx_multiplier_max_x5.ogg",
+      "wavMaster": "audio/sfx/sfx_multiplier_max_x5.wav",
+      "durationSeconds": 0.49,
+      "loop": false,
+      "intendedEvent": "Maximum x5 multiplier reached"
+    },
+    {
+      "id": "sfx_multiplier_x5_streak",
+      "category": "Score",
+      "oggFile": "audio/sfx/sfx_multiplier_x5_streak.ogg",
+      "wavMaster": "audio/sfx/sfx_multiplier_x5_streak.wav",
+      "durationSeconds": 0.285,
+      "loop": false,
+      "intendedEvent": "Every 10th obstacle cleared at x5 streak milestone"
+    },
+    {
+      "id": "sfx_near_miss_graze",
+      "category": "Score",
+      "oggFile": "audio/sfx/sfx_near_miss_graze.ogg",
+      "wavMaster": "audio/sfx/sfx_near_miss_graze.wav",
+      "durationSeconds": 0.16,
+      "loop": false,
+      "intendedEvent": "Cosmetic near-miss tight squeeze graze spark"
+    },
+    {
+      "id": "sfx_stage_star_earned",
+      "category": "Score",
+      "oggFile": "audio/sfx/sfx_stage_star_earned.ogg",
+      "wavMaster": "audio/sfx/sfx_stage_star_earned.wav",
+      "durationSeconds": 0.32,
+      "loop": false,
+      "intendedEvent": "Campaign star rating icon illuminated (1, 2, 3)"
+    },
+    {
+      "id": "sfx_ui_button_tap",
+      "category": "UI",
+      "oggFile": "audio/sfx/sfx_ui_button_tap.ogg",
+      "wavMaster": "audio/sfx/sfx_ui_button_tap.wav",
+      "durationSeconds": 0.065,
+      "loop": false,
+      "intendedEvent": "Primary button tap"
+    },
+    {
+      "id": "sfx_ui_menu_nav",
+      "category": "UI",
+      "oggFile": "audio/sfx/sfx_ui_menu_nav.ogg",
+      "wavMaster": "audio/sfx/sfx_ui_menu_nav.wav",
+      "durationSeconds": 0.055,
+      "loop": false,
+      "intendedEvent": "Menu / skin / stage navigation arrow tick"
+    },
+    {
+      "id": "sfx_ui_stage_unlocked",
+      "category": "UI",
+      "oggFile": "audio/sfx/sfx_ui_stage_unlocked.ogg",
+      "wavMaster": "audio/sfx/sfx_ui_stage_unlocked.wav",
+      "durationSeconds": 0.4,
+      "loop": false,
+      "intendedEvent": "New campaign stage or world unlocked"
+    },
+    {
+      "id": "sfx_ui_pause",
+      "category": "UI",
+      "oggFile": "audio/sfx/sfx_ui_pause.ogg",
+      "wavMaster": "audio/sfx/sfx_ui_pause.wav",
+      "durationSeconds": 0.19,
+      "loop": false,
+      "intendedEvent": "Game paused"
+    },
+    {
+      "id": "sfx_ui_resume",
+      "category": "UI",
+      "oggFile": "audio/sfx/sfx_ui_resume.ogg",
+      "wavMaster": "audio/sfx/sfx_ui_resume.wav",
+      "durationSeconds": 0.19,
+      "loop": false,
+      "intendedEvent": "Game resumed"
+    },
+    {
+      "id": "sfx_ui_retry",
+      "category": "UI",
+      "oggFile": "audio/sfx/sfx_ui_retry.ogg",
+      "wavMaster": "audio/sfx/sfx_ui_retry.wav",
+      "durationSeconds": 0.16,
+      "loop": false,
+      "intendedEvent": "Quick retry / run launch"
+    },
+    {
+      "id": "sfx_ui_settings_toggle",
+      "category": "UI",
+      "oggFile": "audio/sfx/sfx_ui_settings_toggle.ogg",
+      "wavMaster": "audio/sfx/sfx_ui_settings_toggle.wav",
+      "durationSeconds": 0.07,
+      "loop": false,
+      "intendedEvent": "Audio / music / SFX toggle switch"
+    },
+    {
+      "id": "sfx_ui_skin_selected",
+      "category": "UI",
+      "oggFile": "audio/sfx/sfx_ui_skin_selected.ogg",
+      "wavMaster": "audio/sfx/sfx_ui_skin_selected.wav",
+      "durationSeconds": 0.275,
+      "loop": false,
+      "intendedEvent": "Cosmetic orb skin equipped"
+    },
+    {
+      "id": "sfx_ui_stage_clear_panel",
+      "category": "UI",
+      "oggFile": "audio/sfx/sfx_ui_stage_clear_panel.ogg",
+      "wavMaster": "audio/sfx/sfx_ui_stage_clear_panel.wav",
+      "durationSeconds": 0.48,
+      "loop": false,
+      "intendedEvent": "Stage clear results modal appearance"
+    },
+    {
+      "id": "sfx_ui_game_over_panel",
+      "category": "UI",
+      "oggFile": "audio/sfx/sfx_ui_game_over_panel.ogg",
+      "wavMaster": "audio/sfx/sfx_ui_game_over_panel.wav",
+      "durationSeconds": 0.41,
+      "loop": false,
+      "intendedEvent": "Game over summary modal appearance"
+    }
+  ]
+}

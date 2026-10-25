@@ -1,115 +1,77 @@
-# Pulse Campaign System (v1)
+# Pulse Campaign (12 Stages)
 
-> Status: **Three stages built, tested automatically, not yet played on a phone.** Placeholder visuals. Branch `feature/pulse-campaign-system`.
+> Status: **built and tested automatically; not yet played on a phone; not merged.** Branch `feature/pulse-12-stage-campaign` (from `feature/pulse-landscape` @ `8e2d6de`).
 
 ## Structure
 
-- **Main menu:** Campaign, Endless, total stars, Endless best score, and the orb skin picker.
-- **Campaign:** stage list grouped by sector, with locked/unlocked state and best stars. Play, pause, crash, retry, stage clear, next stage, back to stages.
-- **Endless:** unchanged from the prototype (random obstacles, ×5 multiplier, best score). Players now reach it from the menu.
+- **Three worlds** (Gemini v4 art and music) of **four stages** each. Each world has its own backgrounds, intro banner, stage-card plates and gameplay track.
+- **Four acts** (ChatGPT's design brief) run across the worlds: Learn (1–3), Build (4–6), Test (7–9), Mastery (10–12).
+- **Unlocking:** each stage unlocks when the one before it is cleared. A stage you've already cleared never re-locks.
+- **Stars:** unchanged. 1 = finish; 2 = at least 60% of the gold; 3 = at least 90% (rounded up). Mint bonuses never count toward stars. Replays never lower a stage's best.
+- **Skins:** cosmetic only. Solar Flare 3★, Void Prism 6★, Retro Green 9★, **Violet Nova 12★**, **Whiteout 15★** (36★ maximum).
 
-## Stages
+## The 12 Stages
 
-| # | Id | Name | Speed (px/s) | Teaches | Energy | Bonus | Autopilot time |
-|---|----|------|--------------|---------|--------|-------|----------------|
-| 1 | `s1-first-pulse` | First Pulse | 220 → 240 | Gaps first, then cyan barriers (first one on its own) | 6 | 0 | 21.6 s |
-| 2 | `s2-find-the-rhythm` | Find the Rhythm | 260 → 300 | Squeeze/smash beat, then charged barriers (first one on its own) | 5 | 0 | 21.8 s |
-| 3 | `s3-controlled-overload` | Controlled Overload | 300 → 400 | Combos, long hold → charged barrier, two optional mint dares | 5 | 2 | 22.4 s |
+| # | World | Name | Speed (px/s) | Teaches | Gold | Mint | Pressure* |
+|---|-------|------|--------------|---------|------|------|-----------|
+| 1 | Neon Circuit | First Contact | 200→220 | Shrinking through gaps, releasing for gold. No barriers. | 6 | – | 0.40 |
+| 2 | Neon Circuit | Break the Barrier | 220→240 | **Barriers.** First one alone while already big, then after a gap with lots of time. | 6 | – | 0.34 |
+| 3 | Neon Circuit | Alternating Rhythm | 240→260 | Gaps and barriers alternating at a steady beat. | 5 | – | 0.44 |
+| 4 | Neon Circuit | Split Decision | 255→280 | Quicker switches; gold dares (a short release between gaps). | 5 | – | 0.61 |
+| 5 | Chromatic Overdrive | Charged Energy | 270→290 | **Charged barriers.** First while already charged, then after a gap with a long lead. | 6 | – | 0.50 |
+| 6 | Chromatic Overdrive | The Long Hold | 280→305 | **Tunnels** (sustained holds) with recovery gold, then barriers after them. | 7 | – | 0.40 |
+| 7 | Chromatic Overdrive | Double Trouble | 290→315 | **Double and triple squeezes** (hold through), mixed with barriers. | 6 | – | 0.40 |
+| 8 | Chromatic Overdrive | Greed Is Optional | 300→325 | **Mint dares:** a risky release for a bonus, or a safe hold-through. | 5 | 4 | 0.63 |
+| 9 | Pulse Collapse | Overload | 320→360 | Everything known, faster and denser. | 5 | 1 | 0.63 |
+| 10 | Pulse Collapse | Precision | 335→365 | Switch windows close to the fair minimum; narrow gaps. | 5 | – | **0.77** |
+| 11 | Pulse Collapse | Final Circuit | 345→385 | Every mechanic combined, with a recovery section. | 7 | 2 | 0.68 |
+| 12 | Pulse Collapse | The Final Pulse | 355→410 | Climax: build-up, recovery, final gauntlet. | 9 | 1 | 0.72 |
 
-Refined in Gameplay Evolution v2. Why and how is in [GAMEPLAY_EVOLUTION.md](GAMEPLAY_EVOLUTION.md) and [GAMEPLAY_VARIETY.md](GAMEPLAY_VARIETY.md). Every stage ends at a checkered finish line. Times come from the test autopilot.
+\* **Pressure** = how close each required size switch is to its fair minimum (1.0 = exactly the minimum), averaged over the stage. It's measured by `tests/campaign.html`.
 
-**Design note:** the orb always stays in the middle of the screen, so a gap's left/right `shift` is visual only. Variety comes from *what size* each obstacle demands and *when*.
+**How difficulty rises.** Top speed rises every stage, and pressure rises world by world (average 0.45 → 0.53 → 0.70). It deliberately dips on the stages that introduce a mechanic (5, 6, 7): a new rule is taught at gentler timing, and those stages don't speed up either. Each new mechanic follows the brief's sequence: teach it on its own, practise it, combine it with one familiar mechanic, then use it in longer sequences and the mastery stages.
 
-## Stars
+**Every stage takes about 20–28 s** with perfect play (12 stages ≈ 4.5 minutes). Stages are short but varied; content comes from the sequences, not from length.
 
-| Stars | Rule (per stage, configurable via `stars: { two, three }`) |
-|-------|------------------------------------------------------------|
-| ★ | Reach the finish line |
-| ★★ | Finish having collected at least 60% of energy pairs (rounded up) |
-| ★★★ | Finish having collected at least 90% of energy pairs (rounded up) |
+### Save Compatibility
 
-- A crash records nothing.
-- Replaying never lowers a stage's best stars.
-- Bonus diamonds don't count toward stars.
-- A stage with no energy awards 3 stars on completion.
-- Total stars are always recomputed from each stage's best record; no separate counter is stored.
-
-## Skins (cosmetic only)
-
-| Skin | Unlocks at |
-|------|-----------|
-| Classic | Always |
-| Solar Flare | 3 stars |
-| Void Prism | 6 stars |
-| Retro Green | 9 stars |
-
-Choose a skin with the arrows on the main menu; locked skins show their requirement. Skins only change colours (`src/js/skins.js`). A test checks that skin entries contain no gameplay fields. Once earned, a skin stays unlocked.
+- The first three stages keep their original ids (`s1-first-pulse`, `s2-find-the-rhythm`, `s3-controlled-overload`), so existing saves keep their stars and completion. Their *content* and display names now match the new stages 1–3.
+- A player who had cleared the old three stages continues at Stage 4 with their stars, best score and skin.
+- Save version unchanged (`pulse.save.v1`). The only new field is `settings` (audio levels), which is optional and defaulted for older saves.
 
 ## How Stages Are Defined
 
-Stages are plain data in [`src/js/stages.js`](../src/js/stages.js); the schema is documented at the top of that file. Each item's `space` is the clear distance from the previous item, in game pixels (the field is 540 px wide):
+Stages are data in [`src/js/stages.js`](../src/js/stages.js), written with small helpers:
 
 ```js
-{ type: 'gate', space: 260, need: 44, shift: 70 }  // wall; 44 px clearance (below 56 = must shrink)
-{ type: 'gate', space: 270, need: 38, length: 220 } // tunnel: hold through its whole length
-{ type: 'barrier', space: 260 }                     // cyan barrier: smash it at full size
-{ type: 'energy', space: 220 }                      // gold pair (counts for stars)
-{ type: 'bonus', space: 190 }                       // mint pair (optional, tighter timing allowed)
+gap(44, 0.45, 60)    // gap wall, 44 px clearance, 0.45 s of clear time before it, shifted (visual)
+bar(0.5)             // barrier: be full size
+charged(0.8)         // charged barrier: full size AND a full charge ring
+tunnel(42, 280, 0.6) // 280 px long gap: hold through
+gold(0.4) / mint(0.24) / wide(0.6)
 ```
 
-`src/js/campaign.js` compiles a stage into fixed track positions and runs it through the same obstacle pool, collision and pickup code as Endless. Speed rises linearly from `speed.start` to `speed.end` over the stage's length, so a stage plays the same way every time.
+`t` is seconds of clear time before the item. It's converted to distance at the stage's **top** speed, so the real time is never shorter than written. `Pulse.Track.validateItems` (`level.js`) rejects any stage that doesn't leave enough time to switch size: shrink 0.35 s, grow for a barrier or gold 0.32 s, fill the charge ring 0.62 s, either side of a mint 0.22 s. Pixel `space` values are still accepted.
 
 ### Adding a Stage
 
-1. Add an object to `Pulse.STAGES` with a new, permanent `id`. Never rename a shipped id; saves key on it.
-2. Open `tests/campaign.html`. It validates every stage and fails if any of these are wrong:
-   - a field is missing
-   - a gap is narrower than a fully shrunk orb plus 8 px
-   - there's too little time to switch size: to shrink 0.35 s, to grow for a barrier or gold 0.32 s, either side of mint 0.22 s, checked across whole sequences (see GAMEPLAY_VARIETY.md)
-   - walls closer than 40 px
-   - the autopilot can't finish, or can't collect every energy pair, at screen heights 860, 1100 and 1240
-3. Update the stage-count check in that test, which currently expects exactly 3 stages.
+1. Append it to `Pulse.STAGES` with a new, permanent `id`, a `world`, a `teaches` line and an `intro`.
+2. Add a stage-card plate `ui_stage_card_sNN_wW.png` in `src/assets/stage_cards/` (or ask Gemini).
+3. Update the stage count and the introduction table in `tests/campaign.html`, then open it. It must pass.
 
-Stage selection, unlocking and stars pick up new stages automatically.
+## Tests (`tests/campaign.html`, 647 checks, all passing on this branch)
 
-## Save Data
+- **Data:** all 12 stages exist and are valid; unique ids; the original ids are in their places; world assignment; every stage documents what it teaches; at least 5 gold each.
+- **Fairness:** every stage passes the shared sequence checker, and bad data is rejected, including new cases (missing world, charged barrier without time to fill the ring).
+- **Introduction order:** barrier in 2, charged in 5, tunnel in 6, double squeeze in 7, mint in 8; never earlier. Each first encounter is gentle, and teaching stages don't raise the speed.
+- **Difficulty curve:** top speed rises every stage; no pressure jump above 0.25 between stages; pressure rises world by world; Precision is the tightest.
+- **Playable by different players:**
+  - the competent autopilot finishes every stage with **all** gold (3 stars reachable), at 3 screen widths
+  - a cautious player who skips every dare finishes every stage
+  - holding the whole time crashes on stages with barriers
+  - letting go only 0.3 s before barriers crashes on charged barriers
+  - no input crashes
+  - playback is deterministic
+- **Progress:** each of the 12 unlocks in order; the "next stage" logic; 36 stars; skin thresholds 3/6/9/12/15; migration of a 3-stage save; completed stages never re-lock; audio settings clamp and round-trip.
 
-Stored under the browser storage key `pulse.save.v1` inside the app ([`src/js/storage.js`](../src/js/storage.js)):
-
-```json
-{ "version": 1,
-  "endless": { "best": 77 },
-  "campaign": { "stages": { "s1-first-pulse": { "completed": true, "bestStars": 3 } } },
-  "skins": { "selected": "solar-flare", "unlocked": ["classic", "solar-flare"] } }
-```
-
-- **Migration:** the prototype's best score (`pulse.best`) is read on every load, and the higher of the two values wins. It's also still written, so the old best can never be lost.
-- **Malformed data:** an unreadable save is copied once to `pulse.save.corrupt` and the game starts with defaults (keeping the old best score). Bad fields are cleaned field by field: stars are clamped to 0–3, unknown or locked skin choices fall back to Classic.
-- **Blocked storage:** the game runs with defaults and doesn't crash.
-- There's no reset-progress option (it would need approval).
-
-## Other Changes in This Branch
-
-- **Pickup dimming:** while the orb is too small to collect (below 48 px radius), all pickups draw at 45% opacity. Collection still uses the same size rule, so dimming exactly matches what's collectible.
-- **Pause button:** top-left during play. Focus loss still pauses automatically.
-- **Results screen:** dims the play field behind stars and buttons.
-- **Audio:** Phaser's built-in audio engine is turned off. Sounds still come from `sfx.js`.
-
-## Tests
-
-| Test | Covers | Result (this branch) |
-|------|--------|----------------------|
-| `tests/campaign.html` | Stage schema; rejection of bad data; fairness; completion and full energy reachability at 3 screen heights; deterministic compile and playback; idle crashes; held-down collects nothing; star thresholds and boundaries; unlocks; replay never lowers stars; skin thresholds and selection; save migration, corrupt data, blocked storage, round trip | **PASS 168/168** |
-| `tests/scene.html` | The real game with simulated mouse input: hold and release; focus loss releases and pauses; pause button; resume; pickups dimmed while shrunk; crash records nothing and unlocks nothing; retry lock; completion saves stars and unlocks; old best preserved; Endless still uses the random generator and scores; menus open | **PASS** |
-| `tests/logic.html` | Endless generator fairness (regression) | **PASS** (results identical to before) |
-| `tests/gameplay.html?bot=1&mode=campaign&stage=N` | Real game, each stage with the autopilot | All 3 stages complete with 3 stars |
-| `tests/gameplay.html?bot=1&seconds=100` | Real game, Endless with the autopilot | Survives |
-
-The tests prove the stages are valid, fair and completable. They don't prove the stages are fun or well paced; that needs playing on the phone.
-
-## Known Limitations
-
-- Visuals: Gemini's v2.0 art is integrated on `feature/pulse-art-v2` (see ART_BIBLE.md). This branch alone still uses shapes.
-- No haptics, music, mute or settings.
-- The Android back button still closes the app; there's no in-app back handling.
-- Stage pacing numbers are first guesses.
+The real game was also played start to finish by the autopilot: all 12 stages cleared with 3 stars (20–28 s each). **None of this proves the stages are fun.** That needs playing on the phone.

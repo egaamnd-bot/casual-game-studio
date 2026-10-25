@@ -71,8 +71,15 @@
       check(canvas.width <= innerWidth + 1 && canvas.height <= innerHeight + 1, 'canvas fits the window (FIT scaling)');
 
       check(offScreen(active(), SW, SH).length === 0, `menu items off screen: ${offScreen(active(), SW, SH).join('; ')}`);
-      active().scene.start('stages'); await wait(400);
-      check(offScreen(active(), SW, SH).length === 0, `stage select items off screen: ${offScreen(active(), SW, SH).join('; ')}`);
+      for (let w = 1; w <= Pulse.WORLDS.length; w++) {
+        active().scene.start('stages', { world: w }); await wait(400);
+        check(active().scene.key === 'stages', `stage select opens on world ${w}`);
+        check(offScreen(active(), SW, SH).length === 0, `stage select (world ${w}) items off screen: ${offScreen(active(), SW, SH).join('; ')}`);
+      }
+      // Settings panel fits too.
+      active().scene.start('menu'); await wait(400);
+      active().openSettings(); await wait(100);
+      check(offScreen(active(), SW, SH).length === 0, `settings panel off screen: ${offScreen(active(), SW, SH).join('; ')}`);
 
       // Gameplay: mapping and HUD.
       active().scene.start('game', { mode: 'campaign', stageIndex: 1 }); await wait(400);
@@ -83,7 +90,7 @@
       g.test = { bot: true };
       g.startRun();
       let gateSeen = false, barrierSeen = false, enteredRight = true;
-      for (let t = 0; t < 40; t++) {
+      for (let t = 0; t < 80 && !(gateSeen && barrierSeen); t++) {
         await wait(100);
         for (const s of g.level.segments) {
           if (!s.active || !s._vis) continue;

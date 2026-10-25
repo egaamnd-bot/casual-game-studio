@@ -1,0 +1,5 @@
+# PULSE v4.0 — Originality & Commercial-Use Rights Declaration
+
+1. **100% Original Procedural Visual Artwork:** Every sprite, texture atlas, background layer, world decoration, cosmetic orb skin, and UI element in `PULSE_Production_Asset_and_Audio_Pack_v4.zip` was mathematically and procedurally generated from scratch in Python (`Pillow`) specifically for Casual Game Studio's *PULSE*. No third-party sprites, Geometry Dash icons/logos, stock images, or copyrighted textures were copied or sampled.
+2. **100% Original Synthesized Electronic/Synthwave Music & SFX:** Every music track (`audio/music/`) and sound effect (`audio/sfx/`) was composed and synthesized from scratch using mathematical waveform synthesis (`numpy` / `scipy` oscillators, envelopes, and Butterworth filters) using standard chord progressions and original melodies. Zero copyrighted audio samples, loops, or third-party stems were used.
+3. **Unrestricted Commercial License:** All visual, audio, and documentation deliverables in this archive are free of third-party royalties or attribution requirements and are cleared for worldwide commercial distribution on Android (Google Play), iOS, and Web.

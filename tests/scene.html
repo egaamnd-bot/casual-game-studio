@@ -143,10 +143,45 @@
       e.startRun(); e.test.bot = true; await wait(5000);
       check(e.state === 'playing' && e.score > 0, `endless plays and scores (score=${e.score})`);
 
-      // Menus render.
-      e.scene.start('menu'); await wait(300);
-      e.scene.start('stages'); await wait(300);
-      check(true, 'menus open');
+      // ---- Audio lifecycle (state checks; real playback needs a genuine tap on a device) ----
+      const A = () => Pulse.Audio.status();
+      check(Pulse.Music.wanted === 'WORLD_1_GAMEPLAY', `endless starts on the World 1 track (${Pulse.Music.wanted})`);
+      e.elapsed = 35; e.step(1 / 60);
+      check(Pulse.Music.wanted === 'WORLD_2_GAMEPLAY', `endless moves to the World 2 track after 30 s (${Pulse.Music.wanted})`);
+      e.elapsed = 65; e.step(1 / 60);
+      check(Pulse.Music.wanted === 'WORLD_3_GAMEPLAY', `endless moves to the World 3 track after 60 s (${Pulse.Music.wanted})`);
+      e.pause();
+      check(e.state === 'paused' && Pulse.Music.level < 1, 'pause ducks the music');
+      down(cx, cy); up(cx, cy); await wait(100);
+      check(e.state === 'playing' && Pulse.Music.level === 1, 'resume restores the music level');
+      e.game.events.emit('hidden'); await wait(50);
+      check(A().hidden && A().musicPaused && !A().holding, 'app in background: music paused, hum stopped');
+      e.game.events.emit('visible'); await wait(50);
+      check(!A().hidden, 'app back in foreground');
+      check(e.state === 'paused', 'going to the background also pauses the run');
+      down(cx, cy); up(cx, cy); await wait(100);
+      e.test.bot = false;
+      for (let i = 0; i < 100 && e.state !== 'over'; i++) await wait(100);
+      check(e.state === 'over' && Pulse.Music.wanted === null, 'crash stops the gameplay music (game-over sting plays instead)');
+      check(typeof e.crashReason === 'string' && e.reasonText.visible, `crash shows a reason ("${e.crashReason}")`);
+      Pulse.Audio.setVolume('music', 0);
+      check(A().musicPaused && Pulse.Audio.volume('music') === 0, 'music volume 0 silences music');
+      Pulse.Audio.setVolume('music', 0.8);
+
+      // Campaign: a world's first stage opens with the transition sting; others play the world track.
+      window.PULSE_TEST.holdReady = true; // stay on ready screens from here on
+      e.scene.start('game', { mode: 'campaign', stageIndex: 4 }); await wait(300);
+      check(Pulse.Music.wanted === null, 'stage 5 (World 2 opener): music waits for the run, sting plays');
+      scene().startRun(); await wait(100);
+      check(Pulse.Music.wanted === 'WORLD_2_GAMEPLAY', 'stage 5 run: World 2 track');
+      scene().scene.start('game', { mode: 'campaign', stageIndex: 9 }); await wait(300);
+      check(Pulse.Music.wanted === 'WORLD_3_GAMEPLAY', 'stage 10: World 3 track from the ready screen');
+
+      // Menus render, with the menu theme.
+      scene().scene.start('menu'); await wait(300);
+      check(Pulse.Music.wanted === 'MENU_THEME', 'menu plays the menu theme');
+      window.__pulseGame.scene.getScenes(true)[0].scene.start('stages'); await wait(300);
+      check(window.__pulseGame.scene.getScenes(true)[0].scene.key === 'stages', 'stage select opens');
 
       document.title = (failures ? `FAIL ${failures}` : 'PASS scene tests') + (results.length ? ' | ' + results.join(' | ') : '');
     }

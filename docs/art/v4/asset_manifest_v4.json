@@ -1,0 +1,4542 @@
+{
+  "project": "PULSE",
+  "version": "4.0.0",
+  "identity": "PULSE: Neon Geometric Precision",
+  "targetEngine": "Phaser 3.90.0 JavaScript + Capacitor Android",
+  "atlases": {
+    "pulse_gameplay_atlas": {
+      "size": {
+        "w": 1024,
+        "h": 2048
+      },
+      "frameCount": 56
+    },
+    "pulse_skins_atlas": {
+      "size": {
+        "w": 1024,
+        "h": 1024
+      },
+      "frameCount": 45
+    },
+    "pulse_ui_atlas": {
+      "size": {
+        "w": 2048,
+        "h": 2048
+      },
+      "frameCount": 61
+    },
+    "pulse_world_decor_atlas": {
+      "size": {
+        "w": 512,
+        "h": 256
+      },
+      "frameCount": 9
+    }
+  },
+  "animations": {
+    "anim_orb_gold": {
+      "atlas": "pulse_gameplay",
+      "prefix": "orb_energy_gold_",
+      "frames": 4,
+      "fps": 12,
+      "frameDurationMs": 83.3
+    },
+    "anim_orb_mint": {
+      "atlas": "pulse_gameplay",
+      "prefix": "orb_energy_mint_",
+      "frames": 4,
+      "fps": 12,
+      "frameDurationMs": 83.3
+    },
+    "anim_arcs_default": {
+      "atlas": "pulse_gameplay",
+      "prefix": "player_tension_arcs_",
+      "frames": 4,
+      "fps": 24,
+      "frameDurationMs": 41.7
+    },
+    "anim_arcs_skins": {
+      "atlas": "pulse_skins",
+      "prefix": "skin_<id>_tension_arcs_",
+      "frames": 4,
+      "fps": 24,
+      "frameDurationMs": 41.7
+    }
+  },
+  "totalFiles": 308,
+  "files": [
+    {
+      "id": "barrier_charged_danger_tile",
+      "path": "sprites/gameplay/barrier_charged_danger_tile.png",
+      "bytes": 2687,
+      "sha256": "494cbc8ff20d1320027a0f5d3c0f3606fa76ff8d89dc224d4660ebe08e454047",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 64,
+      "height": 84,
+      "mode": "RGBA"
+    },
+    {
+      "id": "barrier_charged_emblem_danger",
+      "path": "sprites/gameplay/barrier_charged_emblem_danger.png",
+      "bytes": 5328,
+      "sha256": "baeb4599bd4ad925d362bfda25ed37e87f03abf1d4ca3430b3122113ed2568d0",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "barrier_charged_emblem_ready",
+      "path": "sprites/gameplay/barrier_charged_emblem_ready.png",
+      "bytes": 4332,
+      "sha256": "cb1488d60bf70b8325335f810672c25f21dac82b3e5ad42e78bfc14364a4f8eb",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "barrier_charged_ready_tile",
+      "path": "sprites/gameplay/barrier_charged_ready_tile.png",
+      "bytes": 1582,
+      "sha256": "d317bbbc905b0bbc94c01973e510a4265f09f33086e57a247b6fb5a8b80eee1b",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 64,
+      "height": 84,
+      "mode": "RGBA"
+    },
+    {
+      "id": "barrier_smash_danger_tile",
+      "path": "sprites/gameplay/barrier_smash_danger_tile.png",
+      "bytes": 1492,
+      "sha256": "8cc755ed53e8bef3e1bec0fcedd66025ca6a430511c0fb3bc5f5c98b9f0da424",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 64,
+      "height": 64,
+      "mode": "RGBA"
+    },
+    {
+      "id": "barrier_smash_ready_tile",
+      "path": "sprites/gameplay/barrier_smash_ready_tile.png",
+      "bytes": 1834,
+      "sha256": "78c4d987aabe4507fa52e3acf248567c4dbe292849cd0d379fbe203a04f2cc26",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 64,
+      "height": 64,
+      "mode": "RGBA"
+    },
+    {
+      "id": "charge_ring_state_a_empty",
+      "path": "sprites/gameplay/charge_ring_state_a_empty.png",
+      "bytes": 9942,
+      "sha256": "c39630452e19501ec7e90c6b83b4378f3f743429060552c2733b6765f5bab89a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 168,
+      "height": 168,
+      "mode": "RGBA"
+    },
+    {
+      "id": "charge_ring_state_b_step_01",
+      "path": "sprites/gameplay/charge_ring_state_b_step_01.png",
+      "bytes": 10753,
+      "sha256": "c2f574265a503bbc4c78d0e8e293dd5f800c7e3ac69c9a253c8eeff4f9b5f609",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 168,
+      "height": 168,
+      "mode": "RGBA"
+    },
+    {
+      "id": "charge_ring_state_b_step_02",
+      "path": "sprites/gameplay/charge_ring_state_b_step_02.png",
+      "bytes": 11275,
+      "sha256": "fa1d3de5e4abb65552a4b07015215c4a9a1dc9e407bf453ee4e38429237282b9",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 168,
+      "height": 168,
+      "mode": "RGBA"
+    },
+    {
+      "id": "charge_ring_state_b_step_03",
+      "path": "sprites/gameplay/charge_ring_state_b_step_03.png",
+      "bytes": 9556,
+      "sha256": "25f0fa61413fa6f1a98069744d86ace496d2bf322126d05d7368a959b65a5951",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 168,
+      "height": 168,
+      "mode": "RGBA"
+    },
+    {
+      "id": "charge_ring_state_b_step_04",
+      "path": "sprites/gameplay/charge_ring_state_b_step_04.png",
+      "bytes": 8333,
+      "sha256": "75ec199350f93362a7dccf5b889403aca9af33d9aea436e44aceb8cb123b6956",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 168,
+      "height": 168,
+      "mode": "RGBA"
+    },
+    {
+      "id": "charge_ring_state_c_full",
+      "path": "sprites/gameplay/charge_ring_state_c_full.png",
+      "bytes": 19424,
+      "sha256": "810f102646d71b605ed56e664aa54366b013d8fd37e0b4b6dea1d99627817d58",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 168,
+      "height": 168,
+      "mode": "RGBA"
+    },
+    {
+      "id": "finish_line_tile",
+      "path": "sprites/gameplay/finish_line_tile.png",
+      "bytes": 730,
+      "sha256": "77c655eef1198373d9bdf3b35f6bd14132a9537456ec76e5433122ea1f87ebe6",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 64,
+      "height": 48,
+      "mode": "RGBA"
+    },
+    {
+      "id": "fx_charge_complete_burst",
+      "path": "sprites/gameplay/fx_charge_complete_burst.png",
+      "bytes": 9604,
+      "sha256": "d8db6790d52895455997f746524c4c3405df32dec0aa36f7651bb05b621ad008",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 192,
+      "height": 192,
+      "mode": "RGBA"
+    },
+    {
+      "id": "fx_collect_gold_burst",
+      "path": "sprites/gameplay/fx_collect_gold_burst.png",
+      "bytes": 6485,
+      "sha256": "fae3f95d3f458be4e8f898dcb01882c05def0c142ecdf962a0786694fce1b626",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "fx_collect_mint_burst",
+      "path": "sprites/gameplay/fx_collect_mint_burst.png",
+      "bytes": 5647,
+      "sha256": "78898160772db5c496c2e28671af94b7fb6a59180a0a52e8e1130f9895101578",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "fx_fail_charged_deflect",
+      "path": "sprites/gameplay/fx_fail_charged_deflect.png",
+      "bytes": 28164,
+      "sha256": "bb88383969cdd880020d985a3dcf620aa332d08424d9c42a4306cbf5af328e25",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 220,
+      "height": 220,
+      "mode": "RGBA"
+    },
+    {
+      "id": "fx_mult_up_chevron",
+      "path": "sprites/gameplay/fx_mult_up_chevron.png",
+      "bytes": 2500,
+      "sha256": "f6aff0f33996b2c9c2b8f5a306110344c0f4f9d94d5b534d4ee53f628a62e47f",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "fx_mult_x5_starburst",
+      "path": "sprites/gameplay/fx_mult_x5_starburst.png",
+      "bytes": 36127,
+      "sha256": "186152053676c8b71d8a7b53048f5f1af9f8fbe5af3a84eb504f732278d73216",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 256,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "id": "fx_near_miss_arc",
+      "path": "sprites/gameplay/fx_near_miss_arc.png",
+      "bytes": 2620,
+      "sha256": "ef671db0c06a0d7cca8e00f1413715abf541618a5af92adef15c55c2e41723d3",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 64,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "fx_orb_spawn_materialize",
+      "path": "sprites/gameplay/fx_orb_spawn_materialize.png",
+      "bytes": 6302,
+      "sha256": "5d6934678949bab8ede6a57cdc6730a1a3312e63a0eeb4058396772508e09082",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 160,
+      "height": 160,
+      "mode": "RGBA"
+    },
+    {
+      "id": "fx_shatter_shard_01",
+      "path": "sprites/gameplay/fx_shatter_shard_01.png",
+      "bytes": 762,
+      "sha256": "3500b72c35606a90ec346a097b740cc25746c4c99c145f39d3473c95c06a7c2e",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 32,
+      "height": 32,
+      "mode": "RGBA"
+    },
+    {
+      "id": "fx_shatter_shard_02",
+      "path": "sprites/gameplay/fx_shatter_shard_02.png",
+      "bytes": 904,
+      "sha256": "57479c87aaa2243c137b8a940416e04fe531e07c75dcc88efc329b8a57a122f6",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 32,
+      "height": 32,
+      "mode": "RGBA"
+    },
+    {
+      "id": "fx_shatter_shard_03",
+      "path": "sprites/gameplay/fx_shatter_shard_03.png",
+      "bytes": 756,
+      "sha256": "b24aa82e8b2b0077b06088352218d53800448f6c3bf2d0a46e985be2bca5b413",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 32,
+      "height": 32,
+      "mode": "RGBA"
+    },
+    {
+      "id": "fx_shockwave_ring",
+      "path": "sprites/gameplay/fx_shockwave_ring.png",
+      "bytes": 28956,
+      "sha256": "a1954afba1e69753632edf52fa8b40be91d28e1472918f1b1bdda90724b639de",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 256,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "id": "fx_smash_charged_nova",
+      "path": "sprites/gameplay/fx_smash_charged_nova.png",
+      "bytes": 30614,
+      "sha256": "e8a5c6c13c394d8c61580806885e3ee79df5add44864e4803536b347b47f0857",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 256,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "id": "fx_smash_ordinary_burst",
+      "path": "sprites/gameplay/fx_smash_ordinary_burst.png",
+      "bytes": 6185,
+      "sha256": "0e02869cb3bf425d2a3267c0e1a2f05588b83c3e38189934b83b796315b6dc02",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 192,
+      "height": 192,
+      "mode": "RGBA"
+    },
+    {
+      "id": "fx_spark_diamond",
+      "path": "sprites/gameplay/fx_spark_diamond.png",
+      "bytes": 738,
+      "sha256": "3720c4d0806c19874bd7b5e5ad7367776da246a1a3d1bc09426aa651ffb32ae7",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 24,
+      "height": 24,
+      "mode": "RGBA"
+    },
+    {
+      "id": "fx_stage_clear_burst",
+      "path": "sprites/gameplay/fx_stage_clear_burst.png",
+      "bytes": 12405,
+      "sha256": "3c836bcbb83c519a86f6e3d0229d00910d294e6be8f1f811fc3836ed5286fa86",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 256,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "id": "fx_world_transition_wave",
+      "path": "sprites/gameplay/fx_world_transition_wave.png",
+      "bytes": 3570,
+      "sha256": "d7e4b3028e0767d2aa49a43a4fb61e804645cd8c8c3902d715e34d0c7d6ba5dc",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ind_long_hold_guide_tile",
+      "path": "sprites/gameplay/ind_long_hold_guide_tile.png",
+      "bytes": 544,
+      "sha256": "f5a7ab217d7aed7363da537715bcb553ef4355cd5efa2a3ff9b189e9814082ca",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 48,
+      "height": 64,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ind_recovery_chevron",
+      "path": "sprites/gameplay/ind_recovery_chevron.png",
+      "bytes": 1472,
+      "sha256": "13b14310ea6d698fc7dff5bf61ed4b29c8cdef4e880466993c873b1ee3403029",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 64,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ind_upcoming_charged_warn",
+      "path": "sprites/gameplay/ind_upcoming_charged_warn.png",
+      "bytes": 1753,
+      "sha256": "52599a7b11dab5279b3af605a7c7e6a25238f50465d1172cb99a37b94a54c8e2",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 64,
+      "height": 64,
+      "mode": "RGBA"
+    },
+    {
+      "id": "orb_energy_gold_01",
+      "path": "sprites/gameplay/orb_energy_gold_01.png",
+      "bytes": 5908,
+      "sha256": "e2b7be7261ce971bf20786e075c6f66ed692fc2a214be3a10bccd2082c937da9",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 80,
+      "height": 80,
+      "mode": "RGBA"
+    },
+    {
+      "id": "orb_energy_gold_02",
+      "path": "sprites/gameplay/orb_energy_gold_02.png",
+      "bytes": 6051,
+      "sha256": "54d268b6315d9ac5e3ff3ebf7f2031b191ad7f055d158c43dbad8d18a81fbd0c",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 80,
+      "height": 80,
+      "mode": "RGBA"
+    },
+    {
+      "id": "orb_energy_gold_03",
+      "path": "sprites/gameplay/orb_energy_gold_03.png",
+      "bytes": 5908,
+      "sha256": "e2b7be7261ce971bf20786e075c6f66ed692fc2a214be3a10bccd2082c937da9",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 80,
+      "height": 80,
+      "mode": "RGBA"
+    },
+    {
+      "id": "orb_energy_gold_04",
+      "path": "sprites/gameplay/orb_energy_gold_04.png",
+      "bytes": 5698,
+      "sha256": "b0b8b307303b50caa5572f16223baea62dfd6103d9515f8b40816e9633f99967",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 80,
+      "height": 80,
+      "mode": "RGBA"
+    },
+    {
+      "id": "orb_energy_mint_01",
+      "path": "sprites/gameplay/orb_energy_mint_01.png",
+      "bytes": 8224,
+      "sha256": "1ad9dab72836faee08f6e71ed3a506ee3ccd0b93781809541c2c398f7adc52fc",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "orb_energy_mint_02",
+      "path": "sprites/gameplay/orb_energy_mint_02.png",
+      "bytes": 9042,
+      "sha256": "c1b9002a559c03c58223495be88dc53934c2ad22930c6eced3a9ef5196d8ca79",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "orb_energy_mint_03",
+      "path": "sprites/gameplay/orb_energy_mint_03.png",
+      "bytes": 8690,
+      "sha256": "bb784fb6a6534e7592163ddddbd3111581a6836aa55c1634069ace0e93aae348",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "orb_energy_mint_04",
+      "path": "sprites/gameplay/orb_energy_mint_04.png",
+      "bytes": 8319,
+      "sha256": "32ce4c114cc7bc1f7e96e48a13f5740c59f74a2b4545ffb893c35b8884610320",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "orb_lock_ring",
+      "path": "sprites/gameplay/orb_lock_ring.png",
+      "bytes": 2056,
+      "sha256": "d2cbfd50ff24600c28e466c48005cfa1677eca29b457bc4c28348f76cce62f39",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 80,
+      "height": 80,
+      "mode": "RGBA"
+    },
+    {
+      "id": "player_orb_morph_01",
+      "path": "sprites/gameplay/player_orb_morph_01.png",
+      "bytes": 8331,
+      "sha256": "649ed02d3dc6944a9b164cdc131b2ffcd352e007a13a5a4fece5edafa22d0efd",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "player_orb_morph_02",
+      "path": "sprites/gameplay/player_orb_morph_02.png",
+      "bytes": 6402,
+      "sha256": "cad4b5c31828e08f56f53ffbf66e961a0d6448777f40e5660030de3b84503f2c",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "player_orb_normal",
+      "path": "sprites/gameplay/player_orb_normal.png",
+      "bytes": 12643,
+      "sha256": "e6237f283b340fa6dbd3be962b169f92839e52cdf8986faa2dc74b1989602382",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "player_orb_ring",
+      "path": "sprites/gameplay/player_orb_ring.png",
+      "bytes": 4614,
+      "sha256": "ce5b5f8fbdfdced71a6a93c685362311e5d3c35f25f4bdb2c45dc99fa02e1e49",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "player_orb_shrunk",
+      "path": "sprites/gameplay/player_orb_shrunk.png",
+      "bytes": 5155,
+      "sha256": "94e3b89dff37b82bc23fa2940643420ddb430fd28d835d470c1ebb8b31e36647",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 76,
+      "height": 76,
+      "mode": "RGBA"
+    },
+    {
+      "id": "player_tension_arcs_01",
+      "path": "sprites/gameplay/player_tension_arcs_01.png",
+      "bytes": 2562,
+      "sha256": "c1df307109f6d01e103e77849568513e5aef4adc4e0b9a700776846cbab2836b",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "player_tension_arcs_02",
+      "path": "sprites/gameplay/player_tension_arcs_02.png",
+      "bytes": 2624,
+      "sha256": "5444ab0de8cf925f1388b1ede5dff6a9a0e0cd209d44b45e86c2fc62850e8f2b",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "player_tension_arcs_03",
+      "path": "sprites/gameplay/player_tension_arcs_03.png",
+      "bytes": 2179,
+      "sha256": "5b9569ee0e672b32f5dd188aa89cabf184c323612734037aadf282e599103ec8",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "player_tension_arcs_04",
+      "path": "sprites/gameplay/player_tension_arcs_04.png",
+      "bytes": 2570,
+      "sha256": "16a68a99b682efc16b179fd73c23cbf9c6415a8bd58e1215cd838e591e22dabd",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "tunnel_wall_edge_tile",
+      "path": "sprites/gameplay/tunnel_wall_edge_tile.png",
+      "bytes": 704,
+      "sha256": "91728f1a0096b4be9b714682f2d6f4b2a57f05d8623bb582fcf4af2e67c996fd",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 64,
+      "height": 64,
+      "mode": "RGBA"
+    },
+    {
+      "id": "wall_body_tile",
+      "path": "sprites/gameplay/wall_body_tile.png",
+      "bytes": 1379,
+      "sha256": "3379180cbf91b99ea6892c88b2a6dac8fa9e9f25196d1225fc4bbba01391f72a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 64,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "wall_cap_left",
+      "path": "sprites/gameplay/wall_cap_left.png",
+      "bytes": 3461,
+      "sha256": "8c0f2a888472312bf37ee5f66746d8f3b2ba071e037899220cc9ef2dddc80707",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 64,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "wall_cap_right",
+      "path": "sprites/gameplay/wall_cap_right.png",
+      "bytes": 3217,
+      "sha256": "e7d34566e89449dd3a51bc8af25e66c76924efd9496c5e163a38b607d46abdbb",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 64,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "wall_joint_divider",
+      "path": "sprites/gameplay/wall_joint_divider.png",
+      "bytes": 661,
+      "sha256": "e4c0ca94e4e8f00015ac1f91f3a74da6324f25310fe2137f13a8c36b42e77802",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 32,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_badge_pill_cyan",
+      "path": "sprites/ui/ui_badge_pill_cyan.png",
+      "bytes": 1277,
+      "sha256": "60fd4ace657b07085f65f35af0ca5d53504fb62af296337c901f34e252874218",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 240,
+      "height": 56,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_badge_pill_gold",
+      "path": "sprites/ui/ui_badge_pill_gold.png",
+      "bytes": 1313,
+      "sha256": "ed649c6d13f43d2f07a310f44a8e2f8276f1e46ab0cbc78ed5cf35c97a191c7c",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 240,
+      "height": 56,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_banner_header_crimson",
+      "path": "sprites/ui/ui_banner_header_crimson.png",
+      "bytes": 1887,
+      "sha256": "b23d6cc76f42e57f7f2a86bc71538f8fcf3053534c6e66b5a0c378ac85d98535",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 640,
+      "height": 110,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_banner_header_cyan",
+      "path": "sprites/ui/ui_banner_header_cyan.png",
+      "bytes": 1830,
+      "sha256": "2a35769c99de6b1c362583e4e2414a2bce044a7f8c69c9149f7e2affae30a06d",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 640,
+      "height": 110,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_banner_header_mint",
+      "path": "sprites/ui/ui_banner_header_mint.png",
+      "bytes": 1874,
+      "sha256": "388bde0083674356fbfbab61f2bdf8395dc05f690d2d7e6cdb072d626e223d9f",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 640,
+      "height": 110,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_audio_bgm_off",
+      "path": "sprites/ui/ui_btn_icon_audio_bgm_off.png",
+      "bytes": 3100,
+      "sha256": "452c2a81a55c67ea701ae38b4235c6d16b5637460c9514c24f1f3717ec82ea0b",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_audio_bgm_on",
+      "path": "sprites/ui/ui_btn_icon_audio_bgm_on.png",
+      "bytes": 1771,
+      "sha256": "cf5098d99fcf7e2c272d5646a68eb074f7294f0de56c8b21ce32e2bdb5a6e0cc",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_audio_sfx_off",
+      "path": "sprites/ui/ui_btn_icon_audio_sfx_off.png",
+      "bytes": 2931,
+      "sha256": "7a4e1ec2b78893dec35df0e15baa15a0ae40f75a516d64b9de58505bd812a111",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_audio_sfx_on",
+      "path": "sprites/ui/ui_btn_icon_audio_sfx_on.png",
+      "bytes": 2547,
+      "sha256": "97942818f8d2b310341531ce2de83529a4e8652831c4a6fd64a95d9b8090fb41",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_back_down",
+      "path": "sprites/ui/ui_btn_icon_back_down.png",
+      "bytes": 2280,
+      "sha256": "5e68a7da75c9ad070e59a4a6c6f00988386b4dc251c7fa3fa9523a095fe8f34d",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_back_up",
+      "path": "sprites/ui/ui_btn_icon_back_up.png",
+      "bytes": 2266,
+      "sha256": "915538aef189aa0e8c69bbb16c950bf9b4391a9d2946f2a12f47f000b69ae987",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_home_down",
+      "path": "sprites/ui/ui_btn_icon_home_down.png",
+      "bytes": 3599,
+      "sha256": "d9047d223e3f13decdba17884e6fc588f5f7ec2978ba70a76bb6103a02a9e7b5",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 120,
+      "height": 120,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_home_up",
+      "path": "sprites/ui/ui_btn_icon_home_up.png",
+      "bytes": 3648,
+      "sha256": "3856ed8f3a541adf1f0b16d06dee7f911bf9b8793af183f74c53f963f84cab7f",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 120,
+      "height": 120,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_next_down",
+      "path": "sprites/ui/ui_btn_icon_next_down.png",
+      "bytes": 2275,
+      "sha256": "da2fd29b26be5905d3e2d4342a6c0fab8eb53e4d72048a7bc98a155b6b75404c",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 120,
+      "height": 120,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_next_up",
+      "path": "sprites/ui/ui_btn_icon_next_up.png",
+      "bytes": 2284,
+      "sha256": "0709c1c657b4bc1718de91fcde4f83a3401b387db0a8ce8c3d3e910056b0d199",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 120,
+      "height": 120,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_pause_down",
+      "path": "sprites/ui/ui_btn_icon_pause_down.png",
+      "bytes": 1680,
+      "sha256": "4d7357600aa2fba2d624abc5be5e9a86f65699e12e85c02ea010cccb15dcdd3b",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_pause_up",
+      "path": "sprites/ui/ui_btn_icon_pause_up.png",
+      "bytes": 1641,
+      "sha256": "5729862fd528a452c82e38a0dbaca32fd8e0c1160459bab75027a9d66291cffc",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_restart_down",
+      "path": "sprites/ui/ui_btn_icon_restart_down.png",
+      "bytes": 4634,
+      "sha256": "8ea26f68d513f87e28f660ed3495720ca12aaa512e3c3cc86d6e3d5d0e5dccc1",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 120,
+      "height": 120,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_restart_up",
+      "path": "sprites/ui/ui_btn_icon_restart_up.png",
+      "bytes": 4746,
+      "sha256": "7a63bc8a69d91f48c153ace27bfa29b0a371f1848a077dc824b00e3f15b263dd",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 120,
+      "height": 120,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_resume_down",
+      "path": "sprites/ui/ui_btn_icon_resume_down.png",
+      "bytes": 2699,
+      "sha256": "c87198cf329c78bb9ebf15ed31aed994e2719f45f63a91ae98a856268e2d6f63",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 120,
+      "height": 120,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_resume_up",
+      "path": "sprites/ui/ui_btn_icon_resume_up.png",
+      "bytes": 2694,
+      "sha256": "9737317caf423791dcbf165197548ed5a4c8d8c58ad5c3aea99d32047a9f8f4d",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 120,
+      "height": 120,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_settings_down",
+      "path": "sprites/ui/ui_btn_icon_settings_down.png",
+      "bytes": 3416,
+      "sha256": "6fe2037af2437164957cb90f6651a44bc58deac4058bc7df99cd81770b2632a8",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_settings_up",
+      "path": "sprites/ui/ui_btn_icon_settings_up.png",
+      "bytes": 3513,
+      "sha256": "20aee3a5b10fac9c60f88b73aed3f4d00acec63ecf803816ba3d62079a45ad51",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_skins_down",
+      "path": "sprites/ui/ui_btn_icon_skins_down.png",
+      "bytes": 5154,
+      "sha256": "ab01ee641ca4c5694ab81b22c39361e7deceddd284b375cd537cf66652a8ff17",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_icon_skins_up",
+      "path": "sprites/ui/ui_btn_icon_skins_up.png",
+      "bytes": 5349,
+      "sha256": "e3c12f1305ba15683837dde90e96cd8e2762d81051cf3eb613cacc0ba02a7f42",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_primary_cyan_down",
+      "path": "sprites/ui/ui_btn_primary_cyan_down.png",
+      "bytes": 2238,
+      "sha256": "c5057b2048dfefaf5b5ecaa4dbdffaae163c5aacb366ceca025a9951377b988a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 480,
+      "height": 140,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_primary_cyan_up",
+      "path": "sprites/ui/ui_btn_primary_cyan_up.png",
+      "bytes": 2266,
+      "sha256": "ec5a02236ebec9f80271ef44929fc2bb426ee533852c424515dfe97d928c4b2f",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 480,
+      "height": 140,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_primary_mint_down",
+      "path": "sprites/ui/ui_btn_primary_mint_down.png",
+      "bytes": 2336,
+      "sha256": "d6d576dc8fdefc9772c8a10b010eb04e46cd0fc672a68af129b20f59673f7762",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 480,
+      "height": 140,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_btn_primary_mint_up",
+      "path": "sprites/ui/ui_btn_primary_mint_up.png",
+      "bytes": 2253,
+      "sha256": "0b785b389fb0f2bffa6fac7506ea3999b10bbebbce1d4150c44407eac4abe0d0",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 480,
+      "height": 140,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_card_mode_campaign_down",
+      "path": "sprites/ui/ui_card_mode_campaign_down.png",
+      "bytes": 6079,
+      "sha256": "9e0a63c89f9b09e06c8449761986c537df0db7203a27da8af3e35c17acc4a293",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 440,
+      "height": 220,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_card_mode_campaign_up",
+      "path": "sprites/ui/ui_card_mode_campaign_up.png",
+      "bytes": 6180,
+      "sha256": "a2874936cad1c0ecc146897eff00dba18bb41be44c3a5f1602ec03406650ce34",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 440,
+      "height": 220,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_card_mode_endless_down",
+      "path": "sprites/ui/ui_card_mode_endless_down.png",
+      "bytes": 9271,
+      "sha256": "6cd5b616a8000e771e16ce6e17cee4381e545d2ee823ef0b30e947a4a658aeee",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 440,
+      "height": 220,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_card_mode_endless_up",
+      "path": "sprites/ui/ui_card_mode_endless_up.png",
+      "bytes": 9298,
+      "sha256": "44b050d93c3be71c263e308d0ac8c61e9e1b8960c70cf0352637811966d6dfd2",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 440,
+      "height": 220,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_hud_bracket_left",
+      "path": "sprites/ui/ui_hud_bracket_left.png",
+      "bytes": 1707,
+      "sha256": "09d6e57f4eab542dcafda82644506f1fc041566166735e7ecb6253c841381b99",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 104,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_hud_bracket_right",
+      "path": "sprites/ui/ui_hud_bracket_right.png",
+      "bytes": 1748,
+      "sha256": "9b2abf4f4d3de2541e5214ab77aff08fae1698c44c46ea2d27e61e3932f5ab08",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 104,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_hud_icon_gold",
+      "path": "sprites/ui/ui_hud_icon_gold.png",
+      "bytes": 3484,
+      "sha256": "488f7371eb52a3177ae47400116e1a9e4d838112d9f13df89d65add325c70f62",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 48,
+      "height": 48,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_hud_icon_mint",
+      "path": "sprites/ui/ui_hud_icon_mint.png",
+      "bytes": 3523,
+      "sha256": "7f5b388a033a419a4e93dd826ea91e9f1f497b60165466a0d34cc843db1b5fec",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 48,
+      "height": 48,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_icon_status_check",
+      "path": "sprites/ui/ui_icon_status_check.png",
+      "bytes": 3726,
+      "sha256": "723dfedc5833365d942c14421300935b33ddcccb9679b79ca2e9629fd4ca30f3",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 64,
+      "height": 64,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_icon_status_error",
+      "path": "sprites/ui/ui_icon_status_error.png",
+      "bytes": 2598,
+      "sha256": "b2d770fdcf2eec92591dbc3cfeac0d34cf8d44a9b8fad1828826b42b538ce205",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 64,
+      "height": 64,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_icon_status_lock",
+      "path": "sprites/ui/ui_icon_status_lock.png",
+      "bytes": 2236,
+      "sha256": "e0965bf1b613e2d81c229512f5571192f2124845143a832ab16f12175fe40778",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 64,
+      "height": 64,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_logo_core",
+      "path": "sprites/ui/ui_logo_core.png",
+      "bytes": 9356,
+      "sha256": "77eb47b7f4fadc45d254cb9e712407ab0a779263a9f8ac53e5b78c876d6fa66a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_logo_pulse",
+      "path": "sprites/ui/ui_logo_pulse.png",
+      "bytes": 42508,
+      "sha256": "aa8cd2a0a80acf53fd4c10f8c13b8c63df7947ba51437da21947b5f93fb33cf3",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 680,
+      "height": 220,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_panel_modal_9slice",
+      "path": "sprites/ui/ui_panel_modal_9slice.png",
+      "bytes": 1967,
+      "sha256": "a562e1299b6bf167a55de15ef9de721a10ca54eb7bd13ef85dc08b5d3c6b5e60",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_skin_slot_selected",
+      "path": "sprites/ui/ui_skin_slot_selected.png",
+      "bytes": 13255,
+      "sha256": "90c53f2dac3e351251e2188f539f26f8c7f537e94614856a58f7b475acc2d6ca",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 260,
+      "height": 300,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_skin_slot_unselected",
+      "path": "sprites/ui/ui_skin_slot_unselected.png",
+      "bytes": 9309,
+      "sha256": "f7eec8403af6e98a822f6ef7b61a44a9c4a75ab8a82f89cac01b32ca1b9239af",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 260,
+      "height": 300,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stage_card_completed",
+      "path": "sprites/ui/ui_stage_card_completed.png",
+      "bytes": 3237,
+      "sha256": "11cc57a05379d85d2eb0996387c466b7d4d6d5dad51653706d12a1590e4ee581",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 320,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stage_card_locked",
+      "path": "sprites/ui/ui_stage_card_locked.png",
+      "bytes": 3066,
+      "sha256": "bfc415c91c4d1f4f33bfde87ca5c7a3e7e9ba863d8275963705c52163fb3a818",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 320,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stage_card_s01_w1",
+      "path": "sprites/ui/ui_stage_card_s01_w1.png",
+      "bytes": 3432,
+      "sha256": "602be8227bda4fb4db85046669b12b47ff78280e6dc858db9f806ac9de6e5989",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 320,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stage_card_s02_w1",
+      "path": "sprites/ui/ui_stage_card_s02_w1.png",
+      "bytes": 3514,
+      "sha256": "4c9b8504632c7061856c6b6301c8611bc4e451233d7f0d7c6f438727b5d317d3",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 320,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stage_card_s03_w1",
+      "path": "sprites/ui/ui_stage_card_s03_w1.png",
+      "bytes": 3508,
+      "sha256": "ba1c6c74569f06b62a8d33b41b525efe3f0c28d9cd2d17ae8936ed65406d62b3",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 320,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stage_card_s04_w1",
+      "path": "sprites/ui/ui_stage_card_s04_w1.png",
+      "bytes": 3579,
+      "sha256": "56a03dab84a5283a349025e5cfe8df401b7aa9a77cae513d905f80b2440374bf",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 320,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stage_card_s05_w2",
+      "path": "sprites/ui/ui_stage_card_s05_w2.png",
+      "bytes": 3629,
+      "sha256": "5349e28c4510f0bedfb246f43d8440129703c68afd0d181d517243739484e9c0",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 320,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stage_card_s06_w2",
+      "path": "sprites/ui/ui_stage_card_s06_w2.png",
+      "bytes": 3708,
+      "sha256": "9a36ad3245a9c69424cdf99d19ed6356308b5215692928267727e07e27d08969",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 320,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stage_card_s07_w2",
+      "path": "sprites/ui/ui_stage_card_s07_w2.png",
+      "bytes": 3702,
+      "sha256": "48e35b1638960f07787b798df6fc4341cc50e2783dcfef50d80fde887c868ee8",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 320,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stage_card_s08_w2",
+      "path": "sprites/ui/ui_stage_card_s08_w2.png",
+      "bytes": 3712,
+      "sha256": "801bf2a1c333243ae855a01e93a31a0ad18be55099672b30448bbf07c5308571",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 320,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stage_card_s09_w3",
+      "path": "sprites/ui/ui_stage_card_s09_w3.png",
+      "bytes": 3358,
+      "sha256": "2bae95781bfc48732c10f0109bbcd07479df37a22ff5a3766484d4e96a9f2f16",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 320,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stage_card_s10_w3",
+      "path": "sprites/ui/ui_stage_card_s10_w3.png",
+      "bytes": 3421,
+      "sha256": "7c9d3280e50db5089284151051b76d51fdde8c62363636da20e04e43a47e7c56",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 320,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stage_card_s11_w3",
+      "path": "sprites/ui/ui_stage_card_s11_w3.png",
+      "bytes": 3422,
+      "sha256": "9fc4c48bde197453a1099877b8b753e310b2761669f2a9b1f3e6128c31425afb",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 320,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stage_card_s12_w3",
+      "path": "sprites/ui/ui_stage_card_s12_w3.png",
+      "bytes": 3429,
+      "sha256": "c6da7159592d1347f8c787f5dbcd69462fbb993871690b4495d8ef8d2c48dc8a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 320,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stage_card_selected",
+      "path": "sprites/ui/ui_stage_card_selected.png",
+      "bytes": 4296,
+      "sha256": "1b19b058987d222367c5382b804b6c0f83c6d30edf9c22d0206701088a3560ca",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 320,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stage_card_unlocked",
+      "path": "sprites/ui/ui_stage_card_unlocked.png",
+      "bytes": 3275,
+      "sha256": "4b3103643063bdcb4fc59954ccfb13164aa9e8fc80c9b4e57e007d6fbbcd1d8c",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 320,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_star_empty",
+      "path": "sprites/ui/ui_star_empty.png",
+      "bytes": 3034,
+      "sha256": "866176844528da5e5d008da3786626bba4a394176cbdfa0e90c05dccf5a87293",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 64,
+      "height": 64,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_star_filled",
+      "path": "sprites/ui/ui_star_filled.png",
+      "bytes": 4261,
+      "sha256": "de0138b2abe7bf08077281b375f7bb67b035886232b3650ed7268e0071f340e2",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 64,
+      "height": 64,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stars_trio_0",
+      "path": "sprites/ui/ui_stars_trio_0.png",
+      "bytes": 2278,
+      "sha256": "ee93a0cc8e4cbf30ed3a709b7d3854cc9078ed5ea293fefcc6f4110c903b1e4a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 180,
+      "height": 56,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stars_trio_1",
+      "path": "sprites/ui/ui_stars_trio_1.png",
+      "bytes": 5018,
+      "sha256": "e7c39c773d22ab548054eca7bc20c8699b850b34f0215d3d523a103c737d970d",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 180,
+      "height": 56,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stars_trio_2",
+      "path": "sprites/ui/ui_stars_trio_2.png",
+      "bytes": 5038,
+      "sha256": "e7fd2a669bbd1bf4625d467c87cb81964c36d5e707710885641a26dc87ce09db",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 180,
+      "height": 56,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_stars_trio_3",
+      "path": "sprites/ui/ui_stars_trio_3.png",
+      "bytes": 3219,
+      "sha256": "50cf6058a5f28f43718d6d7657bb65dfbc1f4d5f99f6b507031bbb9c29d49cb4",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 180,
+      "height": 56,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_tutorial_callout_9slice",
+      "path": "sprites/ui/ui_tutorial_callout_9slice.png",
+      "bytes": 1534,
+      "sha256": "69431f8f93b1ac35c640d841ca93f8f26c80cbad537f30a6e43f5d89f7c1b624",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 160,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_tutorial_hand_hold",
+      "path": "sprites/ui/ui_tutorial_hand_hold.png",
+      "bytes": 3922,
+      "sha256": "ac3997b7be584cd76f6be2b162daffc7a6ff6be3841189c155acfa6632d08ccf",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 160,
+      "height": 160,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_tutorial_hand_release",
+      "path": "sprites/ui/ui_tutorial_hand_release.png",
+      "bytes": 5481,
+      "sha256": "e6ebcc45e10b91dfd90b03adf63d47ce79d3ed4ad020c69b2a43d391c54d53fa",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 160,
+      "height": 160,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_world_card_world1_neon_circuit",
+      "path": "sprites/ui/ui_world_card_world1_neon_circuit.png",
+      "bytes": 4184,
+      "sha256": "149f1dd4e95e47b46d5e7a3c5a1c2bda646b6d6e8cd8af2706f839be8c645af7",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 340,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_world_card_world2_chromatic_overdrive",
+      "path": "sprites/ui/ui_world_card_world2_chromatic_overdrive.png",
+      "bytes": 8181,
+      "sha256": "d2fbae88e8a88d52770e8ccc43471f890bbaa9374632270e21c800278a3454ae",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 340,
+      "mode": "RGBA"
+    },
+    {
+      "id": "ui_world_card_world3_pulse_collapse",
+      "path": "sprites/ui/ui_world_card_world3_pulse_collapse.png",
+      "bytes": 7699,
+      "sha256": "deb50068dd528692498ca2cee3ef9cb052d6f713c196491953caab663339c389",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 280,
+      "height": 340,
+      "mode": "RGBA"
+    },
+    {
+      "id": "decor_w1_beacon_ring",
+      "path": "sprites/worlds/decor_w1_beacon_ring.png",
+      "bytes": 4188,
+      "sha256": "027537e5ac17c9e89278d070a054123a1b8b1271c2b2d63823ae12e816de6655",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "decor_w1_circuit_pylon",
+      "path": "sprites/worlds/decor_w1_circuit_pylon.png",
+      "bytes": 4840,
+      "sha256": "ebc424e7e3de215fb636a8dac65d335c88465ee0114c584c9300c16c13bffb45",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "decor_w1_data_node",
+      "path": "sprites/worlds/decor_w1_data_node.png",
+      "bytes": 5252,
+      "sha256": "7d689b16fab6f7f70f34ac7b1452b00993d4670fdec6835125ca6fd4c26a6e37",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "decor_w2_chroma_diamond",
+      "path": "sprites/worlds/decor_w2_chroma_diamond.png",
+      "bytes": 4840,
+      "sha256": "ebc424e7e3de215fb636a8dac65d335c88465ee0114c584c9300c16c13bffb45",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "decor_w2_equalizer_arch",
+      "path": "sprites/worlds/decor_w2_equalizer_arch.png",
+      "bytes": 4278,
+      "sha256": "3509758c9a58bc2bdef97a0deefd90c92f9ae4a33fc6e2192add6b52fbbcc4df",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "decor_w2_prism_spire",
+      "path": "sprites/worlds/decor_w2_prism_spire.png",
+      "bytes": 3740,
+      "sha256": "4366934d9342fd1ac5b034738b2a4054c2cb37d553a71cfe72a3e7f3a9e41e1b",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "decor_w3_collapse_monolith",
+      "path": "sprites/worlds/decor_w3_collapse_monolith.png",
+      "bytes": 5414,
+      "sha256": "72357057806cbb39a32c787d80d7f81adaacf09675205010357beef55e4d2a31",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "decor_w3_rift_shard",
+      "path": "sprites/worlds/decor_w3_rift_shard.png",
+      "bytes": 3502,
+      "sha256": "a53e716e89a72f7b3acf9cf863ada14b9861b58f7ec25d362d291f472aeef12c",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "decor_w3_singularity_ring",
+      "path": "sprites/worlds/decor_w3_singularity_ring.png",
+      "bytes": 4053,
+      "sha256": "47acb24af676a2d73d8d422b55ad476ef340d77b373ba979252141abb035b7e1",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "pulse_gameplay_atlas",
+      "path": "atlases/pulse_gameplay_atlas.json",
+      "bytes": 23171,
+      "sha256": "26871dd19052698d6d9b7c7fca73bf0b5451e9b6c089d5bd6549b10a2d9375f2",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "pulse_gameplay_atlas",
+      "path": "atlases/pulse_gameplay_atlas.png",
+      "bytes": 386965,
+      "sha256": "70d3cfec46440dc6d56296858c9c895f8e7b9f03c5220f25c67b6ef10449718a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 1024,
+      "height": 2048,
+      "mode": "RGBA"
+    },
+    {
+      "id": "pulse_skins_atlas",
+      "path": "atlases/pulse_skins_atlas.json",
+      "bytes": 18912,
+      "sha256": "a16e2d32c1d9b4b6eba4b37d886328c623155fe5ad470f677f07ed6ff72f1416",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "pulse_skins_atlas",
+      "path": "atlases/pulse_skins_atlas.png",
+      "bytes": 284691,
+      "sha256": "f908227f2a254b6a10506f8471ce7001a06493e8a6094d69e5fdeb34cfe0dccc",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 1024,
+      "height": 1024,
+      "mode": "RGBA"
+    },
+    {
+      "id": "pulse_ui_atlas",
+      "path": "atlases/pulse_ui_atlas.json",
+      "bytes": 25365,
+      "sha256": "76dae38548578bd279e4ef1e313f59e3dcba07c0b23be273bfcaa1da0e72569e",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "pulse_ui_atlas",
+      "path": "atlases/pulse_ui_atlas.png",
+      "bytes": 265310,
+      "sha256": "60fd500a8c7e2d9b3993b09ea502278e1802d33ef0ce6d17bb3364c18b95f35d",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 2048,
+      "height": 2048,
+      "mode": "RGBA"
+    },
+    {
+      "id": "pulse_world_decor_atlas",
+      "path": "atlases/pulse_world_decor_atlas.json",
+      "bytes": 3920,
+      "sha256": "e3d3c1a9832f22f8a6058fa6b02cab68cad7a5e84a85bc57981221639ab5bbaa",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "pulse_world_decor_atlas",
+      "path": "atlases/pulse_world_decor_atlas.png",
+      "bytes": 35923,
+      "sha256": "af796538190659de1e0f9674a3ad03c324be4a6577118ebe7039460fa017dced",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 512,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_endless_mid_parallax",
+      "path": "backgrounds/bg_endless_mid_parallax.png",
+      "bytes": 2877,
+      "sha256": "ac404a79497ba957e5173a2fc79c96c6861aa1e576106363b92e16b57e845322",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 1024,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_grid_tile",
+      "path": "backgrounds/bg_grid_tile.png",
+      "bytes": 3399,
+      "sha256": "b237ea1aa041a8aad4da650ff280cdd4d208aa001a2416d3b6da71c67f1ce44a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 512,
+      "height": 512,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_speed_rail_horiz",
+      "path": "backgrounds/bg_speed_rail_horiz.png",
+      "bytes": 541,
+      "sha256": "c6088e8e772615af61410fac0f03d5846d0b555fa153fadaefdbcd43abd80a4f",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 512,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_stage1_first_pulse",
+      "path": "backgrounds/bg_stage1_first_pulse.png",
+      "bytes": 3399,
+      "sha256": "b237ea1aa041a8aad4da650ff280cdd4d208aa001a2416d3b6da71c67f1ce44a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 512,
+      "height": 512,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_stage1_mid_parallax",
+      "path": "backgrounds/bg_stage1_mid_parallax.png",
+      "bytes": 2877,
+      "sha256": "ac404a79497ba957e5173a2fc79c96c6861aa1e576106363b92e16b57e845322",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 1024,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_stage1_rail_horiz",
+      "path": "backgrounds/bg_stage1_rail_horiz.png",
+      "bytes": 541,
+      "sha256": "c6088e8e772615af61410fac0f03d5846d0b555fa153fadaefdbcd43abd80a4f",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 512,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_stage2_find_rhythm",
+      "path": "backgrounds/bg_stage2_find_rhythm.png",
+      "bytes": 5759,
+      "sha256": "ee9b7923ba65f8f3d986e08824dd1eb16ecc667bbf60b799aac9c385da94453c",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 512,
+      "height": 512,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_stage2_mid_parallax",
+      "path": "backgrounds/bg_stage2_mid_parallax.png",
+      "bytes": 4544,
+      "sha256": "927f128610e8eea13875b2fd5fb52fabdcb82b2476be711e743451c2e81c6f1f",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 1024,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_stage2_rail_horiz",
+      "path": "backgrounds/bg_stage2_rail_horiz.png",
+      "bytes": 546,
+      "sha256": "2f9a2e4819b2c2838d588cc294d7461139a9c3257adf3df9faba5f1d33c53629",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 512,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_stage3_mid_parallax",
+      "path": "backgrounds/bg_stage3_mid_parallax.png",
+      "bytes": 3316,
+      "sha256": "a09d206f76d003f81c711870a97fe27c1635c6c4e18beef7c485509eefbb3078",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 1024,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_stage3_overload",
+      "path": "backgrounds/bg_stage3_overload.png",
+      "bytes": 8079,
+      "sha256": "1243139535dad8e1036b98432bb953dca992a8ae3cb497a87bf3b91e2dec0f2e",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 512,
+      "height": 512,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_stage3_rail_horiz",
+      "path": "backgrounds/bg_stage3_rail_horiz.png",
+      "bytes": 589,
+      "sha256": "c7fd8e720558c49c4b7d593b15c2d1f208fc7847f07ac4eea012f906ce23ef1a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 512,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_world1_far",
+      "path": "backgrounds/bg_world1_far.png",
+      "bytes": 3399,
+      "sha256": "b237ea1aa041a8aad4da650ff280cdd4d208aa001a2416d3b6da71c67f1ce44a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 512,
+      "height": 512,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_world1_fg_rail",
+      "path": "backgrounds/bg_world1_fg_rail.png",
+      "bytes": 541,
+      "sha256": "c6088e8e772615af61410fac0f03d5846d0b555fa153fadaefdbcd43abd80a4f",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 512,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_world1_intro_banner",
+      "path": "backgrounds/bg_world1_intro_banner.png",
+      "bytes": 7309,
+      "sha256": "b517a44f37c6f6434c1c81d555364eee2d0ab154bf57a71ec7c6b550e06551ce",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 512,
+      "height": 160,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_world1_mid",
+      "path": "backgrounds/bg_world1_mid.png",
+      "bytes": 2877,
+      "sha256": "ac404a79497ba957e5173a2fc79c96c6861aa1e576106363b92e16b57e845322",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 1024,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_world2_far",
+      "path": "backgrounds/bg_world2_far.png",
+      "bytes": 5759,
+      "sha256": "ee9b7923ba65f8f3d986e08824dd1eb16ecc667bbf60b799aac9c385da94453c",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 512,
+      "height": 512,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_world2_fg_rail",
+      "path": "backgrounds/bg_world2_fg_rail.png",
+      "bytes": 546,
+      "sha256": "2f9a2e4819b2c2838d588cc294d7461139a9c3257adf3df9faba5f1d33c53629",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 512,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_world2_intro_banner",
+      "path": "backgrounds/bg_world2_intro_banner.png",
+      "bytes": 6871,
+      "sha256": "7963787282ad1acd0d2920d41b36eb9be3d41d0dbe31445e59d9497253666623",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 512,
+      "height": 160,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_world2_mid",
+      "path": "backgrounds/bg_world2_mid.png",
+      "bytes": 4544,
+      "sha256": "927f128610e8eea13875b2fd5fb52fabdcb82b2476be711e743451c2e81c6f1f",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 1024,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_world3_far",
+      "path": "backgrounds/bg_world3_far.png",
+      "bytes": 8079,
+      "sha256": "1243139535dad8e1036b98432bb953dca992a8ae3cb497a87bf3b91e2dec0f2e",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 512,
+      "height": 512,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_world3_fg_rail",
+      "path": "backgrounds/bg_world3_fg_rail.png",
+      "bytes": 589,
+      "sha256": "c7fd8e720558c49c4b7d593b15c2d1f208fc7847f07ac4eea012f906ce23ef1a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 512,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_world3_intro_banner",
+      "path": "backgrounds/bg_world3_intro_banner.png",
+      "bytes": 6888,
+      "sha256": "2f714f4295360ad46d385ae6d1055dd06aebe5675a233a6a740f8ec1ac1c5a9b",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 512,
+      "height": 160,
+      "mode": "RGBA"
+    },
+    {
+      "id": "bg_world3_mid",
+      "path": "backgrounds/bg_world3_mid.png",
+      "bytes": 3316,
+      "sha256": "a09d206f76d003f81c711870a97fe27c1635c6c4e18beef7c485509eefbb3078",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 1024,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_cyan_pulse_morph_01",
+      "path": "cosmetics/skin_cyan_pulse_morph_01.png",
+      "bytes": 8331,
+      "sha256": "649ed02d3dc6944a9b164cdc131b2ffcd352e007a13a5a4fece5edafa22d0efd",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_cyan_pulse_morph_02",
+      "path": "cosmetics/skin_cyan_pulse_morph_02.png",
+      "bytes": 6402,
+      "sha256": "cad4b5c31828e08f56f53ffbf66e961a0d6448777f40e5660030de3b84503f2c",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_cyan_pulse_normal",
+      "path": "cosmetics/skin_cyan_pulse_normal.png",
+      "bytes": 12643,
+      "sha256": "e6237f283b340fa6dbd3be962b169f92839e52cdf8986faa2dc74b1989602382",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_cyan_pulse_ring",
+      "path": "cosmetics/skin_cyan_pulse_ring.png",
+      "bytes": 4614,
+      "sha256": "ce5b5f8fbdfdced71a6a93c685362311e5d3c35f25f4bdb2c45dc99fa02e1e49",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_cyan_pulse_shrunk",
+      "path": "cosmetics/skin_cyan_pulse_shrunk.png",
+      "bytes": 5155,
+      "sha256": "94e3b89dff37b82bc23fa2940643420ddb430fd28d835d470c1ebb8b31e36647",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 76,
+      "height": 76,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_cyan_pulse_tension_arcs_01",
+      "path": "cosmetics/skin_cyan_pulse_tension_arcs_01.png",
+      "bytes": 2562,
+      "sha256": "c1df307109f6d01e103e77849568513e5aef4adc4e0b9a700776846cbab2836b",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_cyan_pulse_tension_arcs_02",
+      "path": "cosmetics/skin_cyan_pulse_tension_arcs_02.png",
+      "bytes": 2624,
+      "sha256": "5444ab0de8cf925f1388b1ede5dff6a9a0e0cd209d44b45e86c2fc62850e8f2b",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_cyan_pulse_tension_arcs_03",
+      "path": "cosmetics/skin_cyan_pulse_tension_arcs_03.png",
+      "bytes": 2179,
+      "sha256": "5b9569ee0e672b32f5dd188aa89cabf184c323612734037aadf282e599103ec8",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_cyan_pulse_tension_arcs_04",
+      "path": "cosmetics/skin_cyan_pulse_tension_arcs_04.png",
+      "bytes": 2570,
+      "sha256": "16a68a99b682efc16b179fd73c23cbf9c6415a8bd58e1215cd838e591e22dabd",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_retro_green_morph_01",
+      "path": "cosmetics/skin_retro_green_morph_01.png",
+      "bytes": 9065,
+      "sha256": "ca9c0bdb6b1abc50a5101ce64267b1f005cf7fc78ada8e3bcdc6a0369fcec0b4",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_retro_green_morph_02",
+      "path": "cosmetics/skin_retro_green_morph_02.png",
+      "bytes": 6988,
+      "sha256": "c5703195dd8ca6c34660bef6427586b897d3200bfea8ad8b6506b57fd653b0ee",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_retro_green_normal",
+      "path": "cosmetics/skin_retro_green_normal.png",
+      "bytes": 15800,
+      "sha256": "d2bbc73d7760587d02388e493190f9ee03198d168e3bf0a7930258c9841a9c9a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_retro_green_ring",
+      "path": "cosmetics/skin_retro_green_ring.png",
+      "bytes": 4355,
+      "sha256": "d0f1f4bcceacc3c43b2eb6085b2ac84228369d7041708e980da8ed80404d38eb",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_retro_green_shrunk",
+      "path": "cosmetics/skin_retro_green_shrunk.png",
+      "bytes": 5898,
+      "sha256": "6a232676e7a81295d349a3d6d08cfa106d26dd780ffe025cd17c3a317d5a1d97",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 76,
+      "height": 76,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_retro_green_tension_arcs_01",
+      "path": "cosmetics/skin_retro_green_tension_arcs_01.png",
+      "bytes": 3188,
+      "sha256": "66fe9cfdca19321eb442855c680ac5a61838bc24602973179b1578924ba84729",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_retro_green_tension_arcs_02",
+      "path": "cosmetics/skin_retro_green_tension_arcs_02.png",
+      "bytes": 3170,
+      "sha256": "030a3ea2b0a0f411ba93357f454d1747d7d9012e288586f557256a2262d98aa6",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_retro_green_tension_arcs_03",
+      "path": "cosmetics/skin_retro_green_tension_arcs_03.png",
+      "bytes": 2861,
+      "sha256": "31949a2cd5f3b2a62750e22d08b36753d479cf0161aa0ce42edce9f905aae675",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_retro_green_tension_arcs_04",
+      "path": "cosmetics/skin_retro_green_tension_arcs_04.png",
+      "bytes": 3140,
+      "sha256": "92b45bc94d6a7294c7b1ec9493f998d5193dde3998f7fe74c7d5d3eeb0fa792e",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_solar_flare_morph_01",
+      "path": "cosmetics/skin_solar_flare_morph_01.png",
+      "bytes": 8930,
+      "sha256": "576642dfe3c38c16a7b1682e3c4c288a0765a7494a15fd8e9833438f6409605e",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_solar_flare_morph_02",
+      "path": "cosmetics/skin_solar_flare_morph_02.png",
+      "bytes": 6915,
+      "sha256": "b9b38c769f8162edc31194e489287b80770399a670342b7acf42fe4b6ba86624",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_solar_flare_normal",
+      "path": "cosmetics/skin_solar_flare_normal.png",
+      "bytes": 16105,
+      "sha256": "1f7f1bdf164e26be2b38b528b446e7119d75260dc0e4cd20b89dda7fca0a474b",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_solar_flare_ring",
+      "path": "cosmetics/skin_solar_flare_ring.png",
+      "bytes": 4468,
+      "sha256": "8de427d603e9249d5b39d9e2b6607d13574764b97cdc3ebbf5bc9fa45b14c8cf",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_solar_flare_shrunk",
+      "path": "cosmetics/skin_solar_flare_shrunk.png",
+      "bytes": 5772,
+      "sha256": "2fdafaf7d59232d86d37206a9732b8a3047b175b88bdfa4b2e67163b5704d775",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 76,
+      "height": 76,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_solar_flare_tension_arcs_01",
+      "path": "cosmetics/skin_solar_flare_tension_arcs_01.png",
+      "bytes": 3180,
+      "sha256": "3ae47d2e84aa50db97b9e173ab9b4e0d506bdc000ca07ec386305bcb8a788b75",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_solar_flare_tension_arcs_02",
+      "path": "cosmetics/skin_solar_flare_tension_arcs_02.png",
+      "bytes": 3208,
+      "sha256": "7df687c85bbf9ab81577033c75a89e033214affad397b9e914a75260ee1523a2",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_solar_flare_tension_arcs_03",
+      "path": "cosmetics/skin_solar_flare_tension_arcs_03.png",
+      "bytes": 2949,
+      "sha256": "fb67f772dc4da9274a5fbac36e0e923a35d910722317a9503a084479c62ec7f0",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_solar_flare_tension_arcs_04",
+      "path": "cosmetics/skin_solar_flare_tension_arcs_04.png",
+      "bytes": 3238,
+      "sha256": "b47b9940f492108b74d35d2bd4eec7293d20f79a58be4b0f2182bc04cc946e71",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_violet_nova_morph_01",
+      "path": "cosmetics/skin_violet_nova_morph_01.png",
+      "bytes": 8682,
+      "sha256": "c33613f05363ae78e0765fae5565aab2eeae98acb989f56cd2fc7da3dc05a03b",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_violet_nova_morph_02",
+      "path": "cosmetics/skin_violet_nova_morph_02.png",
+      "bytes": 6704,
+      "sha256": "990bd808e659307d3eecd1d9cefb1bc540a99156652f67e2a151fa79e0fd9ddc",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_violet_nova_normal",
+      "path": "cosmetics/skin_violet_nova_normal.png",
+      "bytes": 19286,
+      "sha256": "96f31b17d358513824eb60087631aa015aac2ca7f40cdb88402df3503154f3b5",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_violet_nova_ring",
+      "path": "cosmetics/skin_violet_nova_ring.png",
+      "bytes": 5357,
+      "sha256": "556a0795cf16f532a76ab19d66bdb097952a8cacedbcc9dfb6b165e30f3b3efc",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_violet_nova_shrunk",
+      "path": "cosmetics/skin_violet_nova_shrunk.png",
+      "bytes": 6629,
+      "sha256": "49ccaf524f136d4c711966e9c6da132ac3f2416a15df1d6d5998ea620bc1c07a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 76,
+      "height": 76,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_violet_nova_tension_arcs_01",
+      "path": "cosmetics/skin_violet_nova_tension_arcs_01.png",
+      "bytes": 3438,
+      "sha256": "9dd36a5359bf84be1c016eda80622e2955ae1f529cf682be5422d7afddb2e970",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_violet_nova_tension_arcs_02",
+      "path": "cosmetics/skin_violet_nova_tension_arcs_02.png",
+      "bytes": 3261,
+      "sha256": "26c53807118fc98bf0db2baaadd724019890efb6ef4958786c7d626c6e24b8ee",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_violet_nova_tension_arcs_03",
+      "path": "cosmetics/skin_violet_nova_tension_arcs_03.png",
+      "bytes": 3009,
+      "sha256": "b8408e71152ab79262142a25663f3aecaab8911b42486077c0d4a0403c83705a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_violet_nova_tension_arcs_04",
+      "path": "cosmetics/skin_violet_nova_tension_arcs_04.png",
+      "bytes": 3157,
+      "sha256": "fa7c22048038f7c3485a671cd6d58b2a6742a3cb0000081a372b58d1440e1951",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_void_prism_morph_01",
+      "path": "cosmetics/skin_void_prism_morph_01.png",
+      "bytes": 8900,
+      "sha256": "80120ce5257acfce3652e2209cf4791d24a1b9d8cdd513fe90f7a8f9297115bf",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_void_prism_morph_02",
+      "path": "cosmetics/skin_void_prism_morph_02.png",
+      "bytes": 6907,
+      "sha256": "5c7338074cc28aa5014745f6addb85bcd8ae5914be49469c318160e49ec9b4d6",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_void_prism_normal",
+      "path": "cosmetics/skin_void_prism_normal.png",
+      "bytes": 18441,
+      "sha256": "b6d725dfb71541205106dc4a61958913ee29ca115732335ad6a5baf2811829a5",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_void_prism_ring",
+      "path": "cosmetics/skin_void_prism_ring.png",
+      "bytes": 5078,
+      "sha256": "dcb97fa217d32798edeaac2231c2da21ed6bdc01899406ffed9a0b94f8afa7eb",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_void_prism_shrunk",
+      "path": "cosmetics/skin_void_prism_shrunk.png",
+      "bytes": 6253,
+      "sha256": "e18d3653ffcbdf8e5365e3bfe9230d77fef250e62a1de2c1118517bc695a7e52",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 76,
+      "height": 76,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_void_prism_tension_arcs_01",
+      "path": "cosmetics/skin_void_prism_tension_arcs_01.png",
+      "bytes": 3507,
+      "sha256": "7e2f033734161c86440ce0cf652196696dd84c08bec1a019cc902921fcc68b33",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_void_prism_tension_arcs_02",
+      "path": "cosmetics/skin_void_prism_tension_arcs_02.png",
+      "bytes": 3379,
+      "sha256": "e8c7aea33591cc77a53070cac4ac787d2ad0cf890f6d1959f13acb2759f35328",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_void_prism_tension_arcs_03",
+      "path": "cosmetics/skin_void_prism_tension_arcs_03.png",
+      "bytes": 3190,
+      "sha256": "ab67cd1b61c2529d9c4e91248a084f332ab273ba5cbd01f325495eff454d2d41",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_void_prism_tension_arcs_04",
+      "path": "cosmetics/skin_void_prism_tension_arcs_04.png",
+      "bytes": 3326,
+      "sha256": "d757ccd609a6b54e0fb6235968146f15e6f9f9ed708b730b633f487b6e5528be",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_whiteout_morph_01",
+      "path": "cosmetics/skin_whiteout_morph_01.png",
+      "bytes": 7215,
+      "sha256": "1e62b1b8ffcd31b5e500c896511a9334129b2e66c25ae8871955d5be03efe683",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_whiteout_morph_02",
+      "path": "cosmetics/skin_whiteout_morph_02.png",
+      "bytes": 5525,
+      "sha256": "9dd6489deff08a21886cdaf43b07240229d15dec7f558b77101d34b9f665de40",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_whiteout_normal",
+      "path": "cosmetics/skin_whiteout_normal.png",
+      "bytes": 15934,
+      "sha256": "a1902998a9859fb5787f062b789500b330845e461e8cfeb9e8daecd6b8be2891",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_whiteout_ring",
+      "path": "cosmetics/skin_whiteout_ring.png",
+      "bytes": 4505,
+      "sha256": "e3a63217f74e0ab98acdbfba0696e95061bf3abca75572c4905f0722b4d0b69f",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_whiteout_shrunk",
+      "path": "cosmetics/skin_whiteout_shrunk.png",
+      "bytes": 4997,
+      "sha256": "298e87a6ab1bb8f45c6597834b6a5a45fc847ba4be95b1ca4af99901b211e976",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 76,
+      "height": 76,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_whiteout_tension_arcs_01",
+      "path": "cosmetics/skin_whiteout_tension_arcs_01.png",
+      "bytes": 2502,
+      "sha256": "a43d3c6384d20c9ff8835446129b2168a4d3d295a2fa547f9af26022d4c3cfa3",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_whiteout_tension_arcs_02",
+      "path": "cosmetics/skin_whiteout_tension_arcs_02.png",
+      "bytes": 2485,
+      "sha256": "6a894d7801f44c36f53b8acf0fd749db8494dfabef524561e14d376573d85686",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_whiteout_tension_arcs_03",
+      "path": "cosmetics/skin_whiteout_tension_arcs_03.png",
+      "bytes": 2048,
+      "sha256": "24df847b13374c33c5c63b0171206f24a7d52e1ccd86fa521469039c28c7e035",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "skin_whiteout_tension_arcs_04",
+      "path": "cosmetics/skin_whiteout_tension_arcs_04.png",
+      "bytes": 2451,
+      "sha256": "d355e9af0f4684ae33d808ce4b500c9374e758492fa81ed2f7892f9bf9a6de9e",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 96,
+      "height": 96,
+      "mode": "RGBA"
+    },
+    {
+      "id": "audio_manifest_v4",
+      "path": "manifests/audio_manifest_v4.json",
+      "bytes": 13701,
+      "sha256": "dfb53422b43e59d028bdc25664ce5550e7ca3251deba8aeafddc9429e961b9b7",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "CHANGELOG_v3_TO_v4",
+      "path": "documentation/CHANGELOG_v3_TO_v4.md",
+      "bytes": 2959,
+      "sha256": "c8fa0e05a1efbf936bf4e5a954e59d8bda9f52e5e299f9697f0442a39616e5a3",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "COMMERCIAL_RIGHTS_NOTE",
+      "path": "documentation/COMMERCIAL_RIGHTS_NOTE.md",
+      "bytes": 1175,
+      "sha256": "ef04792745261210df072db2a923805e0c80171563ca46163503c2e01af6a89f",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "PHASER3_INTEGRATION_GUIDE_v4",
+      "path": "documentation/PHASER3_INTEGRATION_GUIDE_v4.md",
+      "bytes": 5179,
+      "sha256": "316fd6d4cb0e98836301929704bfe1d6ff1bf430432f71bc4adbdb3b7729b4c9",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "VISUAL_STYLE_GUIDE_v4",
+      "path": "documentation/VISUAL_STYLE_GUIDE_v4.md",
+      "bytes": 4298,
+      "sha256": "b5471f46806ab996bb06c181276849747a7a3e49d1d68831d9208bf83b0ab72a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "PULSE_v4_Audio_OST_and_SFX_Waveforms",
+      "path": "previews/PULSE_v4_Audio_OST_and_SFX_Waveforms.png",
+      "bytes": 91206,
+      "sha256": "d7c8e0b06c6f51b80c07b5a20606cd01dfe07bc38fbedf2c3e99fdf291e9b3ea",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 1920,
+      "height": 1080,
+      "mode": "RGBA"
+    },
+    {
+      "id": "PULSE_v4_Gameplay_and_Charged_States_Preview",
+      "path": "previews/PULSE_v4_Gameplay_and_Charged_States_Preview.png",
+      "bytes": 318107,
+      "sha256": "afe9242d861d3d7c2d9416b59146314a404051a985105be99cdefec93e52567e",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 1920,
+      "height": 1180,
+      "mode": "RGBA"
+    },
+    {
+      "id": "PULSE_v4_Six_Skins_and_UI_Preview",
+      "path": "previews/PULSE_v4_Six_Skins_and_UI_Preview.png",
+      "bytes": 325794,
+      "sha256": "7086613b230b54a6fc90a9a1654121fdd08c2ad8fc6408d69536aa4ec09b983e",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 1920,
+      "height": 1080,
+      "mode": "RGBA"
+    },
+    {
+      "id": "PULSE_v4_Three_Worlds_Parallax_Preview",
+      "path": "previews/PULSE_v4_Three_Worlds_Parallax_Preview.png",
+      "bytes": 340050,
+      "sha256": "567a9430ca2e6ad3f9c564b322a92d38a08ffe9cd3bd2edd35de99b7de1acbd1",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "width": 1920,
+      "height": 1080,
+      "mode": "RGBA"
+    },
+    {
+      "id": "GAME_OVER",
+      "path": "audio/music/GAME_OVER.ogg",
+      "bytes": 56921,
+      "sha256": "7108582a98590f2afe3d2339a89055f13ce6a0254daf73102b9ac5b26a64accb",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "GAME_OVER",
+      "path": "audio/music/GAME_OVER.wav",
+      "bytes": 705644,
+      "sha256": "43adeaebed7b884f0d65904f922608103cfeaf6bc7c1faba72c353ca9d7fd4f2",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 2,
+      "durationSeconds": 4.0
+    },
+    {
+      "id": "MAX_MULTIPLIER_STING",
+      "path": "audio/music/MAX_MULTIPLIER_STING.ogg",
+      "bytes": 47167,
+      "sha256": "a5d8ff0922df2e67da6d64741a93ffe9e5301931cc9fd59e2d732a59a297d31f",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "MAX_MULTIPLIER_STING",
+      "path": "audio/music/MAX_MULTIPLIER_STING.wav",
+      "bytes": 352844,
+      "sha256": "587d3aacda6f2e1aec4d25b66e02c7c3cfaea7be12b4af2d955a7cb603320d5f",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 2,
+      "durationSeconds": 2.0
+    },
+    {
+      "id": "MENU_THEME",
+      "path": "audio/music/MENU_THEME.ogg",
+      "bytes": 1280745,
+      "sha256": "5a55f147d728bcb342fdaa0a1c36dff7a81f5249c873056ab034aa6592fab849",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "OST_Preview_Medley",
+      "path": "audio/music/OST_Preview_Medley.ogg",
+      "bytes": 587203,
+      "sha256": "ffdc029f1196ab8b9e36f5571d5cfd7e92964dcd6d78625891293d53fcd27450",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "STAGE_CLEAR",
+      "path": "audio/music/STAGE_CLEAR.ogg",
+      "bytes": 78313,
+      "sha256": "4634459e835ad28fc49600b381fb2de80513b89a02616b497de60bf9e4c10a0f",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "STAGE_CLEAR",
+      "path": "audio/music/STAGE_CLEAR.wav",
+      "bytes": 793844,
+      "sha256": "e6ab1e4fef35a6c160eab0c92ccfab201bf330864ff61d9263a8338bcf7ad31f",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 2,
+      "durationSeconds": 4.5
+    },
+    {
+      "id": "WORLD_1_GAMEPLAY",
+      "path": "audio/music/WORLD_1_GAMEPLAY.ogg",
+      "bytes": 1408545,
+      "sha256": "26a7bf01ad067e6357e44fc9221a7265cdb85904711ab51792aeca32fe56f115",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "WORLD_2_GAMEPLAY",
+      "path": "audio/music/WORLD_2_GAMEPLAY.ogg",
+      "bytes": 1407469,
+      "sha256": "a6a4b3fb5ca2241b8c9af4f20372d474b40f13770fa2247d2b16dfd8ea718acf",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "WORLD_3_GAMEPLAY",
+      "path": "audio/music/WORLD_3_GAMEPLAY.ogg",
+      "bytes": 1473677,
+      "sha256": "0173d7da7cdb7cfa284bd53ebf6518bce3b95f9b08f759ee18896d2444c980d8",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "WORLD_TRANSITION",
+      "path": "audio/music/WORLD_TRANSITION.ogg",
+      "bytes": 75109,
+      "sha256": "9e249c875924320c1a16fa2d87c5bb643d8ea8d70b5b875e1fe911af65052fe0",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "WORLD_TRANSITION",
+      "path": "audio/music/WORLD_TRANSITION.wav",
+      "bytes": 846764,
+      "sha256": "5a8295c63e473015d3a923da8613cca594ebef83b161d6636ae0145c471e7243",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 2,
+      "durationSeconds": 4.8
+    },
+    {
+      "id": "sfx_barrier_charged_fail",
+      "path": "audio/sfx/sfx_barrier_charged_fail.ogg",
+      "bytes": 8726,
+      "sha256": "7b9b419779c944ca73db06086021038a05ed260e51cd3ac1240fffc9e4e759ee",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_barrier_charged_fail",
+      "path": "audio/sfx/sfx_barrier_charged_fail.wav",
+      "bytes": 31796,
+      "sha256": "ccd123bf2bce1b867739c64543149193a62735e5fb6738ae61380e70e73f07b2",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.36
+    },
+    {
+      "id": "sfx_barrier_charged_ready",
+      "path": "audio/sfx/sfx_barrier_charged_ready.ogg",
+      "bytes": 5281,
+      "sha256": "42828827085749b575e339b154adb420ece47963c6c999a9987fadd6c2bb632c",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_barrier_charged_ready",
+      "path": "audio/sfx/sfx_barrier_charged_ready.wav",
+      "bytes": 20330,
+      "sha256": "29fec789af316aa7c1170961fceaaa80648e3ff2bc580603afe8805633406fb8",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.23
+    },
+    {
+      "id": "sfx_barrier_smash_charged",
+      "path": "audio/sfx/sfx_barrier_smash_charged.ogg",
+      "bytes": 9322,
+      "sha256": "be1279f8ddb4529db6e16d32913859b9cd29b44fe1a99bb1337049c4f5237fe8",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_barrier_smash_charged",
+      "path": "audio/sfx/sfx_barrier_smash_charged.wav",
+      "bytes": 33560,
+      "sha256": "a1b81b433267eb77f943755b236519211c5a813ed4cf430a931ccf120d8358ad",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.38
+    },
+    {
+      "id": "sfx_barrier_smash_ordinary",
+      "path": "audio/sfx/sfx_barrier_smash_ordinary.ogg",
+      "bytes": 7518,
+      "sha256": "6eeb320a1022a224099f9ce0710af7148dfc9258802862d0b9a28ff1daaa2738",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_barrier_smash_ordinary",
+      "path": "audio/sfx/sfx_barrier_smash_ordinary.wav",
+      "bytes": 21212,
+      "sha256": "d7e1f89103a74c616d873868c582c633da13ba9ce87f834060b4310e296ebf4c",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.24
+    },
+    {
+      "id": "sfx_charge_cancelled",
+      "path": "audio/sfx/sfx_charge_cancelled.ogg",
+      "bytes": 4696,
+      "sha256": "f6843142166f454fc0dac465982bda6675a473e2f095f1b75e7ddb687c33b4b8",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_charge_cancelled",
+      "path": "audio/sfx/sfx_charge_cancelled.wav",
+      "bytes": 12392,
+      "sha256": "ceb3bd4109ad70d018072f4feffe9ec4646a2413a28061f35e6ed16c713397de",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.14
+    },
+    {
+      "id": "sfx_charge_complete",
+      "path": "audio/sfx/sfx_charge_complete.ogg",
+      "bytes": 5931,
+      "sha256": "1491e2566d206a93121b938c5c5eb7bcf81162bdfcf7b1d241139bbf28b747c4",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_charge_complete",
+      "path": "audio/sfx/sfx_charge_complete.wav",
+      "bytes": 27828,
+      "sha256": "2e363c72852becb349f86a2a8be6f444f8cb3928875cbe959d8f1137bae5791a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.315
+    },
+    {
+      "id": "sfx_charge_start_fill",
+      "path": "audio/sfx/sfx_charge_start_fill.ogg",
+      "bytes": 8261,
+      "sha256": "ea6af43009afd71d6471c79b305a6a67f8fe885ceb2b0908dac6742301ef4142",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_charge_start_fill",
+      "path": "audio/sfx/sfx_charge_start_fill.wav",
+      "bytes": 26504,
+      "sha256": "4c57f03ef069caebd4a81cf6d67a5cf1ecefb35ffd7d7c54ca8eb42718f78a3c",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.3
+    },
+    {
+      "id": "sfx_multiplier_increase",
+      "path": "audio/sfx/sfx_multiplier_increase.ogg",
+      "bytes": 5395,
+      "sha256": "128b11b2ffb80d282c4ca2616aa734ab46df0df491dad5c2fd21502aa92c3490",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_multiplier_increase",
+      "path": "audio/sfx/sfx_multiplier_increase.wav",
+      "bytes": 20772,
+      "sha256": "afc26068ca012a27d8ac91326dd368d9bd839928c47b3c452f2ee35adf19aca8",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.235
+    },
+    {
+      "id": "sfx_multiplier_max_x5",
+      "path": "audio/sfx/sfx_multiplier_max_x5.ogg",
+      "bytes": 6600,
+      "sha256": "e84ec52ad9c11315683e67efcbe0146a0fa8ca048e6394c7b18c25de951b6fb3",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_multiplier_max_x5",
+      "path": "audio/sfx/sfx_multiplier_max_x5.wav",
+      "bytes": 43262,
+      "sha256": "eb4466192ec5c1ac12eeeb6ba81cba5519db0dc9ff31fa40c27bac40e5bf85d8",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.49
+    },
+    {
+      "id": "sfx_multiplier_x5_streak",
+      "path": "audio/sfx/sfx_multiplier_x5_streak.ogg",
+      "bytes": 5924,
+      "sha256": "ed60b212dfe3674655d1c48ec33b501a3eac14038d640f8f45af546ededbf02a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_multiplier_x5_streak",
+      "path": "audio/sfx/sfx_multiplier_x5_streak.wav",
+      "bytes": 25182,
+      "sha256": "b5ebfa6aa067ca823c81bf2e4a2e7b83a40972628719dac906a772e7804d596b",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.285
+    },
+    {
+      "id": "sfx_near_miss_graze",
+      "path": "audio/sfx/sfx_near_miss_graze.ogg",
+      "bytes": 5888,
+      "sha256": "e04fc0652e81018eebe45335d2437eaa653c760c808e3d29205b1e2f7f3e5a5b",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_near_miss_graze",
+      "path": "audio/sfx/sfx_near_miss_graze.wav",
+      "bytes": 14156,
+      "sha256": "42b7c5ed34ae0c94d096aae826465b4fe2eba7aa0f645cbd2ea3f0cd73e59ed9",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.16
+    },
+    {
+      "id": "sfx_obstacle_approach_cue",
+      "path": "audio/sfx/sfx_obstacle_approach_cue.ogg",
+      "bytes": 5171,
+      "sha256": "aa7ffd41bc0cf8c34b1f774d69ed57f866f1e6f885820c8246491908df6eda14",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_obstacle_approach_cue",
+      "path": "audio/sfx/sfx_obstacle_approach_cue.wav",
+      "bytes": 16802,
+      "sha256": "33314eceb4195abae9168ff9d4a607c0f835468359b1711f8be4ee02b5508be9",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.19
+    },
+    {
+      "id": "sfx_obstacle_gate_pass",
+      "path": "audio/sfx/sfx_obstacle_gate_pass.ogg",
+      "bytes": 5292,
+      "sha256": "07aa0565278cd5402b238b191a6210fde358eee545419404083a47517b20b4ad",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_obstacle_gate_pass",
+      "path": "audio/sfx/sfx_obstacle_gate_pass.wav",
+      "bytes": 8864,
+      "sha256": "0c332a9ab024634d145d252441e8513f3e2fb9127476cdfbc07638d279849319",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.1
+    },
+    {
+      "id": "sfx_pickup_gold",
+      "path": "audio/sfx/sfx_pickup_gold.ogg",
+      "bytes": 5189,
+      "sha256": "2d709daf65a091fdd984a9e75a96bb2c4bb52aa9f83f7c0cf4f91eb4b6383d46",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_pickup_gold",
+      "path": "audio/sfx/sfx_pickup_gold.wav",
+      "bytes": 17684,
+      "sha256": "aa81d9af5e6bdab2d86eb30a1e5661a9f85b559560625b08df942d5914002962",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.2
+    },
+    {
+      "id": "sfx_pickup_mint_bonus",
+      "path": "audio/sfx/sfx_pickup_mint_bonus.ogg",
+      "bytes": 5956,
+      "sha256": "379dfd10609ee82f24d21fa8121dcf31aefdf03ec6f0a242d21f8c381eea8289",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_pickup_mint_bonus",
+      "path": "audio/sfx/sfx_pickup_mint_bonus.wav",
+      "bytes": 24034,
+      "sha256": "8b361103652f937477fae64ec42de991f3d508da6b06f368ad8f96d88d517c85",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.272
+    },
+    {
+      "id": "sfx_player_death_collision",
+      "path": "audio/sfx/sfx_player_death_collision.ogg",
+      "bytes": 15517,
+      "sha256": "2782065da3bfab2c19d632d4c81e032241648e25e0464502401c9072947c2be5",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_player_death_collision",
+      "path": "audio/sfx/sfx_player_death_collision.wav",
+      "bytes": 38852,
+      "sha256": "2699d33c4314ffea4f27dee31219fff0acc22b17d44ae2f5c1809e0aefb45bfc",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.44
+    },
+    {
+      "id": "sfx_player_expand",
+      "path": "audio/sfx/sfx_player_expand.ogg",
+      "bytes": 4712,
+      "sha256": "eeea6ddac3159f6afbeb856629ff79cbc4950870f28c98f99af56f3eb03df331",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_player_expand",
+      "path": "audio/sfx/sfx_player_expand.wav",
+      "bytes": 13274,
+      "sha256": "0d4eb8fe18612e2e838236b9a30f49a62556a0c4edea9f733cd3f0a1c4273b73",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.15
+    },
+    {
+      "id": "sfx_player_shrink_loop",
+      "path": "audio/sfx/sfx_player_shrink_loop.ogg",
+      "bytes": 5064,
+      "sha256": "1b60a0dd3bb2822a12bacefacdeab84b77170d3c675d94a604b2559d02c57749",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_player_shrink_loop",
+      "path": "audio/sfx/sfx_player_shrink_loop.wav",
+      "bytes": 35324,
+      "sha256": "cd14aa2462db8b6edd13d095aefcc94255650683dede7f04df6c77752dc3dd50",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.4
+    },
+    {
+      "id": "sfx_player_shrink_start",
+      "path": "audio/sfx/sfx_player_shrink_start.ogg",
+      "bytes": 4789,
+      "sha256": "f9089cf6824decaa18b284193aeafe04c11746fb896e938971a1eb16a641bfa3",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_player_shrink_start",
+      "path": "audio/sfx/sfx_player_shrink_start.wav",
+      "bytes": 12392,
+      "sha256": "bf2c1d7e90f058b045e53ec0dc84c7ef44edacd88aef3c31972e79851654011f",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.14
+    },
+    {
+      "id": "sfx_stage_finish_line",
+      "path": "audio/sfx/sfx_stage_finish_line.ogg",
+      "bytes": 6361,
+      "sha256": "617a1938e7ec347607d58719854b1b25deb46d2f9b6db3c5986c0b90e4f5a194",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_stage_finish_line",
+      "path": "audio/sfx/sfx_stage_finish_line.wav",
+      "bytes": 38852,
+      "sha256": "5e9abb38444b391b9fa1291e21e55fcfb309b6e1adace9b11f6a47199e475a0f",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.44
+    },
+    {
+      "id": "sfx_stage_star_earned",
+      "path": "audio/sfx/sfx_stage_star_earned.ogg",
+      "bytes": 5777,
+      "sha256": "3910975e9d685a2d9ba7e3a2612f3ab24c22987de498429db3a0a1b0ebd6c51c",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_stage_star_earned",
+      "path": "audio/sfx/sfx_stage_star_earned.wav",
+      "bytes": 28268,
+      "sha256": "30ab54dc236df7aad5864b0f2197dab31ec26e3fe73a7ffd27b891bdec93a238",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.32
+    },
+    {
+      "id": "sfx_ui_button_tap",
+      "path": "audio/sfx/sfx_ui_button_tap.ogg",
+      "bytes": 4509,
+      "sha256": "aca5c3c99de5e088f0fbdce132d925450dbd1eefdd5edc25712d462c857e82fc",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_ui_button_tap",
+      "path": "audio/sfx/sfx_ui_button_tap.wav",
+      "bytes": 5776,
+      "sha256": "7f420fddd5a8f08d0f77eee340f491a66165362aa1042b0aa2638d6b9c39b3e9",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.065
+    },
+    {
+      "id": "sfx_ui_game_over_panel",
+      "path": "audio/sfx/sfx_ui_game_over_panel.ogg",
+      "bytes": 5772,
+      "sha256": "55ecda838ae552856f96ba2ef26aa36a75d411f2d99d304343cd01f1bf69ee90",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_ui_game_over_panel",
+      "path": "audio/sfx/sfx_ui_game_over_panel.wav",
+      "bytes": 36206,
+      "sha256": "ac74b743ad9ecba06ba467a39bf1e7bbf844cdfdb9d45d0f279993c6358b5744",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.41
+    },
+    {
+      "id": "sfx_ui_menu_nav",
+      "path": "audio/sfx/sfx_ui_menu_nav.ogg",
+      "bytes": 4467,
+      "sha256": "00482331b321f09f4e2af596d41fdab3d7d6ad3b6d64afaed7cb6d603283c7ed",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_ui_menu_nav",
+      "path": "audio/sfx/sfx_ui_menu_nav.wav",
+      "bytes": 4896,
+      "sha256": "40bb35124f34a650d9ddbd74075288148abe76ad5036221415bd648b4e74b721",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.055
+    },
+    {
+      "id": "sfx_ui_pause",
+      "path": "audio/sfx/sfx_ui_pause.ogg",
+      "bytes": 4931,
+      "sha256": "49283b8576781d498ee595faa505be9fd040067cf34fed14b323d5358f565f3e",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_ui_pause",
+      "path": "audio/sfx/sfx_ui_pause.wav",
+      "bytes": 16802,
+      "sha256": "f15513ff362e2b36ac0167913b1a7ce486c6f259624a63fe3dbd58ca3b1b19a8",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.19
+    },
+    {
+      "id": "sfx_ui_resume",
+      "path": "audio/sfx/sfx_ui_resume.ogg",
+      "bytes": 5008,
+      "sha256": "19c68b946e33716bc5b908897c692e99ac83e7cea635f4d99f9a90a0fdeee94a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_ui_resume",
+      "path": "audio/sfx/sfx_ui_resume.wav",
+      "bytes": 16802,
+      "sha256": "e37731862df9ef2e9787d0b9bd99d9f3892946f8cfbd86ce70f93f7b0af38331",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.19
+    },
+    {
+      "id": "sfx_ui_retry",
+      "path": "audio/sfx/sfx_ui_retry.ogg",
+      "bytes": 4869,
+      "sha256": "c14640dce710107fd9115ef036a39fd9908b5b207414f767c28b2b5b126f67f7",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_ui_retry",
+      "path": "audio/sfx/sfx_ui_retry.wav",
+      "bytes": 14156,
+      "sha256": "06f58e1c883993534f511adb436489e346f61d53bc45a987083ebcdc23b051d0",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.16
+    },
+    {
+      "id": "sfx_ui_settings_toggle",
+      "path": "audio/sfx/sfx_ui_settings_toggle.ogg",
+      "bytes": 4583,
+      "sha256": "af4b6d0fc0b7764dd2a6c2654e536f6861062c23d1c6f01ff5d179ce455e38e4",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_ui_settings_toggle",
+      "path": "audio/sfx/sfx_ui_settings_toggle.wav",
+      "bytes": 6218,
+      "sha256": "ab209a0246c782266d58db75f003e08f0e8ab2a894fd73595507d362a923319d",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.07
+    },
+    {
+      "id": "sfx_ui_skin_selected",
+      "path": "audio/sfx/sfx_ui_skin_selected.ogg",
+      "bytes": 5735,
+      "sha256": "943c0359ce5cd70c1f061737a5240348d5ecdd0b5fe8b219a45ac93cb739177a",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_ui_skin_selected",
+      "path": "audio/sfx/sfx_ui_skin_selected.wav",
+      "bytes": 24300,
+      "sha256": "7c77179b472426aebe4bd6b75151ef34299909709b213b1e1d5bf36c984b0ca4",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.275
+    },
+    {
+      "id": "sfx_ui_stage_clear_panel",
+      "path": "audio/sfx/sfx_ui_stage_clear_panel.ogg",
+      "bytes": 6513,
+      "sha256": "d711033d1efcf713788471d4574976ef9c0c96b899f2220dd32d4247c3610ef8",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_ui_stage_clear_panel",
+      "path": "audio/sfx/sfx_ui_stage_clear_panel.wav",
+      "bytes": 42380,
+      "sha256": "bed2f0aa8c008966720e959cbca23fffd40aa58d5b1602c0133457466e0b9ea5",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.48
+    },
+    {
+      "id": "sfx_ui_stage_unlocked",
+      "path": "audio/sfx/sfx_ui_stage_unlocked.ogg",
+      "bytes": 6131,
+      "sha256": "e15daa74aec6678e222e95417051176a3f861477eb19a0e00de627be5d8eaece",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final"
+    },
+    {
+      "id": "sfx_ui_stage_unlocked",
+      "path": "audio/sfx/sfx_ui_stage_unlocked.wav",
+      "bytes": 35324,
+      "sha256": "ef0338d2bba9b74cec65465388da326ea9da7f2ecd88ddc091b5c195366c04ac",
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "recommendedScale": 0.5,
+      "status": "final",
+      "sampleRate": 44100,
+      "channels": 1,
+      "durationSeconds": 0.4
+    }
+  ]
+}

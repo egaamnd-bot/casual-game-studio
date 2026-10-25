@@ -196,6 +196,9 @@
       seg.h = it.h;
       seg.y = this.travelled - it.at - it.h;
       seg.pattern = it.pattern || null;
+      // Segments are pooled: reset flags a previous use may have left (a recycled charged
+      // barrier must not make a gate look charged).
+      seg.charged = it.type === 'barrier' && !!it.charged;
       if (it.type === 'gate') {
         seg.kind = 'gate';
         seg.gapL = it.gapL;
@@ -203,7 +206,6 @@
         seg.need = it.need;
       } else if (it.type === 'barrier') {
         seg.kind = 'barrier';
-        seg.charged = !!it.charged;
       } else {
         seg.kind = 'pickup';
         seg.variant = it.type;

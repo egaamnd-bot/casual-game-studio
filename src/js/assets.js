@@ -1,7 +1,8 @@
-// Gemini's v3.0 asset pack (landscape): loading, animations, and a check that every frame the
-// game uses is present. If anything fails to load, the game falls back to code-drawn shapes.
-// Texture memory (RGBA, uncompressed): gameplay 1024² 4 MB, skins 1024×512 2 MB,
-// UI 2048² 16 MB, backgrounds ≈ 3 MB → about 25 MB of GPU memory.
+// Gemini's v4.0 asset pack (landscape, three worlds): loading, animations, and a check that every
+// frame the game uses is present. If anything fails to load, the game falls back to code-drawn
+// shapes. Audio is loaded separately by src/js/sfx.js.
+// Texture memory (RGBA, uncompressed): gameplay 1024×2048 8 MB, skins 1024² 4 MB,
+// UI 2048² 16 MB, backgrounds and stage cards ≈ 4 MB → about 32 MB of GPU memory.
 Pulse.Assets = {
   ATLASES: {
     pulse_gameplay: 'assets/atlases/pulse_gameplay_atlas',
@@ -11,12 +12,20 @@ Pulse.Assets = {
 
   // Landscape backgrounds: a 512² repeating base tile, a 1024×256 ridge strip (floor; flipped
   // for the ceiling) and a 512×128 tick rail (bottom edge; flipped for the top) per theme.
+  // Plus a 512×160 intro banner per world.
   IMAGES: [
     'bg_grid_tile', 'bg_endless_mid_parallax', 'bg_speed_rail_horiz',
-    'bg_stage1_first_pulse', 'bg_stage1_mid_parallax', 'bg_stage1_rail_horiz',
-    'bg_stage2_find_rhythm', 'bg_stage2_mid_parallax', 'bg_stage2_rail_horiz',
-    'bg_stage3_overload', 'bg_stage3_mid_parallax', 'bg_stage3_rail_horiz',
+    'bg_world1_far', 'bg_world1_mid', 'bg_world1_fg_rail', 'bg_world1_intro_banner',
+    'bg_world2_far', 'bg_world2_mid', 'bg_world2_fg_rail', 'bg_world2_intro_banner',
+    'bg_world3_far', 'bg_world3_mid', 'bg_world3_fg_rail', 'bg_world3_intro_banner',
   ],
+
+  // World-themed stage-card plates (280×320), one per campaign stage, in assets/stage_cards/.
+  // Named ui_stage_card_s01_w1 … s12_w3 (stage number, world number).
+  stageCardKey(index) {
+    const stage = Pulse.STAGES[index];
+    return `ui_stage_card_s${String(index + 1).padStart(2, '0')}_w${stage.world.index}`;
+  },
 
   // Background used by Endless and menus; campaign stages name theirs in `visual` (stages.js).
   // Speeds are fractions of the obstacles' speed (parallax).
@@ -42,6 +51,8 @@ Pulse.Assets = {
         'ind_upcoming_charged_warn', 'finish_line_tile',
         'fx_smash_ordinary_burst', 'fx_smash_charged_nova', 'fx_fail_charged_deflect',
         'fx_collect_gold_burst', 'fx_collect_mint_burst', 'fx_mult_up_chevron', 'fx_mult_x5_starburst',
+        // v4.0
+        'fx_orb_spawn_materialize', 'fx_stage_clear_burst',
       ],
       pulse_skins: [],
       pulse_ui: [
@@ -51,6 +62,10 @@ Pulse.Assets = {
         'ui_star_empty', 'ui_star_filled', 'ui_icon_status_lock', 'ui_icon_status_check',
         'ui_panel_modal_9slice', 'ui_skin_slot_selected', 'ui_skin_slot_unselected',
         'ui_hud_bracket_right',
+        // v4.0
+        'ui_btn_icon_settings_up', 'ui_btn_icon_audio_bgm_on', 'ui_btn_icon_audio_bgm_off',
+        'ui_btn_icon_audio_sfx_on', 'ui_btn_icon_audio_sfx_off', 'ui_hud_icon_gold', 'ui_hud_icon_mint',
+        'ui_btn_icon_next_up',
       ],
     };
     for (let i = 1; i <= 4; i++) {
@@ -75,6 +90,10 @@ Pulse.Assets = {
       scene.load.atlas(key, `${base}.png`, `${base}.json`);
     }
     for (const key of this.IMAGES) scene.load.image(key, `assets/backgrounds/${key}.png`);
+    for (let i = 0; i < Pulse.STAGES.length; i++) {
+      const key = this.stageCardKey(i);
+      scene.load.image(key, `assets/stage_cards/${key}.png`);
+    }
   },
 
   // Returns the list of missing textures/frames; empty means sprites can be used.
@@ -82,6 +101,7 @@ Pulse.Assets = {
     const tex = scene.textures;
     const out = [];
     for (const key of this.IMAGES) if (!tex.exists(key)) out.push(key);
+    for (let i = 0; i < Pulse.STAGES.length; i++) if (!tex.exists(this.stageCardKey(i))) out.push(this.stageCardKey(i));
     const frames = this.requiredFrames();
     for (const atlas of Object.keys(frames)) {
       if (!tex.exists(atlas)) {
@@ -128,6 +148,8 @@ Pulse.BootScene = class BootScene extends Phaser.Scene {
     Pulse.Assets.missingList = missing;
     if (Pulse.Assets.ok) Pulse.Assets.createAnims(this);
     else if (!(window.PULSE_TEST && window.PULSE_TEST.noAssets)) console.error('Pulse: assets missing, using shapes', missing);
+    // Audio loads in the background; sounds fall back to synthesized tones until it's ready.
+    Pulse.Audio.init(this.game, Pulse.Save.load().settings);
 
     const test = window.PULSE_TEST;
     if (test && test.autoStart) this.scene.start('game', test);

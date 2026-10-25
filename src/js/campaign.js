@@ -4,16 +4,23 @@
   const C = Pulse.CONFIG;
   const ITEM_TYPES = ['gate', 'barrier', 'energy', 'bonus'];
 
-  // Turns relative `space` values into absolute track positions. `at` is where the item's
-  // near (bottom) edge sits, measured in distance travelled; pickups have zero height.
+  // Turns relative spacing into absolute track positions. `at` is where the item's near
+  // (bottom) edge sits, measured in distance travelled; pickups have zero height.
+  // Items give either `space` (px) or `t` (seconds of clear time before the item, converted
+  // at the stage's top speed so the real time is never shorter than written).
   function compile(stage, width) {
     const items = [];
     let prevTop = 0;
+    let prevType = 'start';
     for (let i = 0; i < stage.items.length; i++) {
-      const item = Pulse.Track.placeItem(stage.items[i], prevTop, width);
+      const src = stage.items[i];
+      const space = src.space !== undefined ? src.space
+        : Pulse.Track.spaceFor(prevType, src.type, src.t, stage.speed.end);
+      const item = Pulse.Track.placeItem(Object.assign({}, src, { space }), prevTop, width);
       item.index = i;
       items.push(item);
       prevTop = item.at + item.h;
+      prevType = src.type;
     }
     const finishAt = prevTop + stage.exit.runout;
     const energyTotal = items.filter((it) => it.type === 'energy').length;
@@ -34,6 +41,7 @@
     if (typeof stage.id !== 'string' || !stage.id) err('missing id');
     if (typeof stage.name !== 'string' || !stage.name) err('missing name');
     if (!stage.sector || !stage.sector.id || !stage.sector.name) err('missing sector');
+    if (!stage.world || !(stage.world.index >= 1) || !stage.world.music) err('missing world');
     if (typeof stage.intro !== 'string') err('missing intro');
     if (!stage.speed || !(stage.speed.start > 0) || !(stage.speed.end > 0)) err('speed.start and speed.end must be > 0');
     if (stage.speed && Math.max(stage.speed.start, stage.speed.end) > C.speed.max) err('speed above the game maximum');
@@ -45,7 +53,7 @@
 
     for (const it of stage.items) {
       if (!ITEM_TYPES.includes(it.type)) err(`unknown item type "${it.type}"`);
-      if (!(it.space > 0)) err(`item ${stage.items.indexOf(it)} needs space > 0`);
+      if (!(it.space > 0) && !(it.t >= 0)) err(`item ${stage.items.indexOf(it)} needs space > 0 or t >= 0`);
       if (it.type === 'gate' && !(typeof it.need === 'number')) err(`gate ${stage.items.indexOf(it)} needs a numeric need`);
     }
     if (errors.length) return errors;
@@ -81,10 +89,19 @@
     return total;
   }
 
+  // A stage is open if it's the first, the one before it is completed, or it was completed
+  // itself (so a stage a player has already beaten can never re-lock if stages are inserted).
   function isUnlocked(save, index) {
     if (index <= 0) return true;
     const prev = Pulse.STAGES[index - 1];
-    return !!prev && stageRecord(save, prev.id).completed;
+    const self = Pulse.STAGES[index];
+    return (!!prev && stageRecord(save, prev.id).completed) || (!!self && stageRecord(save, self.id).completed);
+  }
+
+  // The stage a player should see first: the first one not yet completed (or the last).
+  function nextStageIndex(save) {
+    const i = Pulse.STAGES.findIndex((s, k) => isUnlocked(save, k) && !stageRecord(save, s.id).completed);
+    return i < 0 ? Pulse.STAGES.length - 1 : i;
   }
 
   // Records a completed run. Never lowers a stored star rating. Returns what changed.
@@ -127,6 +144,6 @@
 
   Pulse.Campaign = {
     compile, validate, speedAtDistance, computeStars, starRules,
-    stageRecord, totalStars, isUnlocked, recordCompletion, CampaignLevel,
+    stageRecord, totalStars, isUnlocked, nextStageIndex, recordCompletion, CampaignLevel,
   };
 })();

@@ -2,7 +2,9 @@
 
 > Owner: Gemini (Creative Director). **Direction approved by the producer:** Direction A, *Kinetic Vector / Precision Cyber-Grid* (see DECISIONS.md #7).
 >
-> **Artwork status:** the **v3.0 pack (landscape)** is integrated on `feature/pulse-landscape` and passes automated checks; it isn't tested on the phone or merged. How it's used: [LANDSCAPE.md](LANDSCAPE.md). v3 documents: [art/v3/](art/v3/) (style guide, landscape layout guide, charged-barrier spec, integration guide, reference sheets). The v2.0 pack (portrait) is on `feature/pulse-art-v2`; its documents remain in [art/](art/).
+> **Artwork status:** the **v4.0 pack** (three worlds, six skins, synthwave audio) is integrated on `feature/pulse-12-stage-campaign`; v4 documents are in [art/v4/](art/v4/). It keeps every v3 sprite at identical size and geometry (verified). One correction to Gemini's changelog: the 12 stage-card plates are separate PNGs, not atlas frames; they're loaded from `src/assets/stage_cards/`. Not used yet: the world decor atlas, `fx_world_transition_wave`, the skin morph frames, the tutorial callout, and the star-trio frames.
+>
+> Before that: the **v3.0 pack (landscape)** was integrated on `feature/pulse-landscape`. How it's used: [LANDSCAPE.md](LANDSCAPE.md). v3 documents: [art/v3/](art/v3/) (style guide, landscape layout guide, charged-barrier spec, integration guide, reference sheets). The v2.0 pack (portrait) is on `feature/pulse-art-v2`; its documents remain in [art/](art/).
 >
 > The v3 integration rules match v2's below: art is scaled to gameplay sizes, and the v3 sprites keep v2's measured geometry. v3's new barrier bands measure 44 px (plain) and 60 px (charged), which become 22 and 30 px in-game, the collision thicknesses.
 

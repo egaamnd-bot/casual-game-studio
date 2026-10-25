@@ -5,7 +5,11 @@
 //   { version: 1,
 //     endless:  { best: number },
 //     campaign: { stages: { [stageId]: { completed: bool, bestStars: 0..3 } } },
-//     skins:    { selected: skinId, unlocked: [skinId] } }
+//     skins:    { selected: skinId, unlocked: [skinId] },
+//     settings: { music: 0..1, sfx: 0..1 } }   (added with the v4 audio; optional)
+//
+// Adding a field never needs a version bump: sanitize() fills anything missing with defaults,
+// so saves from earlier builds load unchanged.
 //
 // The prototype's endless best score lives under "pulse.best". It is read on every load,
 // so it can never be lost, and is still written so older builds keep working.
@@ -28,6 +32,7 @@ Pulse.Save = {
       endless: { best: 0 },
       campaign: { stages: {} },
       skins: { selected: 'classic', unlocked: ['classic'] },
+      settings: { music: 0.8, sfx: 1 },
     };
   },
 
@@ -54,6 +59,13 @@ Pulse.Save = {
         for (const id of raw.skins.unlocked) {
           if (typeof id === 'string' && !data.skins.unlocked.includes(id)) data.skins.unlocked.push(id);
         }
+      }
+    }
+
+    if (raw.settings && typeof raw.settings === 'object') {
+      for (const k of ['music', 'sfx']) {
+        const v = Number(raw.settings[k]);
+        if (Number.isFinite(v)) data.settings[k] = Math.max(0, Math.min(1, v));
       }
     }
     return data;

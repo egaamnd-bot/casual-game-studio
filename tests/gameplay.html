@@ -23,6 +23,7 @@
       autoStart: params.get('start') !== '0',
       mode: params.get('mode') || 'endless',
       stageIndex: Number(params.get('stage') || 0),
+      holdReady: params.get('ready') === '1', // open the stage but stay on its ready screen
       onCrash(elapsed, score) {
         document.title = `CRASH at ${elapsed.toFixed(1)}s score ${score}`;
       },

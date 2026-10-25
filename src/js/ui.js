@@ -60,6 +60,21 @@ Pulse.UI = {
     return this.wire(box, img, onPress);
   },
 
+  // World intro banner (Gemini v4, 512×160, emblem in its left ~20%) with the world's name set
+  // to the right of the emblem. Returns the objects so callers can show/hide them.
+  worldBanner(scene, x, y, world, width, depth) {
+    const T = Pulse.THEME;
+    const label = `WORLD ${world.index} · ${world.name.toUpperCase()}`;
+    if (!this.sprites()) return [this.text(scene, x, y, label, 18, T.text, true).setDepth(depth || 0)];
+    const img = scene.add.image(x, y, world.banner).setDisplaySize(width, (width * 160) / 512).setDepth(depth || 0);
+    const left = x - width / 2 + width * 0.22;
+    const txt = scene.add.text(left, y, label, { fontFamily: T.font, fontSize: '16px', fontStyle: 'bold', color: T.text })
+      .setOrigin(0, 0.5).setDepth((depth || 0) + 1);
+    const room = width * 0.74;
+    if (txt.width > room) txt.setScale(room / txt.width);
+    return [img, txt];
+  },
+
   // Row of `max` stars, `count` filled. Sprite images are pushed to `images` so callers can
   // destroy them; the shape fallback draws into `g`.
   stars(scene, g, cx, y, r, count, max, images, depth) {

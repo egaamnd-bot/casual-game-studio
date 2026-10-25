@@ -29,7 +29,10 @@
 - [x] Gameplay evolution v2: charged barriers, combo sequences, multiplier feedback ([GAMEPLAY_EVOLUTION.md](GAMEPLAY_EVOLUTION.md))
 - [x] Barrier and charge-ring art from Gemini (v3.0 pack)
 - [x] Landscape conversion with v3 art ([LANDSCAPE.md](LANDSCAPE.md))
-- [ ] Phone playtest of the landscape build
+- [x] Phone playtest of the landscape build (producer: fun)
+- [x] 12-stage campaign, Gemini v4 worlds, skins, music and sound ([CAMPAIGN.md](CAMPAIGN.md), [AUDIO.md](AUDIO.md))
+- [ ] Phone playtest of the 12-stage campaign and audio
+- [ ] Family-friendly monetization plan for approval ([MONETIZATION_FUTURE.md](MONETIZATION_FUTURE.md))
 - [ ] Playtest with 3–5 people against the targets in [PULSE_PROTOTYPE.md](PULSE_PROTOTYPE.md)
 
 ## Later / Ideas

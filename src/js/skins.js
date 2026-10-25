@@ -21,6 +21,17 @@ Pulse.SKINS = [
     colors: { orb: 0x00ff66, shrunk: 0xccffe0, core: 0xccffe0 },
     sprite: { atlas: 'pulse_skins', prefix: 'skin_retro_green_', arcPrefix: 'skin_retro_green_tension_arcs_' },
   },
+  // v4.0 skins; thresholds from Gemini's integration guide (campaign now has 36 stars).
+  {
+    id: 'violet-nova', name: 'Violet Nova', unlockStars: 12,
+    colors: { orb: 0xd946ef, shrunk: 0xfae8ff, core: 0xffffff },
+    sprite: { atlas: 'pulse_skins', prefix: 'skin_violet_nova_', arcPrefix: 'skin_violet_nova_tension_arcs_' },
+  },
+  {
+    id: 'whiteout', name: 'Whiteout', unlockStars: 15,
+    colors: { orb: 0xf1f5f9, shrunk: 0xffffff, core: 0x0f172a },
+    sprite: { atlas: 'pulse_skins', prefix: 'skin_whiteout_', arcPrefix: 'skin_whiteout_tension_arcs_' },
+  },
 ];
 
 Pulse.Skins = {

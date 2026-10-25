@@ -53,10 +53,12 @@
       if (this.mode === 'campaign') {
         this.stage = Pulse.STAGES[this.stageIndex];
         this.level = new Pulse.Campaign.CampaignLevel(this.W, this.H, this.stage);
-        visual = this.stage.visual || visual;
+        visual = this.stage.world.visual;
       } else {
         this.level = new Pulse.EndlessLevel(this.W, this.H);
       }
+      this.wasHeld = false;
+      this.lastCharge = 1;
 
       this.orbState = Pulse.Orb.create();
       this.scoring = Pulse.Scoring.create();
@@ -94,7 +96,29 @@
 
       if (this.test) window.__pulseScene = this;
       this.setState('ready');
-      if (this.test && this.test.autoStart) this.startRun();
+      this.startMusic();
+      if (this.test && this.test.autoStart && !this.test.holdReady) this.startRun();
+    }
+
+    // Campaign plays its world's track (the first stage of a world opens with the transition
+    // sting, and the track starts with the run); Endless escalates through the worlds' tracks.
+    musicTrack() {
+      if (this.mode === 'campaign') return this.stage.world.music;
+      const t = this.elapsed || 0;
+      return t < 30 ? 'WORLD_1_GAMEPLAY' : t < 60 ? 'WORLD_2_GAMEPLAY' : 'WORLD_3_GAMEPLAY';
+    }
+
+    worldOpener() {
+      return this.mode === 'campaign' && Pulse.STAGES.findIndex((s) => s.world === this.stage.world) === this.stageIndex;
+    }
+
+    startMusic() {
+      if (this.worldOpener()) {
+        Pulse.Music.stop();
+        Pulse.Sfx.play('worldIntro');
+      } else {
+        Pulse.Music.play(this.musicTrack());
+      }
     }
 
     // Landscape HUD (Gemini's layout guide, scaled to the screen width): pause top-left,
@@ -110,7 +134,15 @@
       this.scoreText = UI.text(this, this.rightX, 36, '', 32, T.text, true).setDepth(10);
       this.bestText = UI.text(this, this.rightX - 26, 64, '', 15, T.textAccent, true).setDepth(10);
       this.multText = UI.text(this, this.rightX + 58, 64, '', 18, T.textAccent, true).setDepth(10);
-      this.energyText = UI.text(this, this.rightX, 46, '', 22, T.textAccent, true).setDepth(10);
+      this.energyText = UI.text(this, this.rightX + 14, 46, '', 24, T.textAccent, true).setDepth(10);
+      if (Pulse.Assets.ok) {
+        this.goldIcon = this.add.image(this.rightX - 34, 46, 'pulse_ui', 'ui_hud_icon_gold').setScale(0.6).setDepth(10);
+      }
+      // World banner on the campaign's ready screen.
+      if (this.mode === 'campaign') {
+        this.bannerParts = UI.worldBanner(this, this.overlayX(), 72, this.stage.world, 340, 16);
+      }
+      this.reasonText = UI.text(this, this.overlayX(), 255, '', 18, T.textDim).setDepth(16);
 
       // Overlay text sits to the right of the orb, over the lane ahead.
       const cx = this.overlayX();
@@ -160,7 +192,11 @@
         if (color) t.setColor(color);
       };
 
-      for (const t of [this.titleText, this.subText, this.hintText, this.detailText]) t.setVisible(false);
+      for (const t of [this.titleText, this.subText, this.hintText, this.detailText, this.reasonText]) t.setVisible(false);
+      if (this.bannerParts) this.bannerParts.forEach((o) => o.setVisible(state === 'ready'));
+      if (state !== 'playing' && state !== 'ready') this.endHold();
+      if (state !== 'paused') Pulse.Music.duck(false);
+      this.hintText.setY(300);
       this.titleText.setFontSize(72);
       this.overlay.clear();
       for (const img of this.overlayImages) img.destroy();
@@ -187,7 +223,10 @@
           show(this.titleText, String(this.score), T.text);
           show(this.subText, newBest ? 'New best!' : `Best ${this.best}`, newBest ? T.textAccent : T.textDim);
         }
+        // Why the run ended, when the game knows (see crash()).
+        if (this.crashReason) show(this.reasonText, this.crashReason, T.textDim);
         show(this.hintText, 'Tap to retry');
+        this.hintText.setY(this.crashReason ? 310 : 300);
       } else if (state === 'complete') {
         const r = this.result;
         this.titleText.setFontSize(56);
@@ -195,6 +234,7 @@
         // Dim the frozen play field so the results and buttons read cleanly over it.
         this.overlay.fillStyle(T.background, 0.82).fillRect(0, 0, this.SW, this.SH);
         Pulse.UI.stars(this, this.overlay, this.titleText.x, 215, 24, r.stars, 3, this.overlayImages, 17);
+        this.revealStars(r);
         const lines = [`Energy ${this.energy}/${this.level.track.energyTotal}`];
         if (this.level.track.bonusTotal) lines[0] += ` · Bonus ${this.bonus}/${this.level.track.bonusTotal}`;
         if (r.record.bestStars > r.stars) lines.push(`Best ${r.record.bestStars} stars`);
@@ -204,6 +244,7 @@
         this.detailText.setY(300);
       } else if (state === 'paused') {
         this.overlay.fillStyle(T.background, 0.55).fillRect(0, 0, this.SW, this.SH);
+        Pulse.Music.duck(true);
         show(this.titleText, 'Paused', T.text);
         show(this.hintText, 'Tap to resume');
       }
@@ -226,11 +267,13 @@
     updateHud() {
       const playing = this.state === 'playing' || this.state === 'paused';
       if (this.bracket) this.bracket.setVisible(playing);
+      if (this.goldIcon) this.goldIcon.setVisible(playing && this.mode === 'campaign');
       if (this.mode === 'campaign') {
         this.scoreText.setVisible(false);
         this.multText.setVisible(false);
         this.bestText.setVisible(false);
-        this.energyText.setVisible(playing).setText(`Energy ${this.energy}/${this.level.track.energyTotal}`);
+        const label = `${this.energy}/${this.level.track.energyTotal}`;
+        this.energyText.setVisible(playing).setText(this.goldIcon ? label : `Energy ${label}`);
         return;
       }
       this.energyText.setVisible(false);
@@ -249,8 +292,13 @@
       this.energy = 0;
       this.bonus = 0;
       this.ringT = 1;
+      this.crashReason = null;
+      this.lastCharge = this.orbState.charge;
       this.popupText.setAlpha(0);
       Pulse.Sfx.play('start');
+      this.playingTrack = this.musicTrack();
+      Pulse.Music.play(this.playingTrack);
+      if (this.view) this.view.spawn();
       this.setState('playing');
     }
 
@@ -258,12 +306,22 @@
       Pulse.Sfx.unlock();
       if (currentlyOver && currentlyOver.length) return; // a button handled it
       if (this.state === 'ready') this.startRun();
-      else if (this.state === 'paused') this.setState('playing');
-      else if (this.state === 'over' && this.canAct()) this.startRun();
+      else if (this.state === 'paused') {
+        Pulse.Sfx.play('resume');
+        this.setState('playing');
+      } else if (this.state === 'over' && this.canAct()) this.startRun();
     }
 
     pause() {
-      if (this.state === 'playing') this.setState('paused');
+      if (this.state !== 'playing') return;
+      Pulse.Sfx.play('pause');
+      this.setState('paused');
+    }
+
+    // The soft hum while holding; stopped on release and whenever play stops.
+    endHold() {
+      Pulse.Sfx.stopHold();
+      this.wasHeld = false;
     }
 
     leave() {
@@ -276,6 +334,7 @@
     }
 
     handleFocusLost() {
+      this.endHold();
       const pointers = this.input.manager.pointers;
       for (let i = 0; i < pointers.length; i++) {
         pointers[i].isDown = false;
@@ -303,16 +362,49 @@
       const dt = Math.min(delta / 1000, C.maxFrameSeconds);
 
       // The orb responds in every state except the end screens, so players can practise.
-      if (this.state !== 'over' && this.state !== 'complete') Pulse.Orb.step(this.orbState, this.isHeld(), dt);
+      if (this.state !== 'over' && this.state !== 'complete') {
+        const held = this.isHeld();
+        Pulse.Orb.step(this.orbState, held, dt);
+        if (this.state === 'playing' || this.state === 'ready') this.holdSounds(held);
+      }
 
       if (this.state === 'playing') this.step(dt);
       if (this.ringT < 1) this.ringT = Math.min(1, this.ringT + dt * 3);
       this.draw();
     }
 
+    // Shrink: short "start" + soft looping hum; release: "expand".
+    holdSounds(held) {
+      if (held === this.wasHeld) return;
+      this.wasHeld = held;
+      if (held) {
+        Pulse.Sfx.play('shrinkStart');
+        Pulse.Sfx.startHold();
+      } else {
+        Pulse.Sfx.stopHold();
+        Pulse.Sfx.play('expand');
+      }
+    }
+
+    // Charge-ring sounds, only while a charged barrier is on screen: start filling, full, lost.
+    chargeSounds() {
+      const c = this.orbState.charge;
+      if (this.chargeRingShown) {
+        if (this.lastCharge <= 0 && c > 0 && c < 1) Pulse.Sfx.play('chargeStart');
+        else if (this.lastCharge < 1 && c >= 1) Pulse.Sfx.play('chargeReady');
+        else if (this.lastCharge > 0 && c <= 0) Pulse.Sfx.play('chargeCancel');
+      }
+      this.lastCharge = c;
+    }
+
     step(dt) {
       this.elapsed += dt;
       const campaign = this.mode === 'campaign';
+      const track = this.musicTrack();
+      if (track !== this.playingTrack) {
+        this.playingTrack = track;
+        Pulse.Music.play(track);
+      }
       const speed = this.level.speedAt(this.elapsed);
       this.scroll += speed * dt * 0.5;
       this.level.update(dt, speed, this.elapsed);
@@ -349,7 +441,8 @@
             this.popup(`x${this.multiplier}`, color);
           }
           if (fb.gained) this.bumpMultiplier();
-          Pulse.Sfx.play('pickup');
+          Pulse.Sfx.play(s.variant === 'bonus' ? 'bonusPickup' : 'pickup');
+          if (fb.gained && !fb.reachedMax) Pulse.Sfx.play('multUp');
           this.updateHud();
         } else if (event === 'miss') {
           // Skipping gold resets the Endless multiplier; skipping a mint bonus doesn't, so
@@ -362,9 +455,12 @@
         } else {
           // 'pass' (wall cleared) or 'break' (barrier smashed): both count as an obstacle.
           if (!campaign) this.updateHud();
-          if (fb.streak) this.popup(`×${C.multiplierMax} streak ${fb.streak}`, T.textAccent);
+          if (fb.streak) {
+            this.popup(`×${C.multiplierMax} streak ${fb.streak}`, T.textAccent);
+            Pulse.Sfx.play('streak');
+          }
           if (event === 'break') {
-            Pulse.Sfx.play('smash');
+            Pulse.Sfx.play(s.charged ? 'chargedSmash' : 'smash');
             if (this.view) this.view.smash(s);
           } else {
             Pulse.Sfx.play('pass');
@@ -376,6 +472,17 @@
       if (campaign && this.level.finishY() >= this.orbY) this.completeStage();
     }
 
+    // Why a crash happened, in player terms. The rules make every cause unambiguous: a gap wall
+    // means the orb was too big; a barrier means it was too small, or (charged barrier) the
+    // charge ring wasn't full yet.
+    static crashReason(seg, radius, charge) {
+      if (!seg) return null;
+      if (seg.kind !== 'barrier') return 'Hit a wall: shrink a little sooner.';
+      if (!Pulse.isCharged(radius)) return 'Too small for the barrier: let go earlier.';
+      if (seg.charged && charge < 1) return 'Charge ring not full: double-edged barriers need you big for longer.';
+      return null;
+    }
+
     // `seg` is what the orb hit, so the effect can show why (e.g. a charged barrier too early).
     crash(seg) {
       if (this.mode === 'endless' && this.score > this.best) {
@@ -384,8 +491,12 @@
         Pulse.Save.write(this.save);
       }
       this.crashedOn = seg ? (seg.kind === 'barrier' ? (seg.charged ? 'charged barrier' : 'barrier') : 'gap') : null;
+      this.crashReason = GameScene.crashReason(seg, this.radius, this.orbState.charge);
       if (this.test && this.test.onCrash) this.test.onCrash(this.elapsed, this.score);
-      Pulse.Sfx.play('crash');
+      this.endHold();
+      Pulse.Sfx.play(seg && seg.kind === 'barrier' && seg.charged ? 'chargedFail' : 'crash');
+      Pulse.Music.stop(150);
+      Pulse.Sfx.play('gameOver');
       if (this.view) this.view.crash(seg);
       this.cameras.main.shake(220, 0.012);
       this.cameras.main.flash(120, 255, 93, 108);
@@ -399,8 +510,29 @@
       Pulse.Save.write(this.save);
       this.result = { stars, record };
       if (this.test && this.test.onComplete) this.test.onComplete(this.elapsed, this.energy, this.bonus, stars);
-      Pulse.Sfx.play('complete');
+      this.endHold();
+      Pulse.Music.stop(200);
+      Pulse.Sfx.play('finish');
+      Pulse.Sfx.play('stageClear');
+      if (this.view) this.view.stageClear();
       this.setState('complete');
+    }
+
+    // Stage clear: panel sound, then each earned star pops in with a chime, then the unlock chime.
+    revealStars(r) {
+      Pulse.Sfx.play('clearPanel');
+      const stars = this.overlayImages.slice(0, 3);
+      stars.forEach((img) => img.setScale(0));
+      const base = 24 * 2.2 / 64;
+      stars.forEach((img, i) => {
+        this.time.delayedCall(350 + i * 260, () => {
+          if (this.state !== 'complete') return;
+          this.tweens.add({ targets: img, scale: base, duration: 220, ease: 'Back.easeOut' });
+          if (i < r.stars) Pulse.Sfx.play('star');
+        });
+      });
+      if (!stars.length) for (let i = 0; i < r.stars; i++) this.time.delayedCall(350 + i * 260, () => Pulse.Sfx.play('star'));
+      if (r.record.unlockedNext) this.time.delayedCall(350 + 3 * 260 + 150, () => Pulse.Sfx.play('unlocked'));
     }
 
     // Feedback only (no points): the multiplier text pops when it rises.
@@ -423,6 +555,7 @@
     checkNearMiss(s, r) {
       if (s.need - r > C.nearMissMargin) return;
       this.nearMisses++;
+      Pulse.Sfx.play('nearMiss');
       if (this.view) this.view.nearMiss(this.orbX - s.gapL <= s.gapR - this.orbX ? -1 : 1, r);
     }
 
@@ -472,6 +605,7 @@
         this.level.segments.some((s) => s.active && s.charged && !s.broken && s.y < this.orbY && s.y + s.h > 0);
       if (this.view) this.view.renderChargeRing(this.chargeRingShown, this.orbState.charge, this.radius);
       else if (this.chargeRingShown) Pulse.Render.chargeRing(g, this.orbX, this.orbY, this.radius, this.orbState.charge);
+      if (this.state === 'playing') this.chargeSounds();
 
       this.warnShown = active && this.chargedComing();
       if (this.warnIcon) this.warnIcon.setVisible(this.warnShown);

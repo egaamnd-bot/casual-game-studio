@@ -368,6 +368,18 @@
       else this.pulse(this.smashBurst, A.base * 0.4, A.base * 1.0, 260, sc.orbX, cy);
     }
 
+    // Run start: the orb materializes (v4 effect).
+    spawn() {
+      if (!this.spawnFx) this.spawnFx = this.add(this.scene.add.image(0, 0, 'pulse_gameplay', 'fx_orb_spawn_materialize').setBlendMode('ADD'), 6);
+      this.pulse(this.spawnFx, A.base * 1.6, A.base * 0.9, 320);
+    }
+
+    // Stage clear: a large burst around the orb (v4 effect).
+    stageClear() {
+      if (!this.clearFx) this.clearFx = this.add(this.scene.add.image(0, 0, 'pulse_gameplay', 'fx_stage_clear_burst').setBlendMode('ADD'), 6);
+      this.pulse(this.clearFx, A.base * 0.6, A.base * 2.2, 700);
+    }
+
     // Multiplier reached its maximum: golden starburst around the orb (feedback only).
     milestone() {
       this.pulse(this.starburst, A.base * 0.7, A.base * 1.4, 480);
