@@ -125,12 +125,12 @@ Pulse.Render = (function () {
     }
   }
 
-  function orb(g, x, y, radius, dead, skin) {
+  function orb(g, x, y, radius, dead, skin, fx) {
     const colors = skin.colors;
     const shrunk = radius < C.orb.radius - 4;
     const color = dead ? T.danger : (shrunk ? colors.shrunk : colors.orb);
     g.fillStyle(color, 0.18);
-    g.fillCircle(x, y, radius + 10);
+    g.fillCircle(x, y, radius * (fx ? fx.glow : 1) + 10);
     g.fillStyle(color, 1);
     g.fillCircle(x, y, radius);
     g.fillStyle(colors.core, 0.9);

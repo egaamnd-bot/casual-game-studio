@@ -296,15 +296,19 @@
       this.finish.setVisible(visible).setPosition(0, y - 6 * FINISH_SCALE);
     }
 
-    renderOrb(radius, dead) {
+    // `fx` (Pulse.Rhythm.OrbFx.scales) is cosmetic: the glow ring breathes on the beat and the
+    // body stretches along the direction of travel. All its scales are >= 1, so the drawn orb
+    // always covers the collision circle (radius), which fx never changes.
+    renderOrb(radius, dead, fx) {
       const R = C.orb.radius;
+      const f = fx || { glow: 1, along: 1, across: 1 };
       const t = Math.min(1, Math.max(0, (R - radius) / (R - C.orb.minRadius)));
       const bodyScale = radius / A.orbBodyRadius;
       const coreScale = radius / A.orbShrunkRadius;
-      this.body.setScale(bodyScale).setAlpha(1 - 0.85 * t);
-      this.ring.setScale(bodyScale).setAlpha(0.9);
-      this.core.setScale(coreScale).setAlpha(t);
-      this.arcs.setScale(coreScale).setAlpha(0.9 * t);
+      this.body.setScale(bodyScale * f.across, bodyScale * f.along).setAlpha(1 - 0.85 * t);
+      this.ring.setScale(bodyScale * f.glow).setAlpha(0.9);
+      this.core.setScale(coreScale * f.across, coreScale * f.along).setAlpha(t);
+      this.arcs.setScale(coreScale * f.across, coreScale * f.along).setAlpha(0.9 * t);
       for (const img of [this.body, this.ring, this.core, this.arcs]) {
         if (dead) img.setTint(T.danger);
         else img.clearTint();

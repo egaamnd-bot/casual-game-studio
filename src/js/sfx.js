@@ -222,6 +222,25 @@
       }, 30);
     },
 
+    // Where the music is, in seconds into `track`, or null when that can't be known right now
+    // (muted, not started, still cross-fading from another track, hidden). The rhythm clock uses
+    // it to keep the music in step with the run; null means "nothing to align".
+    position(track) {
+      const el = this.el;
+      if (!el || this.track !== track || !this.started || el.paused || el.readyState < 2) return null;
+      return el.currentTime;
+    },
+
+    loopLength() {
+      const d = this.el ? this.el.duration : 0;
+      return Number.isFinite(d) ? d : 0;
+    },
+
+    // Moves the music (the run clock is the master; gameplay never waits for the music).
+    seek(seconds) {
+      if (this.el && Number.isFinite(seconds)) this.el.currentTime = Math.max(0, seconds);
+    },
+
     play(track) {
       this.wanted = track;
       this.level = 1;
@@ -231,10 +250,12 @@
         this.fadeTo(this.targetVolume(), 200);
         return;
       }
+      this.started = false; // not aligned until the new track is actually playing
       const start = () => {
         this.track = track;
         el.src = `${base()}assets/audio/music/${track}.ogg`;
         el.volume = 0;
+        this.started = true;
         if (!state.unlocked || state.hidden || state.volumes.music <= 0) return;
         const p = el.play();
         if (p && p.catch) p.catch(() => { /* waits for the next tap */ });

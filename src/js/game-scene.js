@@ -60,6 +60,13 @@
       this.wasHeld = false;
       this.lastCharge = 1;
 
+      // Rhythm: the run clock (stepped only while playing, so pause/retry need no special cases)
+      // and the cosmetic orb stretch. The music follows the clock, never the other way round.
+      this.clock = Pulse.Rhythm.createClock({ bpm: this.trackBpm() });
+      this.stretch = 0;
+      this.prevRadius = C.orb.radius;
+      this.syncIn = 0;
+      this.seeks = 0;
       this.orbState = Pulse.Orb.create();
       this.scoring = Pulse.Scoring.create();
       this.score = 0;
@@ -106,6 +113,28 @@
       if (this.mode === 'campaign') return this.stage.world.music;
       const t = this.elapsed || 0;
       return t < 30 ? 'WORLD_1_GAMEPLAY' : t < 60 ? 'WORLD_2_GAMEPLAY' : 'WORLD_3_GAMEPLAY';
+    }
+
+    // Tempo of the track now playing (campaign: the stage's; Endless: the current world's).
+    trackBpm() {
+      if (this.mode === 'campaign') return this.stage.bpm || this.stage.world.bpm;
+      return Pulse.Rhythm.TRACKS[this.musicTrack()].bpm;
+    }
+
+    // Keeps the streamed music on the run clock. Checked twice a second; the music is only moved
+    // when it has drifted by more than the tolerance (start-up latency, a long pause). No-op
+    // while muted, loading or cross-fading (Music.position returns null).
+    syncMusic(dt) {
+      this.syncIn -= dt;
+      if (this.syncIn > 0) return;
+      this.syncIn = 0.5;
+      if (this.seeks >= 12) return; // a stream that won't seek is left alone rather than fought
+      const Rh = Pulse.Rhythm;
+      const target = Rh.seekTarget(Rh.trackTime(this.clock), Pulse.Music.position(this.playingTrack), Pulse.Music.loopLength());
+      if (target !== null) {
+        this.seeks++;
+        Pulse.Music.seek(target);
+      }
     }
 
     worldOpener() {
@@ -297,7 +326,13 @@
       this.popupText.setAlpha(0);
       Pulse.Sfx.play('start');
       this.playingTrack = this.musicTrack();
+      Pulse.Rhythm.reset(this.clock, this.trackBpm());
+      this.syncIn = 0.25;
+      this.seeks = 0;
+      // The music that was playing on the ready screen restarts so beat 1 lines up with the run.
+      const continuing = Pulse.Music.position(this.playingTrack) !== null;
       Pulse.Music.play(this.playingTrack);
+      if (continuing) Pulse.Music.seek(0);
       if (this.view) this.view.spawn();
       this.setState('playing');
     }
@@ -308,6 +343,7 @@
       if (this.state === 'ready') this.startRun();
       else if (this.state === 'paused') {
         Pulse.Sfx.play('resume');
+        this.syncIn = 0; // the music kept playing under the pause screen: realign at once
         this.setState('playing');
       } else if (this.state === 'over' && this.canAct()) this.startRun();
     }
@@ -369,8 +405,23 @@
       }
 
       if (this.state === 'playing') this.step(dt);
+      else if (this.state === 'ready') Pulse.Rhythm.step(this.clock, dt); // idle orb breathes to the beat
       if (this.ringT < 1) this.ringT = Math.min(1, this.ringT + dt * 3);
+      this.updateOrbFx(dt);
       this.draw();
+    }
+
+    // Cosmetic orb animation: the glow breathes on the beat and the body stretches along the
+    // direction of travel while it changes size. Rules only ever read orbState, never this.
+    updateOrbFx(dt) {
+      const Rh = Pulse.Rhythm;
+      if (dt > 0) {
+        const rate = (this.radius - this.prevRadius) / dt;
+        this.stretch = Rh.OrbFx.stretchStep(this.stretch, Rh.OrbFx.stretchTarget(rate), dt);
+      }
+      this.prevRadius = this.radius;
+      const calm = this.state === 'over' || this.state === 'paused';
+      this.orbFx = Rh.OrbFx.scales(calm ? 1 : Rh.position(this.clock).phase, calm ? 0 : this.stretch);
     }
 
     // Shrink: short "start" + soft looping hum; release: "expand".
@@ -403,8 +454,12 @@
       const track = this.musicTrack();
       if (track !== this.playingTrack) {
         this.playingTrack = track;
+        Pulse.Rhythm.retune(this.clock, this.trackBpm()); // Endless moves to the next world's tempo
         Pulse.Music.play(track);
+        this.seeks = 0;
       }
+      Pulse.Rhythm.step(this.clock, dt);
+      this.syncMusic(dt);
       const speed = this.level.speedAt(this.elapsed);
       this.scroll += speed * dt * 0.5;
       this.level.update(dt, speed, this.elapsed);
@@ -619,9 +674,9 @@
       }
 
       if (this.view) {
-        this.view.renderOrb(this.radius, this.state === 'over');
+        this.view.renderOrb(this.radius, this.state === 'over', this.orbFx);
       } else {
-        Pulse.Render.orb(g, this.orbX, this.orbY, this.radius, this.state === 'over', this.skin);
+        Pulse.Render.orb(g, this.orbX, this.orbY, this.radius, this.state === 'over', this.skin, this.orbFx);
         if (this.ringT < 1) Pulse.Render.collectRing(g, this.orbX, this.orbY, this.ringT);
       }
     }
