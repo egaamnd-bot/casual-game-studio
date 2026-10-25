@@ -5,20 +5,23 @@ This guide turns the rules in [AI_TEAM.md](AI_TEAM.md) into a day-to-day workflo
 ## Source of Truth
 
 - Repository documents are the shared source of truth. Conversations with an AI assistant are not.
-- Approved decisions go in [docs/DECISIONS.md](docs/DECISIONS.md). Recommendations stay in issues or PR comments until the producer approves them.
+- Approved decisions go in [docs/DECISIONS.md](docs/DECISIONS.md). Recommendations and open proposals stay in GitHub Issues or PR comments until the producer approves them.
+- Every coding task ready for review must have the required handoff described in [docs/AI_HANDOFF.md](docs/AI_HANDOFF.md).
 
 ## Workflow
 
-1. **Start from an issue.** Each task needs an objective and acceptance criteria.
-2. **Create a branch** from `main`:
+1. **Start from an issue or explicit producer task.** Record the objective and acceptance criteria.
+2. **Inspect the current state** before editing: default branch, active PRs/dependencies, relevant docs, working tree, and current tests.
+3. **Create or use a dedicated branch** and do not mix unrelated changes:
    - `feature/<short-description>` for gameplay or app features
    - `fix/<short-description>` for bug fixes
    - `art/<short-description>` for art, animation, or audio assets
    - `docs/<short-description>` for documentation
-3. **Commit small, focused changes** (see the commit style below).
-4. **Run the relevant tests and builds** before asking for review. Until automated tests exist, describe the manual checks you ran.
-5. **Open a pull request** into `main` that links the issue.
-6. **The human producer approves the merge.** Nobody merges into `main` without that approval.
+4. **Commit small, focused changes** (see the commit style below).
+5. **Run relevant tests and builds** before asking for review. Until automated tests exist, describe the manual checks actually run.
+6. **Complete the handoff files** required by [docs/AI_HANDOFF.md](docs/AI_HANDOFF.md).
+7. **Open or update a pull request** into the appropriate base branch. Link dependencies and state explicitly whether the PR must wait for another PR.
+8. **The human producer approves the merge.** Nobody merges into `main` without that explicit approval. Approval to continue coding is not approval to merge.
 
 ## Commit Messages
 
@@ -36,23 +39,20 @@ docs: update build instructions
 Every PR includes:
 
 - **What** changed and **why**
-- The linked issue (`Closes #12`)
-- How it was tested (device, platform, build type) and the result
-- Screenshots or a short clip for any gameplay or UI change
-- Anything left unfinished or known to be broken
-
-Before you change an approved design decision or remove existing functionality, get the producer's approval and record it in `docs/DECISIONS.md`.
+- The linked issue or task
+- Exact branch and head commit SHA
+- Dependencies and correct merge order
+- How it was tested (commands, platform, device, build type) and actual result
+- CI workflow/run links and status
+- APK/artifact link and exact commit it was built from, if applicable
+- Screenshots or a short clip for gameplay/UI changes when available
+- Anything unfinished, known broken, or not tested
+- The specific producer decision requested: review only, approve merge, choose between options, or phone-test approval
+- Link to the latest [AI handoff](docs/AI_HANDOFF.md) and dated handoff note
 
 ## Handoffs Between AI Assistants
 
-Assistants don't share conversations. Each handoff (in an issue, PR, or comment) states:
-
-- Task and objective
-- Relevant repository files
-- Constraints and dependencies
-- Expected output
-- Acceptance criteria
-- What is done and what remains
+Assistants do not share conversations. Each handoff must state the task/objective, relevant files, constraints/dependencies, acceptance criteria, completed work, remaining work, test evidence, and requested decision. Follow [docs/AI_HANDOFF.md](docs/AI_HANDOFF.md) exactly.
 
 ## Assets
 
@@ -60,7 +60,7 @@ Assistants don't share conversations. Each handoff (in an issue, PR, or comment)
 - Deliver assets with filenames, formats, dimensions, and integration notes.
 - An asset counts as integrated only once it is merged into the repository.
 - Only commit assets you have the right to use. Record third-party sources and licenses.
-- Git LFS is not used. Keep files small (TODO: agree a size limit) and ask the producer before adding large binaries.
+- Git LFS is not used. Keep files small and ask the producer before adding large binaries.
 
 ## Secrets
 
@@ -68,9 +68,4 @@ Never commit API keys, passwords, tokens, signing keys, or keystores. If one is 
 
 ## Reporting Bugs
 
-Open an issue with:
-
-- Steps to reproduce
-- Expected vs. actual behaviour
-- Platform, device, and build version
-- Screenshots, video, or logs if available
+Open an issue with steps to reproduce, expected vs. actual behaviour, platform/device/build version, and screenshots, video, or logs if available.
