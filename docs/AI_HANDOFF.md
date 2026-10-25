@@ -1,105 +1,58 @@
-# AI Handoff Protocol
+# Current AI Handoff
 
-**Purpose:** Make every coding iteration self-contained and reviewable by Claude, ChatGPT, Gemini, and the human producer without depending on private chat history.
+> This is the current status snapshot. Claude must update it at every review-ready coding checkpoint. Historical handoffs belong in [`docs/ai-handoffs/`](ai-handoffs/) and must not be overwritten. The required structure is in [AI_HANDOFF_PROTOCOL.md](AI_HANDOFF_PROTOCOL.md).
 
-## Required files
-
-1. `docs/AI_HANDOFF.md` — current status snapshot. Update it at the end of every coding iteration that is ready for review. It describes only the latest handoff.
-2. `docs/ai-handoffs/YYYY-MM-DD-<short-task-name>.md` — append-only historical note for each review-ready coding iteration. Use a distinct descriptive filename if more than one handoff occurs on a date; never overwrite an older note.
-3. Pull request description or PR comment — copy the concise summary, tests, artifact, dependencies, and exact decision requested so the producer can review it on a phone.
-
-Do not create a dated note for every tiny intermediate edit. Create it when an iteration reaches a meaningful checkpoint, especially when requesting review, phone testing, or approval. If work is paused unexpectedly, update the current snapshot with the incomplete state and what blocks it.
-
-## Mandatory handoff template
-
-Use all headings. If something does not apply, write `N/A`; if it has not been verified, write `UNKNOWN`, `NOT RUN`, `NOT BUILT`, or `NOT DEVICE-TESTED`. Never leave uncertainty implicit or claim success without evidence.
-
-```markdown
-# Handoff — <task / iteration>
-
-- Updated: YYYY-MM-DD HH:MM UTC
-- Project: PULSE / Heartvile / shared tooling
-- Status: IN PROGRESS / READY FOR REVIEW / BLOCKED / NEEDS PRODUCER DECISION
-- Branch:
-- PR:
-- Head commit SHA:
-- Base branch and base SHA:
-- Depends on PRs/issues:
-- Is it safe to merge now? YES / NO / UNKNOWN
-- Producer decision needed: NONE / REVIEW / PHONE TEST / APPROVE MERGE / CHOOSE OPTION / OTHER
+- Updated: 2026-10-26 (UTC; exact review timestamp not recorded)
+- Project: PULSE
+- Status: NEEDS PRODUCER PHONE TEST / REVIEW
+- Branch: `feature/pulse-rhythm-motion`
+- PR: [#11 — rhythm clock, beat-synced sound, comet look and moving gaps](https://github.com/egaamnd-bot/casual-game-studio/pull/11)
+- Head commit SHA: UNKNOWN in this snapshot; verify current PR head before testing
+- Base branch: `feature/pulse-12-stage-campaign`
+- Depends on: PR #9 — [12-stage campaign](https://github.com/egaamnd-bot/casual-game-studio/pull/9)
+- Merge status: PR #11 was reported as not merged in its available description. Re-check live status and dependencies before any merge.
+- Producer decision needed: Test the exact APK built from the latest verified PR head; give feedback on game feel, audio response, and rotating-ring readability. Do not merge PR #11 or PR #9 automatically.
 
 ## Executive summary
-<What changed and why, in plain language.>
+
+The available PR #11 description and [`docs/RHYTHM.md`](RHYTHM.md) document a rhythm-driven visual/game-feel pass: procedural comet orb and tail, neon trailer styling, beat clock and reward sound timing, deterministic moving gaps, and a rotating ring obstacle. The core hold-to-shrink / release-to-grow mechanic is intended to remain unchanged.
 
 ## Changed files
-- `path` — purpose and notable behaviour change.
 
-## Behaviour and design impact
-- Player-facing changes:
-- Controls/gameplay/scoring/save compatibility:
-- Visual/audio/accessibility/performance:
-- Approved decision changed? If yes, cite the producer approval. Otherwise state NONE.
+See the live PR #11 Files changed tab for the authoritative list. Do not infer the complete file list from this snapshot.
 
 ## Validation evidence
-| Check | Exact command or workflow | Result | Evidence / commit |
-|---|---|---|---|
-| Automated tests | ... | PASS / FAIL / NOT RUN | ... |
-| Build | ... | PASS / FAIL / NOT BUILT | ... |
-| CI | workflow URL | status | run URL |
-| Device test | device + steps | PASS / FAIL / NOT DEVICE-TESTED | notes/video |
-| Regression checks | ... | ... | ... |
 
-Report actual counts, failures, skipped tests, warnings, environment caveats, and whether a browser was hidden/zero-sized. Distinguish a verified environment issue from a code regression; don't dismiss failures without evidence.
+The checked-in `docs/RHYTHM.md` reports:
+- `tests/rhythm.html`: 4,870 checks passed in the documented run.
+- `tests/campaign.html`: 647 checks passed, covering 12 stages at three screen widths.
+- `tests/logic.html`, `tests/assets.html`, `tests/scene.html`, and `tests/landscape.html`: reported passing at a real-size browser window.
+- Documented caveat: some timing/layout checks fail in hidden or zero-size browser panes, and the note says those failures also occur on the base commit.
+- These are recorded test claims from repository documentation, not a fresh test run by ChatGPT.
 
-## Android artifact (if applicable)
-- APK URL:
-- Workflow/run URL:
-- Artifact filename:
-- Exact commit SHA the APK was built from:
-- Install/launch verification:
-- If unavailable, say NOT BUILT or NOT ATTACHED.
+## Android artifact
+
+- APK URL: Re-check PR #11 comments and the latest successful Android debug APK workflow run.
+- Exact APK commit SHA: UNKNOWN in this snapshot; verify that the artifact was built from the current PR head before installing.
+- Real-device test: NOT DEVICE-TESTED according to the checked-in rhythm documentation.
 
 ## Known limitations and risks
-- ...
+
+- Actual phone feel and audio latency remain unverified in the available documentation.
+- Confirm the rotating ring is readable at phone size and collisions feel fair.
+- Verify current branch/PR heads, workflow status, and APK-to-commit correspondence before making a decision.
 
 ## Remaining work
-- ...
 
-## What the producer should check on phone
-1. ...
-2. ...
+1. Re-check the live PR #9 / PR #11 status and dependency order.
+2. Obtain the newest APK artifact that corresponds to a verified commit.
+3. Test landscape touch response, orb fluidity, sound timing, ring readability, pause/retry/resume, and Android performance.
+4. Record the producer's decision and next task in the PR and a dated handoff.
 
 ## Explicit decision requested
-<State one clear question. For example: "Please install this APK and approve/reject the gameplay feel. Do not merge until phone approval.">
+
+Producer: please test the latest verified APK and report whether the rhythm-motion/game-feel changes are approved, need adjustments, or are blocked. Do not merge based on automated tests alone.
 
 ## Next recommended task
-<One small next step; do not start it unless authorized by the current task.>
-```
 
-## PULSE-specific safeguards
-
-- Preserve the current working landscape gameplay and hold-to-shrink / release-to-grow mechanic unless explicitly approved otherwise.
-- Do not silently change controls, collision rules, scoring, star thresholds, stage IDs, save format/compatibility, or the approved campaign structure.
-- Keep new obstacles incremental. State how each obstacle is taught, its deterministic/fair collision rule, and the relevant test coverage.
-- Do not add audio quantization or other timing that delays control response.
-- Automated browser checks do not replace real Android phone testing for touch response, audio latency, readability, performance, pause/resume, and landscape layout.
-- The APK must be linked to the exact commit SHA that produced it. Do not imply an artifact came from the PR head unless verified.
-
-## Approval and merge rules
-
-- "Continue", "proceed", or approval of a coding plan authorizes only the scope clearly stated by the producer; it is not blanket permission to merge or release.
-- Do not merge into `main`, release a build, delete important work, change secrets/account configuration, or alter approved decisions without the required explicit approval.
-- If a PR depends on another PR, state the dependency prominently and do not merge out of order.
-- If approval is pending, set status to `NEEDS PRODUCER DECISION` or `READY FOR REVIEW`, list the exact decision, and stop at that checkpoint.
-- If no approval is needed, explicitly state why the task can continue safely.
-
-## Updating the handoff
-
-At the end of a review-ready iteration:
-1. Verify branch name, PR URL, base/head commit SHAs, and PR dependencies from GitHub.
-2. Run tests/builds and capture their actual results and URLs.
-3. Update `docs/AI_HANDOFF.md`.
-4. Add a dated historical note under `docs/ai-handoffs/`.
-5. Copy a concise version into the PR description or comment.
-6. Ensure all three records agree. Commit and push these notes on the same feature branch as the code they describe.
-7. Tell the producer the exact PR, commit, test result, artifact link, requested decision, and whether work is blocked pending approval.
+Finish the producer-requested fluidity and phone-validation iteration before adding more obstacle families. Confirm the live PR status and artifact SHA first.
