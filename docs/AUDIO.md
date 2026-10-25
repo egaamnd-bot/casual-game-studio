@@ -43,6 +43,10 @@
 
 **Unused files** (in the repo, available later): `sfx_barrier_charged_ready` and `sfx_obstacle_approach_cue`, held back to avoid clutter. `sfx_ui_retry` doubles as the run-start sound.
 
+## Rhythm Alignment
+
+The run has a beat clock (125 / 133 / 140 BPM per world). The music is re-aligned to it at run start, on resume and when it drifts over 80 ms; see [RHYTHM.md](RHYTHM.md).
+
 ## Tests
 
 - `tests/assets.html`: all 32 effect and sting files decode; every music track exists.
