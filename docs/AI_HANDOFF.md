@@ -7,7 +7,7 @@
 - Project: PULSE
 - Status: NEEDS PRODUCER DECISION
 - Branch: audit notes on `docs/pulse-handoff-audit-2026-10-26` (docs only). Audited code branch: `feature/pulse-rhythm-motion`
-- PR: audit notes in DOCS_PR_PLACEHOLDER. Audited code: [PR #11](https://github.com/egaamnd-bot/casual-game-studio/pull/11) (stacked on [PR #9](https://github.com/egaamnd-bot/casual-game-studio/pull/9))
+- PR: audit notes in [PR #14](https://github.com/egaamnd-bot/casual-game-studio/pull/14) (docs only, into `main`). Audited code: [PR #11](https://github.com/egaamnd-bot/casual-game-studio/pull/11) (stacked on [PR #9](https://github.com/egaamnd-bot/casual-game-studio/pull/9))
 - Head commit SHA: audited PR #11 head = `4e8ba1ac88f4673cd6adf47007ef3362512263f8`. The docs branch head SHA is in the docs PR (a commit cannot contain its own SHA).
 - Base branch and base SHA: docs branch is based on `main` @ `897ae86c61a9f9cd4434a70c65ad0f62aa8b0c11`. PR #11 base = `feature/pulse-12-stage-campaign` @ `deb067096822c77f31c0b459b26b437be0844bc8`. PR #9 base = `main` (recorded base SHA `9ff64de8a2dde80f8e5df39ac46922fd9ab47a7a`, which is older than current main).
 - Depends on PRs/issues: PR #11 depends on PR #9. Merge order: **#9 first, then #11.** See "Merge order" below.
