@@ -35,19 +35,26 @@
   const charged = (t) => ({ type: 'barrier', charged: true, t });
   const gold = (t) => ({ type: 'energy', t });
   const mint = (t) => ({ type: 'bonus', t });
+  // Moving gap: the gap swings `amp` px either side of the lane centre every `beats` beats.
+  // `need` is the clearance at its tightest. `phase` (0..1 of the swing) is where it is when it
+  // reaches the orb: 0 = passing through the middle, 0.25 / 0.75 = at an end of its swing.
+  const slide = (need, t, amp, beats, phase) => ({ type: 'gate', need, t, slide: { amp, beats, phase: phase || 0 } });
+  // Beat-aligns an item: it reaches the orb on a multiple of `sub` beats (default every beat).
+  // Only ever delays an item, so the clear time is never shorter than written.
+  const on = (item, sub) => Object.assign(item, { beat: sub || 1 });
 
   // Gemini v4 worlds: backgrounds, intro banner, and music track (assets/audio/music/).
   Pulse.WORLDS = [
     {
-      index: 1, id: 'world-1', name: 'Neon Circuit', music: 'WORLD_1_GAMEPLAY', banner: 'bg_world1_intro_banner',
+      index: 1, id: 'world-1', name: 'Neon Circuit', music: 'WORLD_1_GAMEPLAY', bpm: 125, banner: 'bg_world1_intro_banner',
       visual: { background: 'bg_world1_far', mid: 'bg_world1_mid', rail: 'bg_world1_fg_rail', bgSpeed: 0.22, midSpeed: 0.4, railSpeed: 0.5 },
     },
     {
-      index: 2, id: 'world-2', name: 'Chromatic Overdrive', music: 'WORLD_2_GAMEPLAY', banner: 'bg_world2_intro_banner',
+      index: 2, id: 'world-2', name: 'Chromatic Overdrive', music: 'WORLD_2_GAMEPLAY', bpm: 133, banner: 'bg_world2_intro_banner',
       visual: { background: 'bg_world2_far', mid: 'bg_world2_mid', rail: 'bg_world2_fg_rail', bgSpeed: 0.3, midSpeed: 0.5, railSpeed: 0.65 },
     },
     {
-      index: 3, id: 'world-3', name: 'Pulse Collapse', music: 'WORLD_3_GAMEPLAY', banner: 'bg_world3_intro_banner',
+      index: 3, id: 'world-3', name: 'Pulse Collapse', music: 'WORLD_3_GAMEPLAY', bpm: 140, banner: 'bg_world3_intro_banner',
       visual: { background: 'bg_world3_far', mid: 'bg_world3_mid', rail: 'bg_world3_fg_rail', bgSpeed: 0.38, midSpeed: 0.6, railSpeed: 0.8 },
     },
   ];
@@ -84,14 +91,14 @@
     },
     {
       id: 's3-controlled-overload', name: 'Alternating Rhythm', world: W1,
-      intro: 'Shrink, smash, shrink, smash. Find the beat.',
-      teaches: 'Gaps and barriers alternating in short, readable sequences at a steady beat.',
+      intro: 'Shrink, smash, shrink, smash. Find the beat. Swaying gaps move with the music.',
+      teaches: 'Gaps and barriers alternating at a steady beat; first gently swaying (moving) gaps.',
       speed: { start: 240, end: 260 }, exit: RUNOUT,
       items: [
         gap(48, 1.1), bar(0.7), gap(46, 0.7), gold(0.55),
         bar(0.4), gap(46, 0.65), bar(0.6), gap(46, 0.6), gold(0.55),
-        bar(0.4), gap(44, 0.6), bar(0.6), gap(44, 0.6), gold(0.55),
-        bar(0.4), gold(0.4), gap(44, 0.6), gold(0.55),
+        bar(0.4), on(slide(44, 0.6, 14, 4, 0), 0.5), bar(0.6), gap(44, 0.6), gold(0.55), // first moving gap: gentle
+        bar(0.4), gold(0.4), on(slide(44, 0.6, 14, 4, 0), 0.5), gold(0.55),
       ],
     },
     {
@@ -102,8 +109,8 @@
       items: [
         gap(46, 1.0), bar(0.55), gap(44, 0.55), gold(0.45), gap(44, 0.45), // first gold dare
         bar(0.55), gap(44, 0.55), gold(0.42), gap(42, 0.45),
-        bar(0.55), gap(42, 0.55, 60), bar(0.5), gold(0.4),
-        gap(44, 0.5, -60), gold(0.42), gap(42, 0.45, 60), bar(0.5), gold(0.4),
+        bar(0.55), on(slide(42, 0.55, 20, 4, 0.25), 0.5), bar(0.5), gold(0.4),
+        gap(44, 0.5, -60), gold(0.42), on(slide(42, 0.45, 20, 4, 0.75), 0.5), bar(0.5), gold(0.4),
       ],
     },
 

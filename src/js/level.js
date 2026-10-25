@@ -74,7 +74,14 @@
   function placeItem(src, prevTop, width) {
     const h = itemHeight(src);
     const item = { type: src.type, at: prevTop + src.space, h, space: src.space };
-    if (src.type === 'gate') Pulse.setGap(item, src.need, src.shift || 0, width);
+    if (src.type === 'gate' && src.slide) {
+      // Moving gap: `need` is the clearance at its tightest, so the gap is `amp` wider than that
+      // when centred. It starts centred; Level.applyMotion moves it.
+      const s = src.slide;
+      Pulse.setGap(item, src.need + s.amp, 0, width);
+      item.need = src.need;
+      item.slide = { amp: s.amp, beats: s.beats, phase: s.phase || 0, half: src.need + s.amp };
+    } else if (src.type === 'gate') Pulse.setGap(item, src.need, src.shift || 0, width);
     if (src.type === 'barrier' && src.charged) item.charged = true;
     if (src.pattern) item.pattern = src.pattern;
     return item;
@@ -144,6 +151,7 @@
       for (let i = 0; i < this.segments.length; i++) this.segments[i].active = false;
       this.travelled = 0;
       this.nextIndex = 0;
+      this.time = 0; // run time (s); moving obstacles are a function of it, so a run is repeatable
     }
 
     difficulty(elapsed) {
@@ -161,10 +169,29 @@
       const dy = speed * dt;
       this.moveSegments(dy);
       this.travelled += dy;
+      this.time += dt;
       this.fill(elapsed, speed);
       const items = this.items;
       while (this.nextIndex < items.length && this.travelled >= items[this.nextIndex].at) {
         this.spawnItem(items[this.nextIndex++]);
+      }
+      this.applyMotion();
+    }
+
+    // Moves every active moving gap to where the beat puts it. `bpm` is set by the campaign level;
+    // without one (Endless) nothing moves. The orb's path stays inside the gap at all times:
+    // the clearance never drops below the item's `need` (checked by Track.validateItems).
+    applyMotion() {
+      if (!this.bpm) return;
+      const beat = (this.time * this.bpm) / 60;
+      const ox = C.orb.x;
+      for (let i = 0; i < this.segments.length; i++) {
+        const s = this.segments[i];
+        if (!s.active || !s.slide) continue;
+        const off = Pulse.Rhythm.motionOffset(s.slide, beat, s.arriveBeat);
+        s.gapL = ox + off - s.slide.half;
+        s.gapR = ox + off + s.slide.half;
+        s.need = s.slide.half - Math.abs(off);
       }
     }
 
@@ -196,6 +223,9 @@
       seg.h = it.h;
       seg.y = this.travelled - it.at - it.h;
       seg.pattern = it.pattern || null;
+      seg.slide = it.slide || null;
+      seg.arriveBeat = it.arriveBeat || 0;
+      seg.minNeed = it.need; // tightest clearance over a moving gap's whole cycle
       // Segments are pooled: reset flags a previous use may have left (a recycled charged
       // barrier must not make a gate look charged).
       seg.charged = it.type === 'barrier' && !!it.charged;
@@ -280,7 +310,7 @@
     for (let i = 0; i < segs.length; i++) {
       const s = segs[i];
       if (!s.active || s.kind === 'pickup' || s.broken) continue;
-      if (s.kind === 'gate' && (s.need >= R || s.y >= orbY + R)) continue;
+      if (s.kind === 'gate' && ((s.minNeed === undefined ? s.need : s.minNeed) >= R || s.y >= orbY + R)) continue;
       const bottom = s.y + s.h;
       if (bottom < orbY - R - look - (s.charged ? chargeLook : 0)) continue;
       if (bottom > nearestBottom) {

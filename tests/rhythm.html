@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse rhythm tests</title>
+</head>
+<body>
+  <pre id="out">running…</pre>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script>
+    // Rhythm clock, beat-aligned stages, moving gaps and orb effects. No Phaser needed.
+    // Open in a browser; the page title becomes "PASS ..." or "FAIL ...".
+    const C = Pulse.CONFIG;
+    const R = C.orb.radius;
+    const W = C.width;
+    const Rh = Pulse.Rhythm;
+    const lines = [];
+    let failures = 0, checks = 0;
+    function check(ok, message) {
+      checks++;
+      if (!ok) { failures++; if (failures <= 40) lines.push('FAIL ' + message); }
+    }
+    const near = (a, b, eps) => Math.abs(a - b) <= eps;
+
+    // ---- Clock: beat and bar maths ----
+    {
+      const c = Rh.createClock({ bpm: 125 }); // beat = 0.48 s, bar = 1.92 s
+      check(near(Rh.beatSeconds(125), 0.48, 1e-12), 'beat length at 125 BPM is 0.48 s');
+      let p = Rh.position(c);
+      check(p.beat === 0 && p.index === 0 && p.phase === 0 && p.bar === 0 && p.beatInBar === 0, 'starts on beat 0 of bar 0');
+      Rh.step(c, 0.72);
+      p = Rh.position(c);
+      check(p.index === 1 && near(p.phase, 0.5, 1e-9) && p.beatInBar === 1, 'at 0.72 s: halfway through beat 1');
+      Rh.step(c, 1.2); // t = 1.92
+      p = Rh.position(c);
+      check(p.bar === 1 && p.beatInBar === 0 && p.index === 4, 'at 1.92 s: first beat of bar 1');
+      check(near(Rh.pulse(0), 1, 1e-12) && Rh.pulse(1) === 0 && Rh.pulse(0.5) < Rh.pulse(0.1), 'beat pulse peaks on the beat and eases out');
+    }
+
+    // ---- Clock: no drift, whatever the frame rate ----
+    {
+      for (const bpm of [112, 125, 133, 140]) {
+        for (const fps of [20, 30, 59.94, 60, 90, 144]) {
+          const c = Rh.createClock({ bpm });
+          const dt = 1 / fps;
+          const seconds = 600;
+          let counted = 0, bars = 0;
+          const frames = Math.round(seconds * fps);
+          for (let i = 0; i < frames; i++) { const e = Rh.step(c, dt); counted += e.beats; bars += e.bars; }
+          const exactBeat = Math.floor(c.t * bpm / 60);
+          check(counted === exactBeat, `${bpm} BPM @ ${fps} fps: ${counted} beat events vs ${exactBeat} expected after 10 min`);
+          check(bars === Math.floor(exactBeat / 4), `${bpm} BPM @ ${fps} fps: bar events match`);
+          check(near(c.t, frames * dt, 1e-6), `${bpm} BPM @ ${fps} fps: clock time matches the frames stepped`);
+        }
+      }
+      // A long hitch (the game clamps frame time to 0.05 s) crosses at most a beat or two.
+      const c = Rh.createClock({ bpm: 140 });
+      check(Rh.step(c, C.maxFrameSeconds).beats <= 1, 'a clamped frame crosses at most one beat');
+    }
+
+    // ---- Pause, resume, retry, track change ----
+    {
+      const c = Rh.createClock({ bpm: 125 });
+      for (let i = 0; i < 100; i++) Rh.step(c, 1 / 60);
+      const before = Rh.position(c);
+      // Paused: the game doesn't step the clock, so nothing moves however long the pause.
+      const after = Rh.position(c);
+      check(before.beat === after.beat, 'a paused clock does not move');
+      for (let i = 0; i < 20; i++) Rh.step(c, 1 / 60);
+      check(near(c.t, 120 / 60, 1e-9), 'resuming continues from the same moment');
+      Rh.reset(c);
+      check(c.t === 0 && Rh.position(c).beat === 0 && Rh.step(c, 0.01).beats === 0, 'retry restarts at beat 0 with no stray beat event');
+      // Endless: the next world's track starts here, at its own tempo.
+      Rh.reset(c, 125);
+      for (let i = 0; i < 30 * 60; i++) Rh.step(c, 1 / 60);
+      Rh.retune(c, 133);
+      check(c.bpm === 133 && Rh.position(c).beat === 0 && Rh.trackTime(c) === 0, 'a new track restarts the beat count');
+      for (let i = 0; i < 60; i++) Rh.step(c, 1 / 60);
+      check(near(Rh.position(c).beat, 133 / 60, 1e-6), 'new tempo applies from the switch');
+    }
+
+    // ---- Audio sync ----
+    {
+      const loop = 76.8;
+      check(Rh.seekTarget(10, 10.05, loop) === null, 'music within tolerance is left alone');
+      check(near(Rh.seekTarget(10, 10.3, loop), 10, 1e-9), 'music 0.3 s ahead is pulled back to the clock');
+      check(near(Rh.seekTarget(10, 9.6, loop), 10, 1e-9), 'music behind the clock is moved up');
+      // Around the loop seam: the clock has wrapped (trackTime 76.85), the music just restarted.
+      check(Rh.seekTarget(76.85, 0.05, loop) === null, 'loop boundary: clock past the seam, music just wrapped, in sync');
+      check(Rh.seekTarget(76.75, 0.0, loop) === null, 'loop boundary: music wrapped 50 ms early, in sync');
+      check(near(Rh.audioError(1, 76.5, loop), -1.3, 1e-9), 'loop boundary: error is measured the short way round');
+      check(Rh.seekTarget(5, null, loop) === null && Rh.seekTarget(5, undefined, loop) === null && Rh.seekTarget(5, NaN, loop) === null,
+        'muted / unavailable audio: nothing to align, no error');
+      check(near(Rh.seekTarget(200, 50, loop), 200 % loop, 1e-9), 'a long run seeks inside the loop');
+      check(Rh.seekTarget(3, 3.05, 0) === null, 'no loop length known: plain comparison');
+    }
+
+    // ---- Speed profile: exact time ↔ distance ----
+    {
+      for (const [s0, s1, len] of [[240, 260, 5000], [355, 410, 7000], [200, 200, 3000], [300, 250, 4000]]) {
+        const p = Rh.profile(s0, s1, len);
+        for (const d of [0, 10, 700, 2500, len, len + 500]) {
+          check(near(p.dist(p.time(d)), d, 1e-6), `profile ${s0}→${s1}: dist(time(${d})) round-trips`);
+        }
+        // Against brute-force integration of the speed ramp.
+        let d = 0, t = 0;
+        const dt = 1 / 2000;
+        while (t < 15) { d += p.speed(d) * dt; t += dt; }
+        check(near(p.dist(15), d, 0.5), `profile ${s0}→${s1}: closed form matches integration (${p.dist(15).toFixed(2)} vs ${d.toFixed(2)})`);
+        check(p.time(100) < p.time(200), `profile ${s0}→${s1}: time increases with distance`);
+      }
+    }
+
+    // ---- Stages: beat-aligned patterns ----
+    const STAGES = Pulse.STAGES;
+    const snapped = STAGES.filter((s) => s.items.some((it) => it.beat));
+    const moving = STAGES.filter((s) => s.items.some((it) => it.slide));
+    check(snapped.length >= 2 && moving.length >= 2, 'the vertical slice has beat-aligned stages with moving gaps');
+
+    // Stages without beat-aligned items compile exactly as before: the speed ramp is their own length.
+    for (const s of STAGES.filter((st) => !snapped.includes(st))) {
+      const track = Pulse.Campaign.compile(s, W);
+      check(track.speedLength === track.finishAt, `${s.id}: unaligned stage keeps its original speed ramp`);
+    }
+
+    // Screens from 860 to 1240 px long (16:9 = 960): alignment must hold on every one.
+    const LENGTHS = [860, 960, 1100, 1240];
+    for (const stage of snapped) {
+      const beatSec = Rh.beatSeconds(stage.world.bpm);
+      for (const len of LENGTHS) {
+        const track = Pulse.Campaign.compile(stage, W, len);
+        const plain = Pulse.Campaign.compile(Object.assign({}, stage, { items: stage.items.map((it) => Object.assign({}, it, { beat: 0 })) }), W, len);
+        const prof = Rh.profile(stage.speed.start, stage.speed.end, track.speedLength);
+        stage.items.forEach((src, i) => {
+          const it = track.items[i];
+          check(near(it.arrive, prof.time(it.at + track.orbY), 1e-9), `${stage.id}#${i} @${len}: arrival time is consistent`);
+          if (!src.beat) return;
+          const grid = beatSec * src.beat;
+          const k = it.arrive / grid;
+          check(near(k, Math.round(k), 1e-6), `${stage.id}#${i} @${len}: reaches the orb on a ${src.beat}-beat grid (${k.toFixed(4)})`);
+          check(near(it.arriveBeat, it.arrive / beatSec, 1e-9), `${stage.id}#${i} @${len}: arriveBeat matches arrival`);
+        });
+        // Aligning only delays items: never closer together than the unaligned stage.
+        for (let i = 1; i < track.items.length; i++) {
+          const gapNow = track.items[i].at - (track.items[i - 1].at + track.items[i - 1].h);
+          check(gapNow >= 0, `${stage.id}#${i} @${len}: items keep their order and spacing`);
+        }
+        check(Pulse.Campaign.validate(stage, W).length === 0, `${stage.id}: valid`);
+        check(track.energyTotal === plain.energyTotal, `${stage.id}: aligning does not change the gold count`);
+        check(track.finishAt >= plain.finishAt - 1e-6, `${stage.id} @${len}: aligned stage is never shorter`);
+      }
+    }
+
+    // Plays a stage with the game's own rules at 60 fps. Records, for every beat-aligned item, the
+    // run time its leading edge reaches the orb, and for every moving gap its clearance each frame.
+    function simulate(stage, height, dt, policy) {
+      height = height || 960;
+      dt = dt || 1 / 60;
+      const orbY = Math.round(height * C.orb.yRatio);
+      const level = new Pulse.Campaign.CampaignLevel(W, height, stage);
+      const orb = Pulse.Orb.create();
+      const arrivals = {};
+      const slides = {};
+      let frames = 0, energy = 0, hash = 0, crashed = false, completed = false;
+      while (frames < 60 * 300 / (dt * 60)) {
+        const speed = level.speedAt();
+        Pulse.Orb.step(orb, (policy || Pulse.autopilot)(level, orbY, speed), dt);
+        frames++;
+        level.update(dt, speed);
+        for (const s of level.segments) {
+          if (!s.active) continue;
+          if (s.kind === 'gate' && s.slide) {
+            const rec = slides[s.arriveBeat] || (slides[s.arriveBeat] = { minClear: Infinity, maxOff: 0, rate: 0, last: null, atArrival: null, lastOff: null, slide: s.slide });
+            const clearL = C.orb.x - s.gapL;
+            const clearR = s.gapR - C.orb.x;
+            rec.minClear = Math.min(rec.minClear, clearL, clearR);
+            const off = (s.gapL + s.gapR) / 2 - C.orb.x;
+            rec.maxOff = Math.max(rec.maxOff, Math.abs(off));
+            if (rec.lastOff !== null) rec.rate = Math.max(rec.rate, Math.abs(off - rec.lastOff) / dt);
+            rec.lastOff = off;
+            if (rec.atArrival === null && s.y + s.h >= orbY) rec.atArrival = { time: level.time, off };
+            hash = (hash * 31 + Math.round(off * 1000)) % 1000003;
+          }
+          if (s.kind === 'gate' || s.kind === 'barrier') {
+            // travelled − y − h is exactly the item's `at`, so it identifies the item.
+            const idx = level.items.findIndex((it) => Math.abs(it.at - (level.travelled - s.y - s.h)) < 1e-4);
+            if (idx >= 0 && arrivals[idx] === undefined && s.y + s.h >= orbY) arrivals[idx] = level.time;
+          }
+          const e = level.resolve(s, orbY, orb.radius, orb.charge);
+          if (e === 'crash') { crashed = true; return { crashed, completed, arrivals, slides, hash, level, frames, energy }; }
+          if (e === 'collect' && s.variant !== 'bonus') energy++;
+        }
+        if (level.finishY() >= orbY) { completed = true; break; }
+      }
+      return { crashed, completed, arrivals, slides, hash, level, frames, energy };
+    }
+
+    // The stage plays out as compiled: items reach the orb on the beat in the running game.
+    for (const stage of snapped) {
+      const beatSec = Rh.beatSeconds(stage.world.bpm);
+      for (const len of LENGTHS) {
+        const res = simulate(stage, len);
+        check(res.completed && !res.crashed, `${stage.id} @${len}: autopilot completes the stage`);
+        stage.items.forEach((src, i) => {
+          if (!src.beat || res.arrivals[i] === undefined) return;
+          const grid = beatSec * src.beat;
+          const err = Math.abs(res.arrivals[i] - Math.round(res.arrivals[i] / grid) * grid);
+          // One frame of quantisation (the check runs after the frame the edge crosses the orb).
+          check(err <= 1 / 60 + 0.004, `${stage.id}#${i} @${len}: in play it reaches the orb within ${(err * 1000).toFixed(1)} ms of the beat`);
+        });
+      }
+    }
+
+    // ---- Moving gaps: fair, bounded and deterministic ----
+    let slideCount = 0;
+    for (const stage of moving) {
+      const bpm = stage.world.bpm;
+      for (const len of [860, 960, 1240]) {
+        const a = simulate(stage, len);
+        const b = simulate(stage, len);
+        check(a.hash === b.hash && a.frames === b.frames, `${stage.id} @${len}: motion is identical on every run`);
+        // Same motion at 30 fps and 144 fps (position is a function of run time, not of frames).
+        const slow = simulate(stage, len, 1 / 30);
+        const fast = simulate(stage, len, 1 / 144);
+        check(slow.completed && fast.completed, `${stage.id} @${len}: completes at 30 and 144 fps`);
+        for (const key of Object.keys(a.slides)) {
+          slideCount++;
+          const r = a.slides[key];
+          const src = stage.items.find((it) => it.slide && it.slide.amp === r.slide.amp);
+          const minNeed = C.orb.minRadius + C.fairMargin;
+          check(r.minClear >= minNeed - 1e-6, `${stage.id}: gap never closes below the fair minimum (${r.minClear.toFixed(1)} px)`);
+          check(r.minClear >= src.need - 1e-6, `${stage.id}: clearance never drops below the authored need ${src.need} (${r.minClear.toFixed(1)})`);
+          check(r.maxOff <= r.slide.amp + 1e-6, `${stage.id}: swing stays within ±${r.slide.amp} px (${r.maxOff.toFixed(1)})`);
+          check(r.rate <= C.motion.maxRate * 1.05 + 1, `${stage.id}: gap edge moves ${r.rate.toFixed(0)} px/s, within the ${C.motion.maxRate} limit`);
+          check(r.rate <= C.orb.shrinkRate * 0.6, `${stage.id}: gap moves much slower than the orb can shrink`);
+          // On arrival the gap is where the stage says it will be.
+          const want = Rh.motionOffset(r.slide, r.atArrival.time * bpm / 60, parseFloat(key));
+          check(near(r.atArrival.off, want, 1e-6), `${stage.id}: gap offset on arrival matches the motion function`);
+          const wantPhase = r.slide.amp * Math.sin(2 * Math.PI * (r.slide.phase));
+          check(near(r.atArrival.off, wantPhase, r.slide.amp * 0.12 + 1), `${stage.id}: gap is at its authored phase when it reaches the orb (${r.atArrival.off.toFixed(1)} vs ${wantPhase.toFixed(1)})`);
+        }
+      }
+      // Collision geometry always matches what is drawn: the walls are the gap edges, and the
+      // orb's real radius is what is tested.
+      const level = new Pulse.Campaign.CampaignLevel(W, 960, stage);
+      let tested = 0;
+      for (let f = 0; f < 60 * 40 && tested < 50; f++) {
+        level.update(1 / 60, level.speedAt());
+        for (const s of level.segments) {
+          if (!s.active || !s.slide) continue;
+          const y = s.y + s.h / 2;
+          // Shrunk orb centred in the gap: never hits. Full-size orb off-centre in a tight gap: hits.
+          check(!level.hitsWall(s, C.orb.x, y, C.orb.minRadius), 'a shrunk orb is never hit by a moving gap');
+          if (s.need < R) check(level.hitsWall(s, C.orb.x, y, R), 'a full-size orb is hit by a tight moving gap');
+          check(s.gapL < C.orb.x && s.gapR > C.orb.x, 'the gap always contains the orb path');
+          tested++;
+        }
+      }
+      check(tested > 0, `${stage.id}: moving gaps were exercised`);
+    }
+    check(slideCount >= 6, `moving gaps measured (${slideCount})`);
+
+    // Authoring rules reject unfair or unreadable motion.
+    {
+      const base = STAGES[2];
+      const mod = (item) => Object.assign({}, base, { items: base.items.slice().concat([item]) });
+      const bad = (item) => Pulse.Campaign.validate(mod(item), W).length > 0;
+      const gap = { type: 'gate', need: 44, t: 0.6, beat: 0.5 };
+      check(!bad(Object.assign({}, gap, { slide: { amp: 14, beats: 4 } })), 'a sensible moving gap is accepted');
+      check(bad(Object.assign({}, gap, { slide: { amp: 14, beats: 4 }, beat: 0 })), 'a moving gap must be beat-aligned');
+      check(bad(Object.assign({}, gap, { slide: { amp: 14, beats: 1 } })), 'a swing faster than the minimum period is rejected');
+      check(bad(Object.assign({}, gap, { slide: { amp: 60, beats: 4 } })), 'a swing faster than the rate limit is rejected');
+      check(bad(Object.assign({}, gap, { need: 20, slide: { amp: 10, beats: 4 } })), 'a gap that closes below the fair minimum is rejected');
+      check(bad(Object.assign({}, gap, { need: 230, slide: { amp: 20, beats: 8 } })), 'a swing that leaves the lane is rejected');
+      check(bad(Object.assign({}, gap, { length: 200, slide: { amp: 14, beats: 4 } })), 'tunnels cannot move');
+      check(bad({ type: 'barrier', t: 0.6, slide: { amp: 14, beats: 4 }, beat: 1 }), 'only gaps can move');
+    }
+
+    // Level.reset puts moving gaps and the run clock back.
+    {
+      const stage = moving[0];
+      const level = new Pulse.Campaign.CampaignLevel(W, 960, stage);
+      for (let i = 0; i < 600; i++) level.update(1 / 60, level.speedAt());
+      check(level.time > 9.9 && level.segments.some((s) => s.active), 'run clock advances with the level');
+      level.reset();
+      check(level.time === 0 && level.travelled === 0 && !level.segments.some((s) => s.active), 'retry resets the run clock and clears moving gaps');
+      const again = [];
+      for (let i = 0; i < 600; i++) { level.update(1 / 60, level.speedAt()); again.push(level.segments.filter((s) => s.active && s.slide).map((s) => Math.round(s.gapL * 100)).join()); }
+      const first = new Pulse.Campaign.CampaignLevel(W, 960, stage);
+      let same = true;
+      for (let i = 0; i < 600; i++) { first.update(1 / 60, first.speedAt()); if (first.segments.filter((s) => s.active && s.slide).map((s) => Math.round(s.gapL * 100)).join() !== again[i]) same = false; }
+      check(same, 'a retried run plays out identically to a fresh one');
+    }
+
+    // A level with no tempo (Endless) never moves anything.
+    check(!new Pulse.Level(W, 1000).bpm, 'a level without a tempo has no moving gaps');
+
+    // ---- Orb effects: never smaller than the collision circle ----
+    {
+      let ok = true, maxAlong = 0, maxGlow = 0;
+      for (let rate = -400; rate <= 400; rate += 10) {
+        const st = Rh.OrbFx.stretchTarget(rate);
+        check(st >= 0 && st <= Rh.OrbFx.maxStretch + 1e-12, `stretch target stays in range (${st.toFixed(3)})`);
+        for (let phase = 0; phase < 1; phase += 0.05) {
+          const s = Rh.OrbFx.scales(phase, st);
+          if (s.along < 1 || s.across < 1 || s.glow < 1) ok = false;
+          maxAlong = Math.max(maxAlong, s.along);
+          maxGlow = Math.max(maxGlow, s.glow);
+        }
+      }
+      check(ok, 'orb effect scales are never below 1: the drawn orb always covers the collision circle');
+      check(maxAlong <= 1.06 && maxGlow <= 1.09, `orb effects stay subtle (stretch ${maxAlong.toFixed(3)}, glow ${maxGlow.toFixed(3)})`);
+      let s = 0;
+      for (let i = 0; i < 600; i++) s = Rh.OrbFx.stretchStep(s, Rh.OrbFx.maxStretch, 1 / 60);
+      check(near(s, Rh.OrbFx.maxStretch, 1e-6), 'stretch settles on its target');
+      const slowStep = Rh.OrbFx.stretchStep(0, 0.05, 1 / 30);
+      let fastStep = 0;
+      fastStep = Rh.OrbFx.stretchStep(Rh.OrbFx.stretchStep(0, 0.05, 1 / 60), 0.05, 1 / 60);
+      check(near(slowStep, fastStep, 1e-9), 'stretch smoothing is frame-rate independent');
+      // The orb's real size is untouched by effects: rules read Pulse.Orb only.
+      const orb = Pulse.Orb.create();
+      Pulse.Orb.step(orb, true, 0.1);
+      check(near(orb.radius, R - C.orb.shrinkRate * 0.1, 1e-9), 'orb size follows the shrink rate exactly');
+      Pulse.Orb.step(orb, true, 5);
+      check(orb.radius === C.orb.minRadius, 'orb stops shrinking at its minimum radius');
+    }
+
+    // ---- Save compatibility ----
+    {
+      const ids = ['s1-first-pulse', 's2-find-the-rhythm', 's3-controlled-overload'];
+      check(ids.every((id, i) => STAGES[i].id === id), 'the original three stage ids are unchanged');
+      check(STAGES.length === 12, 'still 12 stages');
+      for (const s of STAGES) {
+        const t = Pulse.Campaign.compile(s, W);
+        check(t.energyTotal === s.items.filter((it) => it.type === 'energy').length, `${s.id}: gold count unchanged by the rhythm layer`);
+      }
+      const d = Pulse.Save.defaults();
+      check(!('rhythm' in d) && !('clock' in d), 'the rhythm layer adds nothing to the save file');
+    }
+
+    document.title = (failures ? 'FAIL ' + failures + ' of ' : 'PASS ') + checks + ' checks';
+    document.getElementById('out').textContent = document.title + '\n' + lines.join('\n');
+  </script>
+</body>
+</html>
