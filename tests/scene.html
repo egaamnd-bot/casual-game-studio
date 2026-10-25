@@ -102,8 +102,11 @@
       check(s.clock.t === frozen, 'run clock is frozen while paused');
       down(cx, cy); up(cx, cy); await wait(300);
       check(s.state === 'playing' && s.clock.t > frozen && Math.abs(s.clock.t - s.level.time) < 1e-6, 'run clock continues after resume');
-      check(s.orbFx && s.orbFx.glow >= 1 && s.orbFx.along >= 1 && s.orbFx.across === 1, 'orb effects never shrink the drawn orb');
+      check(s.orbFx && s.orbFx.glow >= 1 && s.orbFx.along >= 1 && s.orbFx.across >= 1 && s.orbFx.radius >= s.radius - 1e-9, 'orb effects never shrink the drawn orb');
       check(s.radius === C.orb.radius, 'orb effects leave the collision radius alone');
+
+      // Input sounds are never delayed to the beat.
+      check(C.groove.inputDelay === 0, 'shrink and release sounds play at once');
 
       // Pickup dimming: wait until a pickup is on screen, then hold.
       const sprites = !!s.view;
@@ -166,8 +169,9 @@
       check(e.clock.bpm === 140 && Pulse.Rhythm.trackTime(e.clock) < 0.1, `endless clock follows the track change (${e.clock.bpm} BPM)`);
       e.pause();
       check(e.state === 'paused' && Pulse.Music.level < 1, 'pause ducks the music');
+      check(Pulse.Music.holding === true, 'pause holds the music where it is, so resuming needs no seek');
       down(cx, cy); up(cx, cy); await wait(100);
-      check(e.state === 'playing' && Pulse.Music.level === 1, 'resume restores the music level');
+      check(e.state === 'playing' && Pulse.Music.level === 1 && Pulse.Music.holding === false, 'resume restores the music level and releases the hold');
       e.game.events.emit('hidden'); await wait(50);
       check(A().hidden && A().musicPaused && !A().holding, 'app in background: music paused, hum stopped');
       e.game.events.emit('visible'); await wait(50);

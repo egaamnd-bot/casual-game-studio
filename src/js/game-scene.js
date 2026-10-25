@@ -63,8 +63,7 @@
       // Rhythm: the run clock (stepped only while playing, so pause/retry need no special cases)
       // and the cosmetic orb stretch. The music follows the clock, never the other way round.
       this.clock = Pulse.Rhythm.createClock({ bpm: this.trackBpm() });
-      this.stretch = 0;
-      this.prevRadius = C.orb.radius;
+      this.fx = Pulse.Rhythm.OrbFx.create(); // the springy drawn orb (cosmetic; the rules read orbState)
       this.syncIn = 0;
       this.seeks = 0;
       this.noteStep = 0;
@@ -131,7 +130,7 @@
     }
 
     sfx(name, maxDelay, extra) {
-      const delay = Pulse.Rhythm.Groove.delay(this.clock, this.aligned(), maxDelay);
+      const delay = C.groove.enabled && maxDelay > 0 ? Pulse.Rhythm.Groove.delay(this.clock, this.aligned(), maxDelay) : 0;
       return Pulse.Sfx.play(name, Object.assign({ delay }, extra));
     }
 
@@ -155,7 +154,7 @@
       this.syncIn -= dt;
       if (this.syncIn > 0) return;
       this.syncIn = 0.5;
-      if (this.seeks >= 12) return; // a stream that won't seek is left alone rather than fought
+      if (this.seeks >= C.groove.maxSeeks) return; // seeking is audible: only for real drift, and a stream that won't seek is left alone
       const Rh = Pulse.Rhythm;
       const target = Rh.seekTarget(Rh.trackTime(this.clock), Pulse.Music.position(this.playingTrack), Pulse.Music.loopLength());
       if (target !== null) {
@@ -484,15 +483,24 @@
       this.hintSub.setVisible(true).setAlpha(Math.max(0, a));
     }
 
+    // The drawn orb follows the collision radius through springs (Pulse.Rhythm.OrbFx): it eases
+    // into a shrink, pops slightly past full size on release, stretches while changing size and
+    // pulses when it is rewarded. It is only ever drawn at least as big as the collision circle.
     updateOrbFx(dt) {
       const Rh = Pulse.Rhythm;
-      if (dt > 0) {
-        const rate = (this.radius - this.prevRadius) / dt;
-        this.stretch = Rh.OrbFx.stretchStep(this.stretch, Rh.OrbFx.stretchTarget(rate), dt);
-      }
-      this.prevRadius = this.radius;
+      const squeeze = this.state === 'playing' && this.level.segments.some((s) =>
+        s.active && s.kind === 'gate' && s.y < this.orbY + this.radius && s.y + s.h > this.orbY - this.radius);
+      const v = Rh.OrbFx.step(this.fx, this.radius, dt, squeeze);
       const calm = this.state === 'over' || this.state === 'paused';
-      this.orbFx = Rh.OrbFx.scales(calm ? 1 : Rh.position(this.clock).phase, calm ? 0 : this.stretch);
+      const phase = calm ? 1 : Rh.position(this.clock).phase;
+      const base = Rh.OrbFx.scales(phase, 0);
+      this.orbFx = { radius: v.radius, glow: base.glow * (1 + v.pop), along: v.along, across: v.across, pop: v.pop, shrink: v.shrink, grow: v.grow, phase };
+      if (this.view && this.view.beatPulse) this.view.beatPulse(phase, calm);
+    }
+
+    // A reward makes the orb pulse once (pickup small, smash larger).
+    reward(amount) {
+      Pulse.Rhythm.OrbFx.kick(this.fx, amount);
     }
 
     // Shrink: short "start" + soft looping hum; release: "expand".
@@ -500,11 +508,11 @@
       if (held === this.wasHeld) return;
       this.wasHeld = held;
       if (held) {
-        this.sfx('shrinkStart', 0.05);
+        this.sfx('shrinkStart', C.groove.inputDelay); // input sounds are immediate
         Pulse.Sfx.startHold();
       } else {
         Pulse.Sfx.stopHold();
-        this.sfx('expand', 0.05);
+        this.sfx('expand', C.groove.inputDelay);
         if (this.view) this.view.releaseRipple(this.radius);
       }
     }
@@ -571,9 +579,10 @@
           }
           if (fb.gained) this.bumpMultiplier();
           // Each pickup in a run is the next note of the world's scale, landing on the 16th note.
-          this.sfx(s.variant === 'bonus' ? 'bonusPickup' : 'pickup', 0.07, { rate: Pulse.Rhythm.Groove.noteRate(this.worldIndex(), this.noteStep++) });
+          this.sfx(s.variant === 'bonus' ? 'bonusPickup' : 'pickup', C.groove.eventDelay, { rate: Pulse.Rhythm.Groove.noteRate(this.worldIndex(), this.noteStep++) });
           this.accent();
-          if (fb.gained && !fb.reachedMax) this.sfx('multUp', 0.07);
+          this.reward(s.variant === 'bonus' ? 4.5 : 3.2);
+          if (fb.gained && !fb.reachedMax) this.sfx('multUp', C.groove.eventDelay);
           this.updateHud();
         } else if (event === 'miss') {
           // Skipping gold resets the Endless multiplier; skipping a mint bonus doesn't, so
@@ -596,12 +605,16 @@
             Pulse.Sfx.play('streak');
           }
           if (event === 'break') {
-            this.sfx(s.charged ? 'chargedSmash' : 'smash', 0.07);
+            this.sfx(s.charged ? 'chargedSmash' : 'smash', C.groove.eventDelay);
             this.accent();
-            if (s.charged) Pulse.Music.pulseDuck();
+            this.reward(s.charged ? 7 : 4.5);
+            if (s.charged) {
+              Pulse.Music.pulseDuck();
+              this.cameras.main.shake(110, 0.004); // a small punch: only the big hit gets one
+            }
             if (this.view) this.view.smash(s);
           } else {
-            this.sfx('pass', 0.05);
+            this.sfx('pass', C.groove.eventDelay);
             this.checkNearMiss(s, r);
           }
         }
@@ -611,9 +624,14 @@
       const beat = Pulse.Rhythm.position(this.clock).beat;
       for (let i = 0; i < segs.length; i++) {
         const s = segs[i];
-        if (s.active && s.slide && !s.pinged && s.arriveBeat - beat <= 2) {
+        if (s.active && (s.slide || s.ring) && !s.pinged && s.arriveBeat - beat <= 2) {
           s.pinged = true;
-          if (s.arriveBeat - beat > 0) this.sfx('telegraphPing', 0.07);
+          if (s.arriveBeat - beat > 0) this.sfx('telegraphPing', C.groove.eventDelay);
+        }
+        // A ring whooshes as the orb meets its front arc, on the beat the stage was built for.
+        if (s.active && s.ring && !s.whooshed && this.level.time >= s.ring.tf) {
+          s.whooshed = true;
+          Pulse.Sfx.play('rotorWhoosh');
         }
       }
 
@@ -695,6 +713,7 @@
     // Feedback only: reaching the maximum multiplier gets one restrained flourish.
     milestone() {
       Pulse.Sfx.play('milestone');
+      this.reward(8);
       Pulse.Sfx.play('maxMultSfx');
       Pulse.Music.pulseDuck();
       if (this.view) this.view.milestone();
@@ -747,6 +766,7 @@
           if (!s.active || s.y > this.H || s.y + s.h < -40) continue;
           if (s.kind === 'pickup') Pulse.Render.pickup(g, s, this.orbX, dimmed);
           else if (s.kind === 'barrier') Pulse.Render.barrier(g, s, this.W, canSmash(s));
+          else if (s.ring) Pulse.Render.ring(g, s, this.level.time);
           else Pulse.Render.walls(g, s, this.W);
         }
       }
@@ -759,7 +779,7 @@
       if (this.state === 'playing') this.chargeSounds();
 
       const warn = active && this.chargedComing();
-      if (warn && !this.warnShown && this.state === 'playing') this.sfx('approachCue', 0.07); // a charged barrier is coming
+      if (warn && !this.warnShown && this.state === 'playing') this.sfx('approachCue', C.groove.eventDelay); // a charged barrier is coming
       this.warnShown = warn;
       if (this.warnIcon) this.warnIcon.setVisible(this.warnShown);
 

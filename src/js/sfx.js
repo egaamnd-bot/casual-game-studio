@@ -315,9 +315,19 @@
     },
 
     // Quieter music behind the pause screen.
+    // While paused the track dips and then holds (pauses) where it is, so the run clock and the
+    // music stay in step and resuming needs no seek (a seek would click). Coming back picks it up
+    // from the same spot.
     duck(on) {
       this.level = on ? 0.4 : 1;
-      if (this.el && !this.el.paused) this.fadeTo(this.targetVolume(), 200);
+      this.holding = !!on;
+      if (this.el && !this.el.paused) {
+        this.fadeTo(this.targetVolume(), 200, () => {
+          if (this.holding && this.el) this.el.pause();
+        });
+      } else if (!on && this.wanted) {
+        this.sync();
+      }
     },
 
     // Called on unlock / return from background: start whatever should be playing.

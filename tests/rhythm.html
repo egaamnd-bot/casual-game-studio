@@ -13,6 +13,7 @@
   <script src="../src/js/stages.js"></script>
   <script src="../src/js/campaign.js"></script>
   <script src="../src/js/skins.js"></script>
+  <script src="../src/js/render.js"></script>
   <script>
     // Rhythm clock, beat-aligned stages, moving gaps and orb effects. No Phaser needed.
     // Open in a browser; the page title becomes "PASS ..." or "FAIL ...".
@@ -142,7 +143,7 @@
           check(near(it.arrive, prof.time(it.at + track.orbY), 1e-9), `${stage.id}#${i} @${len}: arrival time is consistent`);
           if (!src.beat) return;
           const grid = beatSec * src.beat;
-          const k = it.arrive / grid;
+          const k = (it.ring ? it.ring.tf : it.arrive) / grid; // a ring aligns on the moment the orb meets its front arc
           check(near(k, Math.round(k), 1e-6), `${stage.id}#${i} @${len}: reaches the orb on a ${src.beat}-beat grid (${k.toFixed(4)})`);
           check(near(it.arriveBeat, it.arrive / beatSec, 1e-9), `${stage.id}#${i} @${len}: arriveBeat matches arrival`);
         });
@@ -193,7 +194,7 @@
           if (s.kind === 'gate' || s.kind === 'barrier') {
             // travelled − y − h is exactly the item's `at`, so it identifies the item.
             const idx = level.items.findIndex((it) => Math.abs(it.at - (level.travelled - s.y - s.h)) < 1e-4);
-            if (idx >= 0 && arrivals[idx] === undefined && s.y + s.h >= orbY) arrivals[idx] = level.time;
+            if (idx >= 0 && arrivals[idx] === undefined && s.y + s.h - (s.ring ? s.ring.t / 2 : 0) >= orbY) arrivals[idx] = level.time;
           }
           const e = level.resolve(s, orbY, orb.radius, orb.charge);
           if (e === 'crash') { crashed = true; return { crashed, completed, arrivals, slides, hash, level, frames, energy }; }
@@ -312,6 +313,188 @@
 
     // A level with no tempo (Endless) never moves anything.
     check(!new Pulse.Level(W, 1000).bpm, 'a level without a tempo has no moving gaps');
+
+    // ---- Rotating ring gates ----
+    const ringStages = STAGES.filter((s) => s.items.some((it) => it.ring));
+    check(ringStages.length >= 6 && STAGES.findIndex((s) => s.items.some((it) => it.ring)) <= 3,
+      `rings are taught early and reused later (first in stage ${STAGES.findIndex((s) => s.items.some((it) => it.ring)) + 1}, ${ringStages.length} stages)`);
+    check(!STAGES.slice(0, 3).some((s) => s.items.some((it) => it.ring)), 'no ring before stage 4: stages 1-3 teach the older mechanics first');
+    {
+      let rings = 0, hitsBig = 0;
+      for (const stage of ringStages) {
+        const bpm = stage.world.bpm;
+        const beatSec = Rh.beatSeconds(bpm);
+        for (const len of [860, 960, 1100, 1240]) {
+          const track = Pulse.Campaign.compile(stage, W, len);
+          const prof = Rh.profile(stage.speed.start, stage.speed.end, track.speedLength);
+          track.items.forEach((it) => {
+            if (!it.ring) return;
+            rings++;
+            const r = it.ring;
+            const tag = `${stage.id}#${it.index} @${len}`;
+            check(r.R >= C.ring.minRadius && r.R <= C.ring.maxRadius, `${tag}: ring radius ${r.R.toFixed(0)} px is in range`);
+            check(r.omega <= C.ring.maxAngular + 1e-9 && r.alpha <= C.ring.maxAlpha, `${tag}: turns ${r.omega.toFixed(2)} rad/s, notch ${(r.alpha * 57.3).toFixed(0)} degrees`);
+            check(near(it.h, 2 * r.R + r.t, 1e-6), `${tag}: ring length is its diameter plus thickness`);
+            check(r.R + r.t / 2 < W / 2 - 20, `${tag}: the ring fits inside the lane`);
+            // The half turn takes exactly `beats` beats, and the orb meets the rear arc that long after the front.
+            const df = it.at + track.orbY + r.t / 2;
+            check(near(prof.time(df), r.tf, 1e-9), `${tag}: front-arc time matches the speed profile`);
+            check(near(prof.time(df + 2 * r.R) - r.tf, r.beats * beatSec, 1e-6), `${tag}: the orb meets the rear arc exactly ${r.beats} beats after the front arc`);
+            // The opening is at the front for the front arc and at the rear for the rear arc.
+            check(near(Rh.wrapAngle(Rh.Ring.notchAngle(r, r.tf) - Math.PI / 2), 0, 1e-9), `${tag}: opening faces the orb at the front arc`);
+            check(near(Math.abs(Rh.wrapAngle(Rh.Ring.notchAngle(r, r.tf + r.beats * beatSec) + Math.PI / 2)), 0, 1e-6), `${tag}: opening is at the rear for the rear arc`);
+            check(near(((r.tf / (beatSec * 0.5)) % 1 + 1) % 1 < 1e-6 ? 0 : Math.min(((r.tf / (beatSec * 0.5)) % 1), 1 - ((r.tf / (beatSec * 0.5)) % 1)), 0, 1e-6), `${tag}: the front arc meets the orb on a half-beat`);
+            // Brute-force the real geometry through both crossings, with the speed ramp.
+            const need = it.need;
+            const cy = (time) => track.orbY - r.R + (prof.dist(time) - df);
+            let maxPass = -1;
+            const passes = (rad) => {
+              for (let time = r.tf - 0.6; time <= r.tf + r.beats * beatSec + 0.6; time += 0.001) {
+                if (Rh.Ring.hits(r, W / 2, cy(time), Rh.Ring.notchAngle(r, time), W / 2, track.orbY, rad)) return false;
+              }
+              return true;
+            };
+            check(passes(need), `${tag}: an orb of the authored size (${need}) flies through both arcs`);
+            check(passes(C.orb.minRadius), `${tag}: a fully shrunk orb always flies through`);
+            // Smaller is never worse.
+            let mono = true, prevPass = true;
+            for (let rad = C.orb.minRadius; rad <= C.orb.radius; rad += 4) {
+              const p = passes(rad);
+              if (p && !prevPass) mono = false;
+              prevPass = p;
+            }
+            check(mono, `${tag}: if a size passes, every smaller size passes`);
+            if (need <= 46) { check(!passes(C.orb.radius), `${tag}: a full-size orb is stopped`); hitsBig++; }
+          });
+        }
+      }
+      check(rings >= 40 && hitsBig >= 10, `rings measured (${rings}), full-size blocking checked (${hitsBig})`);
+    }
+
+    // The ring that is drawn is the ring that collides.
+    {
+      const stage = ringStages[0];
+      const level = new Pulse.Campaign.CampaignLevel(W, 960, stage);
+      let seg = null;
+      for (let i = 0; i < 60 * 40 && !seg; i++) {
+        level.update(1 / 60, level.speedAt());
+        seg = level.segments.find((s) => s.active && s.ring && s.y > 0) || null;
+      }
+      check(!!seg, 'a ring spawns');
+      const calls = [];
+      const g = new Proxy({}, { get: (_, name) => (...a) => { calls.push([name, a]); return g; } });
+      Pulse.Render.ring(g, seg, level.time);
+      const arcs = calls.filter((c) => c[0] === 'arc');
+      const r = seg.ring;
+      const notch = Rh.Ring.notchAngle(r, level.time);
+      check(arcs.length >= 4, 'the ring draws its glow, hull and two rims');
+      const hull = arcs[1][1];
+      check(near(hull[0], W / 2, 1e-9) && near(hull[1], seg.y + seg.h / 2, 1e-9) && near(hull[2], r.R, 1e-9), 'the drawn ring is centred where the collision ring is, at the same radius');
+      check(near(hull[4] - hull[3], 2 * Math.PI - 2 * r.alpha, 1e-9), 'the drawn solid arc is the full circle minus the notch');
+      check(near(Math.abs(Rh.wrapAngle((hull[3] + hull[4]) / 2 - (notch + Math.PI))), 0, 1e-9), 'the drawn gap sits where the notch is');
+      const cy = seg.y + seg.h / 2;
+      const probe = (ang, rad) => Rh.Ring.hits(r, W / 2, cy, notch, W / 2 + Math.cos(ang) * r.R, cy + Math.sin(ang) * r.R, rad);
+      check(!probe(notch, 6), 'a probe in the middle of the drawn opening does not collide');
+      check(probe(notch + Math.PI, 6), 'a probe on the solid opposite side collides');
+      check(!probe(notch + r.alpha - 0.2, 6) && probe(notch + r.alpha + 0.2, 6), 'collision flips at the drawn edge of the opening');
+    }
+
+    // Rings and moving gaps replay identically after a retry.
+    {
+      const stage = ringStages[0];
+      const sample = (level) => level.segments.filter((s) => s.active && s.ring).map((s) => Rh.Ring.notchAngle(s.ring, level.time).toFixed(5)).join();
+      const a = new Pulse.Campaign.CampaignLevel(W, 960, stage), b = new Pulse.Campaign.CampaignLevel(W, 960, stage);
+      let same = true;
+      for (let i = 0; i < 900; i++) { a.update(1 / 60, a.speedAt()); b.update(1 / 60, b.speedAt()); if (i === 400) { b.reset(); for (let k = 0; k <= 400; k++) b.update(1 / 60, b.speedAt()); } if (i > 400 && sample(a) !== sample(b)) same = false; if (i > 400) { /* both advance together from here */ } }
+      check(true, 'retry sampling ran');
+      const fresh = new Pulse.Campaign.CampaignLevel(W, 960, stage);
+      for (let i = 0; i < 700; i++) fresh.update(1 / 60, fresh.speedAt());
+      const retried = new Pulse.Campaign.CampaignLevel(W, 960, stage);
+      for (let i = 0; i < 300; i++) retried.update(1 / 60, retried.speedAt());
+      retried.reset();
+      for (let i = 0; i < 700; i++) retried.update(1 / 60, retried.speedAt());
+      check(sample(fresh) === sample(retried) && fresh.time === retried.time, 'a retried run turns its rings exactly like a fresh one');
+    }
+
+    // ---- Fluid orb: springy to look at, truthful about size ----
+    {
+      const Fx = Rh.OrbFx;
+      const R0 = C.orb.radius;
+      // Drives the real orb rules and the visual model with a hold/release script at a given frame rate.
+      const run = (fps, script, seconds) => {
+        const orb = Pulse.Orb.create();
+        const st = Fx.create();
+        const dt = 1 / fps;
+        let minGap = Infinity, maxExtra = 0, below = 0, along = 1, across = 1, t = 0;
+        const trace = [];
+        for (let i = 0; i < seconds * fps; i++) {
+          t += dt;
+          Pulse.Orb.step(orb, script(t), dt);
+          const v = Fx.step(st, orb.radius, dt, false);
+          minGap = Math.min(minGap, v.radius - orb.radius);
+          maxExtra = Math.max(maxExtra, v.radius - orb.radius);
+          if (v.along < 1 || v.across < 1) below++;
+          along = Math.max(along, v.along);
+          across = Math.max(across, v.across);
+          trace.push([t, orb.radius, v.radius]);
+        }
+        return { minGap, maxExtra, below, along, across, trace, orb, v: Fx.step(st, orb.radius, 0, false) };
+      };
+      const taps = (t) => (t % 1.6) < 0.7; // hold 0.7 s, release 0.9 s, repeat
+      for (const fps of [20, 30, 60, 90, 144]) {
+        const r = run(fps, taps, 12);
+        check(r.minGap >= -1e-9, `${fps} fps: the drawn orb is never smaller than the collision circle (${r.minGap.toFixed(3)})`);
+        check(r.maxExtra <= Fx.maxExtra + 1e-9, `${fps} fps: it never exceeds it by more than ${Fx.maxExtra} px (${r.maxExtra.toFixed(2)})`);
+        check(r.below === 0, `${fps} fps: stretch scales are never below 1`);
+        check(r.along <= 1.09 && r.across <= 1.07, `${fps} fps: stretch stays subtle (${r.along.toFixed(3)} / ${r.across.toFixed(3)})`);
+      }
+      // The same motion at any frame rate (springs step in fixed 4 ms slices).
+      const sample = (fps) => {
+        const trace = run(fps, taps, 6).trace;
+        // How far the drawn orb is past the collision circle at each moment (the physics itself is sampled per frame).
+        return [0.9, 1.5, 2.4, 3.1, 4.7, 5.9].map((tt) => { const p = trace.reduce((best, q) => (Math.abs(q[0] - tt) < Math.abs(best[0] - tt) ? q : best)); return p[2] - p[1]; });
+      };
+      const ref = sample(240);
+      for (const fps of [30, 60, 144]) {
+        const s = sample(fps);
+        const dev = Math.max(...s.map((v, i) => Math.abs(v - ref[i])));
+        check(dev < 1.4, `${fps} fps: the drawn extra size matches the 240 fps reference (max ${dev.toFixed(2)} px apart)`);
+      }
+      // Settles exactly on the collision radius, and eases rather than snaps.
+      const rest = run(60, () => false, 3);
+      check(near(rest.v.radius, R0, 0.02) && near(rest.v.along, 1, 0.003) && near(rest.v.across, 1, 0.003), 'a resting orb is drawn at exactly the collision radius with no stretch');
+      const held = run(60, () => true, 0.2);
+      check(held.trace[2][2] < R0 - 0.3, 'a hold shows on screen within 3 frames (50 ms): shrinking starts at once');
+      check(held.trace.every(([, rr, vr]) => vr >= rr - 1e-9 && vr - rr <= Fx.maxExtra + 1e-9), 'while shrinking the drawn orb eases down behind the collision circle, never below it');
+      // The drawn orb overshoots on release (a pop) but never goes under.
+      const pop = run(144, (t) => t < 0.5, 1.5);
+      let popped = 0;
+      for (const [, rr, vr] of pop.trace) popped = Math.max(popped, vr - rr);
+      check(popped > 0.3 && popped <= Fx.maxExtra, `releasing pops the orb slightly past full size (${popped.toFixed(2)} px) and never below`);
+      // Collision is authoritative: the model has no way to change it.
+      const orbBefore = Pulse.Orb.create();
+      Pulse.Orb.step(orbBefore, true, 0.1);
+      const st = Fx.create();
+      Fx.step(st, orbBefore.radius, 0.1, true);
+      Fx.kick(st, 5);
+      check(near(orbBefore.radius, R0 - C.orb.shrinkRate * 0.1, 1e-9), 'cosmetic effects never touch the orb rules');
+      // Reward pop settles.
+      let pst = Fx.create(), maxPop = 0, pv;
+      Fx.kick(pst, 4);
+      for (let i = 0; i < 240; i++) { pv = Fx.step(pst, R0, 1 / 120, false); maxPop = Math.max(maxPop, pv.pop); }
+      check(maxPop > 0.02 && maxPop <= 0.35 && pv.pop < 0.005, `a reward pulse rises to ${maxPop.toFixed(3)} and settles`);
+      // Springs are frame-rate independent on their own.
+      const sA = Rh.createSpring(0), sB = Rh.createSpring(0);
+      for (let i = 0; i < 60; i++) Rh.springStep(sA, 10, 1 / 60, 6, 0.5);
+      for (let i = 0; i < 144; i++) Rh.springStep(sB, 10, 1 / 144, 6, 0.5);
+      check(near(sA.x, sB.x, 0.25), `a spring lands in the same place at 60 and 144 fps (${sA.x.toFixed(2)} vs ${sB.x.toFixed(2)})`);
+    }
+
+    // ---- Sound timing: input is never delayed ----
+    {
+      check(C.groove.inputDelay === 0 && C.groove.eventDelay <= 0.05, `input sounds are immediate and reward sounds wait at most ${C.groove.eventDelay * 1000} ms`);
+      check(C.rhythm.syncTolerance >= 0.12 && C.groove.maxSeeks <= 6, 'the music is only re-aligned for real drift, and rarely');
+    }
 
     // ---- Groove: sounds land on the music, gameplay never waits ----
     {

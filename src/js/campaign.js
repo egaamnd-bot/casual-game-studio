@@ -21,6 +21,22 @@
     return build(stage, width, orbY, bpm, build(stage, width, orbY, bpm, null).finishAt);
   }
 
+  // Ring geometry. The ring turns half a revolution in `beats` beats while the orb is inside it, so
+  // its radius is the distance the orb travels in that time (half of it each way), and the notch is
+  // widened just enough to let an orb of radius `need` through both arcs: the same geometry that
+  // Level.ringHit tests and the renderer draws.
+  function buildRing(item, need, prof, orbY, beatSec) {
+    const t = C.ring.thickness;
+    const nb = item.ring.beats * beatSec;
+    const df = item.at + orbY + t / 2; // travelled when the orb meets the front arc's centre line
+    const tf = prof.time(df);
+    const span = prof.dist(tf + nb) - df; // distance covered during the half turn
+    const omega = Math.PI / nb;
+    const alpha = Pulse.Rhythm.Ring.minAlpha(span / 2, t, omega, need, prof.speed(df), prof.speed(df + span)) + C.ring.margin;
+    item.ring = { dir: item.ring.dir, beats: item.ring.beats, R: span / 2, t, omega, tf, alpha };
+    item.h = span + t;
+  }
+
   function build(stage, width, orbY, bpm, speedLength) {
     const items = [];
     const prof = speedLength ? Pulse.Rhythm.profile(stage.speed.start, stage.speed.end, speedLength) : null;
@@ -33,15 +49,18 @@
         : Pulse.Track.spaceFor(prevType, src.type, src.t, stage.speed.end);
       const item = Pulse.Track.placeItem(Object.assign({}, src, { space }), prevTop, width);
       if (prof) {
-        const arrive = prof.time(item.at + orbY);
+        // A ring is aligned on the moment the orb meets the centre line of its front arc.
+        const lead = item.ring ? C.ring.thickness / 2 : 0;
+        const arrive = prof.time(item.at + orbY + lead);
         if (src.beat) {
           const grid = beatSec * src.beat;
           const onGrid = Math.ceil(arrive / grid - 1e-6) * grid;
-          item.at = prof.dist(onGrid) - orbY;
+          item.at = prof.dist(onGrid) - orbY - lead;
           item.space = item.at - prevTop;
         }
         item.arrive = prof.time(item.at + orbY);
         item.arriveBeat = item.arrive / beatSec;
+        if (item.ring) buildRing(item, src.need, prof, orbY, beatSec);
       }
       item.index = i;
       items.push(item);
@@ -81,6 +100,12 @@
       if (!ITEM_TYPES.includes(it.type)) err(`unknown item type "${it.type}"`);
       if (!(it.space > 0) && !(it.t >= 0)) err(`item ${stage.items.indexOf(it)} needs space > 0 or t >= 0`);
       if (it.type === 'gate' && !(typeof it.need === 'number')) err(`gate ${stage.items.indexOf(it)} needs a numeric need`);
+      if (it.ring) {
+        const n = stage.items.indexOf(it);
+        if (it.type !== 'gate' || it.length || it.slide) err(`item ${n}: a ring is a plain gate`);
+        if (!it.beat) err(`item ${n}: a ring must be beat-aligned (use on())`);
+        if (!(it.ring.beats === undefined || (it.ring.beats >= 1.5 && it.ring.beats <= 4))) err(`item ${n}: ring half-turn must take 1.5-4 beats`);
+      }
       if (it.slide) {
         const n = stage.items.indexOf(it);
         const bpm = stage.bpm || stage.world.bpm;
@@ -98,6 +123,15 @@
     if (errors.length) return errors;
 
     const track = compile(stage, width);
+    for (const it of track.items) {
+      if (!it.ring) continue;
+      const r = it.ring;
+      const n = it.index;
+      if (r.R < C.ring.minRadius || r.R > C.ring.maxRadius) err(`item ${n}: ring radius ${r.R.toFixed(0)} px outside ${C.ring.minRadius}-${C.ring.maxRadius}`);
+      if (r.omega > C.ring.maxAngular) err(`item ${n}: ring turns ${r.omega.toFixed(2)} rad/s, above the ${C.ring.maxAngular} limit`);
+      if (r.alpha > C.ring.maxAlpha) err(`item ${n}: ring notch ${(r.alpha * 57.3).toFixed(0)} degrees half-width is too wide for the need`);
+    }
+    if (errors.length) return errors;
     return Pulse.Track.validateItems(track.items, (it) => speedAtDistance(stage, track.speedLength, it.at), stage.id);
   }
 

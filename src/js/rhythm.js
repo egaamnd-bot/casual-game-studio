@@ -128,6 +128,80 @@
   // Fastest the obstacle's edge moves (px/s) at the given tempo.
   const motionRate = (spec, bpm) => (spec.amp * (spec.kind === 'breathe' ? Math.PI : TAU)) / (spec.beats * beatSeconds(bpm));
 
+  // ---- Rotating ring gate ----
+  // A ring centred on the lane, travelling toward the orb, with one notch (the opening). The orb
+  // flies through the *front* arc and, half a turn later, the *rear* arc, so the ring turns exactly
+  // half a revolution while the orb is inside it: the opening is at the front when the orb meets the
+  // front arc and at the rear when it meets the rear arc. Whole-beat timing: the half turn takes
+  // `beats` beats. Angles are track-space angles (0 = +x across the lane, +90deg = toward the orb).
+  const wrapAngle = (a) => {
+    const t = ((a + Math.PI) % TAU + TAU) % TAU;
+    return t - Math.PI;
+  };
+
+  const Ring = {
+    // Angle of the notch's centre at run time `time`. `ring` = { dir, omega, tf } (see campaign.js).
+    notchAngle(ring, time) {
+      return Math.PI / 2 + ring.dir * ring.omega * (time - ring.tf);
+    },
+
+    // Half-angle (rad) of the arc of the ring's centre line that an orb of radius `r`, with its
+    // centre `d` from the ring's centre, overlaps. Ring thickness `t`, ring radius `R`.
+    overlap(R, t, d, r) {
+      const rho = r + t / 2;
+      if (Math.abs(d - R) >= rho || d < 1e-6) return -1; // no contact
+      return Math.acos(clamp((R * R + d * d - rho * rho) / (2 * R * d), -1, 1));
+    },
+
+    // Whether the orb at (x, y) with radius r is touching a solid part of the ring whose centre is
+    // (cx, cy) and whose notch (half-angle `alpha`) is centred on `notch`. Exact geometry: the orb
+    // is safe only if every point of the ring it overlaps lies inside the notch.
+    hits(ring, cx, cy, notch, x, y, r) {
+      const dx = x - cx;
+      const dy = y - cy;
+      const d = Math.hypot(dx, dy);
+      const g = Ring.overlap(ring.R, ring.t, d, r);
+      if (g < 0) return false;
+      return Math.abs(wrapAngle(Math.atan2(dy, dx) - notch)) + g > ring.alpha;
+    },
+
+    // The smallest notch half-angle that lets an orb of radius `need` through both arcs when the
+    // ring is aligned at their mid points, given the speeds there. Found by sweeping the crossing
+    // in small steps, so the geometry that is drawn and the geometry that is tested are the same.
+    minAlpha(R, t, omega, need, speedFront, speedRear) {
+      let worst = 0;
+      for (const v of [speedFront, speedRear]) {
+        const rho = need + t / 2;
+        const span = rho / v + 0.02;
+        for (let tau = -span; tau <= span; tau += 0.002) {
+          const d = Math.abs(R - v * tau); // the orb's distance from the ring's centre
+          const g = Ring.overlap(R, t, d, need);
+          if (g < 0) continue;
+          worst = Math.max(worst, g + omega * Math.abs(tau));
+        }
+      }
+      return worst;
+    },
+  };
+
+  // ---- Fluid motion helpers (cosmetic smoothing; never feed back into the rules) ----
+  // A spring stepped in fixed 4 ms slices, so the result is the same at 30, 60 or 144 fps.
+  const SPRING_STEP = 1 / 240;
+  function createSpring(x) {
+    return { x: x || 0, v: 0, acc: 0 };
+  }
+
+  function springStep(s, target, dt, freq, zeta) {
+    s.acc += Math.min(Math.max(dt, 0), 0.1);
+    const w = TAU * freq;
+    while (s.acc >= SPRING_STEP) {
+      s.v += (w * w * (target - s.x) - 2 * zeta * w * s.v) * SPRING_STEP;
+      s.x += s.v * SPRING_STEP;
+      s.acc -= SPRING_STEP;
+    }
+    return s.x;
+  }
+
   // ---- Audio sync ----
   // Signed distance (s) the music is ahead of the clock, accounting for the loop wrapping.
   function audioError(trackT, audioPos, loop) {
@@ -168,6 +242,44 @@
     // Scale multipliers for the glow and the body.
     scales(phase, stretch) {
       return { glow: 1 + OrbFx.maxGlow * pulse(phase, C.rhythm.pulseSharpness), along: 1 + stretch, across: 1 };
+    },
+
+    // ---- A springy orb that never lies about its size ----
+    // The collision radius `r` (Pulse.Orb) is authoritative and moves at a constant rate. What is
+    // *drawn* follows it through springs so the orb feels alive: it eases into a shrink instead of
+    // snapping to full speed, springs past its full size when released (a pop), stretches along
+    // the direction of travel while changing size and bulges across the lane while growing.
+    // The drawn radius is always `r` plus a small non-negative extra, and the stretch scales are
+    // always >= 1: the picture can only be bigger than what collides, never smaller.
+    maxExtra: 7, // px the drawn orb may exceed the collision circle
+    create() {
+      return {
+        radius: createSpring(C.orb.radius), along: createSpring(1), across: createSpring(1),
+        pop: createSpring(0), prev: C.orb.radius,
+      };
+    },
+    // Advances the visual model one frame. `squeeze` = a gate wall is passing the orb.
+    step(st, r, dt, squeeze) {
+      const rate = dt > 0 ? (r - st.prev) / dt : 0;
+      st.prev = r;
+      springStep(st.radius, r, dt, 6.5, 0.6);
+      const shrink = clamp(-rate / C.orb.shrinkRate, 0, 1.2);
+      const grow = clamp(rate / C.orb.growRate, 0, 1.2);
+      springStep(st.along, 1 + 0.06 * shrink + 0.02 * grow + (squeeze ? 0.03 : 0), dt, 9, 0.7);
+      springStep(st.across, 1 + 0.045 * grow, dt, 9, 0.7);
+      springStep(st.pop, 0, dt, 8, 0.4);
+      return {
+        radius: r + clamp(st.radius.x - r, 0, OrbFx.maxExtra),
+        along: Math.max(1, st.along.x),
+        across: Math.max(1, st.across.x),
+        pop: clamp(st.pop.x, 0, 0.35),
+        shrink,
+        grow,
+      };
+    },
+    // A reward (pickup, smash) makes the orb pulse once.
+    kick(st, amount) {
+      st.pop.v += amount;
     },
   };
 
@@ -220,5 +332,6 @@
   Pulse.Rhythm = {
     TRACKS, beatSeconds, createClock, reset, retune, trackTime, beatAt, position, step, pulse,
     profile, motionOffset, motionShape, motionRate, audioError, seekTarget, OrbFx, Groove,
+    Ring, wrapAngle, createSpring, springStep,
   };
 })();

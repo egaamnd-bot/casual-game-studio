@@ -100,12 +100,13 @@
         check(g.state === 'playing', `run ${k}: still playing after 3s with autopilot`);
         // Orb art edge equals the collision radius at full size.
         g.radius = C.orb.radius; g.draw();
-        // (Comet look: the round disc is the orb; it is drawn at exactly the collision radius across the lane and never shorter along it.)
+        // (Comet look: the round disc is the orb; it is never smaller than the collision circle, at most a few px bigger while it springs, and never shorter along travel.)
         const body = g.view.comet ? g.view.cometBody : null;
-        check(body ? near(body.displayWidth / 2, C.orb.radius) && body.displayHeight >= body.displayWidth - 0.01
+        const within = (rad) => body.displayWidth / 2 >= rad - 0.01 && body.displayWidth / 2 <= rad + Pulse.Rhythm.OrbFx.maxExtra + 0.01;
+        check(body ? within(C.orb.radius) && body.displayHeight >= body.displayWidth - 0.01
           : near(g.view.body.displayWidth / 2 * (A.orbBodyRadius / 64), C.orb.radius), `run ${k}: orb art radius = ${C.orb.radius}`);
         g.radius = C.orb.minRadius; g.draw();
-        check(body ? near(body.displayWidth / 2, C.orb.minRadius) && body.displayHeight >= body.displayWidth - 0.01
+        check(body ? within(C.orb.minRadius) && body.displayHeight >= body.displayWidth - 0.01
           : near(g.view.core.displayWidth / 2 * (A.orbShrunkRadius / 38), C.orb.minRadius), `run ${k}: shrunk art radius = ${C.orb.minRadius}`);
         const gates = g.level.segments.filter((s) => s.active && s._vis && s._vis.kind === 'gate' && s._vis.parts[1].visible);
         if (gates.length) {

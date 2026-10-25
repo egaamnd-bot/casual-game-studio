@@ -74,7 +74,12 @@
   function placeItem(src, prevTop, width) {
     const h = itemHeight(src);
     const item = { type: src.type, at: prevTop + src.space, h, space: src.space };
-    if (src.type === 'gate' && src.slide) {
+    if (src.type === 'gate' && src.ring) {
+      // Rotating ring: geometry (radius, notch, timing) is filled in by Pulse.Campaign.compile,
+      // which knows the speed ramp. Until then it is an ordinary gap of clearance `need`.
+      Pulse.setGap(item, src.need, 0, width);
+      item.ring = { dir: src.ring.dir < 0 ? -1 : 1, beats: src.ring.beats || 2 };
+    } else if (src.type === 'gate' && src.slide) {
       // Moving gap: `need` is the clearance at its tightest, so the gap is `amp` wider than that
       // when centred. It starts centred; Level.applyMotion moves it.
       const s = src.slide;
@@ -226,7 +231,9 @@
       seg.y = this.travelled - it.at - it.h;
       seg.pattern = it.pattern || null;
       seg.slide = it.slide || null;
+      seg.ring = it.ring || null;
       seg.pinged = false;
+      seg.whooshed = false;
       seg.arriveBeat = it.arriveBeat || 0;
       seg.minNeed = it.need; // tightest clearance over a moving gap's whole cycle
       // Segments are pooled: reset flags a previous use may have left (a recycled charged
@@ -246,9 +253,16 @@
       }
     }
 
+    // A ring gate: the ring is centred on the lane, and its notch turns with the run clock.
+    ringHit(seg, x, y, r) {
+      const cx = this.width / 2;
+      return Pulse.Rhythm.Ring.hits(seg.ring, cx, seg.y + seg.h / 2, Pulse.Rhythm.Ring.notchAngle(seg.ring, this.time), x, y, r);
+    }
+
     hitsWall(seg, x, y, r) {
       if (seg.kind !== 'gate') return false;
       if (y + r < seg.y || y - r > seg.y + seg.h) return false;
+      if (seg.ring) return this.ringHit(seg, x, y, r);
       return circleRect(x, y, r, 0, seg.y, seg.gapL, seg.h) ||
         circleRect(x, y, r, seg.gapR, seg.y, this.width - seg.gapR, seg.h);
     }

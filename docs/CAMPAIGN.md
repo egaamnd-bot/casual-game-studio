@@ -17,7 +17,7 @@
 | 1 | Neon Circuit | First Contact | 200→220 | Shrinking through gaps, releasing for gold. No barriers. | 6 | – | 0.40 |
 | 2 | Neon Circuit | Break the Barrier | 220→240 | **Barriers.** First one alone while already big, then after a gap with lots of time. | 6 | – | 0.34 |
 | 3 | Neon Circuit | Alternating Rhythm | 240→260 | Gaps and barriers alternating at a steady beat; **first moving (swaying) gaps**, see [RHYTHM.md](RHYTHM.md). | 5 | – | 0.44 |
-| 4 | Neon Circuit | Split Decision | 255→280 | Quicker switches; gold dares (a short release between gaps); moving gaps at the ends of their swing. | 5 | – | 0.61 |
+| 4 | Neon Circuit | Split Decision | 255→280 | Quicker switches; gold dares (a short release between gaps); **first rotating rings** (see [RHYTHM.md](RHYTHM.md)); a swinging gap. | 5 | – | 0.61 |
 | 5 | Chromatic Overdrive | Charged Energy | 270→290 | **Charged barriers.** First while already charged, then after a gap with a long lead. | 6 | – | 0.50 |
 | 6 | Chromatic Overdrive | The Long Hold | 280→305 | **Tunnels** (sustained holds) with recovery gold, then barriers after them. | 7 | – | 0.40 |
 | 7 | Chromatic Overdrive | Double Trouble | 290→315 | **Double and triple squeezes** (hold through), mixed with barriers. | 6 | – | 0.40 |
