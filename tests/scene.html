@@ -191,10 +191,13 @@
       // ---- Audio lifecycle (state checks; real playback needs a genuine tap on a device) ----
       const A = () => Pulse.Audio.status();
       check(Pulse.Music.wanted === 'WORLD_1_GAMEPLAY', `endless starts on the World 1 track (${Pulse.Music.wanted})`);
+      while (!e.od.active) Pulse.Overdrive.charge(e.od, 'chargedBreak', {});
+      const odLeft = e.od.remaining;
       e.elapsed = 35; e.step(1 / 60);
       check(Pulse.Music.wanted === 'WORLD_2_GAMEPLAY', `endless moves to the World 2 track after 30 s (${Pulse.Music.wanted})`);
       e.elapsed = 65; e.step(1 / 60);
       check(Pulse.Music.wanted === 'WORLD_3_GAMEPLAY', `endless moves to the World 3 track after 60 s (${Pulse.Music.wanted})`);
+      check(e.od.active && e.od.remaining < odLeft && e.od.remaining > odLeft - 0.1, 'a track change leaves Overdrive running and undisturbed');
       check(e.clock.bpm === 140 && Pulse.Rhythm.trackTime(e.clock) < 0.1, `endless clock follows the track change (${e.clock.bpm} BPM)`);
       e.pause();
       check(e.state === 'paused' && Pulse.Music.level < 1, 'pause ducks the music');
@@ -223,6 +226,7 @@
       check(Pulse.Music.wanted === 'WORLD_2_GAMEPLAY', 'stage 5 run: World 2 track');
       scene().scene.start('game', { mode: 'campaign', stageIndex: 9 }); await wait(300);
       check(Pulse.Music.wanted === 'WORLD_3_GAMEPLAY', 'stage 10: World 3 track from the ready screen');
+      check(scene().od && !scene().od.active && scene().od.meter === 0 && scene().od.fx === 0, 'a new stage starts with a fresh Overdrive state');
 
       // Menus render, with the menu theme.
       scene().scene.start('menu'); await wait(300);
