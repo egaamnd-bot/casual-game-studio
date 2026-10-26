@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Pulse overdrive tests</title></head>
+<body>
+  <pre id="out">running…</pre>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/melody.js"></script>
+  <script src="../src/js/overdrive.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/patterns.js"></script>
+  <script>
+    // Overdrive meter, combo milestones and their musical layers (docs/OVERDRIVE.md). Pure rules: no
+    // Phaser, no audio. The scene wiring (pause, retry, HUD) is covered in scene.html.
+    const C = Pulse.CONFIG, O = C.overdrive, OD = Pulse.Overdrive, M = Pulse.Melody;
+    const W = C.width;
+    let checks = 0, failures = 0; const msgs = [], lines = [];
+    const check = (ok, m) => { checks++; if (!ok) { failures++; msgs.push('FAIL ' + m); } };
+    const near = (a, b, e) => Math.abs(a - b) <= e;
+
+    // ---- Charge amounts ----
+    check(OD.amount('pass', {}, 1) === O.charge.pass, 'a plain gate pass charges its base value');
+    check(near(OD.amount('pickup', { quality: 'perfect' }, 1), O.charge.pickup * O.perfectMult, 1e-9), 'Perfect charges 40% more');
+    check(near(OD.amount('break', { combo: 4 }, 1), O.charge.break * 1.1, 1e-9) && near(OD.amount('break', { combo: 8 }, 1), O.charge.break * 1.2, 1e-9), 'every 4 in a row adds 10%');
+    check(near(OD.amount('break', { combo: 400 }, 1), O.charge.break * (1 + O.comboMaxBonus), 1e-9), 'the combo bonus is capped at +30%');
+    check(near(OD.amount('pass', {}, 2), O.charge.pass * (1 - O.repeatDrop), 1e-9), 'repeating the same kind earns 12% less each time');
+    check(OD.amount('pass', {}, 50) === O.charge.pass * O.minRepeat, 'repeats never earn less than half');
+    check(O.charge.chargedBreak > O.charge.break && O.charge.break > O.charge.pickup && O.charge.bonus > O.charge.pickup && O.charge.pickup > O.charge.pass, 'harder / riskier contacts charge more');
+    check(OD.amount('bogus', {}, 1) === 0, 'an unknown kind charges nothing');
+    // Worst case per contact (charged smash, Perfect, big combo) stays a fraction of the meter.
+    check(OD.amount('chargedBreak', { quality: 'perfect', combo: 99 }, 1) < O.threshold * 0.3, 'no single contact can fill more than 30% of the meter');
+
+    // ---- Filling and activating ----
+    {
+      const od = OD.create();
+      let started = 0, n = 0;
+      while (!od.active && n < 1000) { const r = OD.charge(od, n % 2 ? 'pass' : 'pickup', { combo: 0 }); n++; if (r.started) started++; }
+      check(od.active && started === 1 && od.activations === 1, `the meter fills and Overdrive starts once (after ${n} alternating contacts)`);
+      check(od.meter === O.threshold && od.remaining === O.duration, 'it starts with a full meter and the full duration');
+      check(OD.fraction(od) === 1, 'the bar shows full at the start');
+      const before = od.meter;
+      const r = OD.charge(od, 'chargedBreak', { quality: 'perfect', combo: 20 });
+      check(r.added === 0 && !r.started && od.meter === before && od.activations === 1, 'contacts during Overdrive add nothing and cannot restart it');
+    }
+    // Spamming one easy action is weak: the meter needs many more passes than mixed play.
+    {
+      const spam = (kind, info) => { const od = OD.create(); let n = 0; while (!od.active && n < 5000) { OD.charge(od, kind, info); n++; } return n; };
+      const mixed = (() => { const od = OD.create(); const ks = ['pass', 'pickup', 'break', 'pass', 'bonus']; let n = 0; while (!od.active && n < 5000) { OD.charge(od, ks[n % ks.length], {}); n++; } return n; })();
+      const passes = spam('pass', {}), picks = spam('pickup', {}), perfectPasses = spam('pass', { quality: 'perfect', combo: 16 });
+      check(passes >= 30, `filling the meter with plain passes alone takes ${passes} (≥ 30)`);
+      check(picks >= 18, `with plain notes alone it takes ${picks} (≥ 18)`);
+      check(perfectPasses >= 20, `even Perfect passes at combo 16 alone take ${perfectPasses} (≥ 20)`);
+      check(mixed < passes, `mixed play (${mixed}) fills faster than spamming passes (${passes})`);
+      lines.push(`contacts to fill: passes ${passes}, notes ${picks}, perfect passes @16 ${perfectPasses}, mixed ${mixed}`);
+    }
+
+    // ---- Misses, crashes, retries ----
+    {
+      const od = OD.create();
+      for (let i = 0; i < 5; i++) OD.charge(od, 'break', {});
+      const m0 = od.meter;
+      check(OD.miss(od, true) === 0 && od.meter === m0, 'a missed mint (bonus) costs nothing');
+      check(OD.miss(od, false) === O.missPenalty && near(od.meter, m0 - O.missPenalty, 1e-9), 'a missed gold note drains 20');
+      OD.miss(od, false); OD.miss(od, false); OD.miss(od, false);
+      check(od.meter === 0, 'the meter never goes below zero');
+      OD.charge(od, 'pass', {}); OD.charge(od, 'pass', {});
+      check(OD.crash(od) === false && od.meter === 0 && od.chargedTotal === 0, 'a crash clears the meter');
+      // Active Overdrive: a miss does not touch it; a crash ends it.
+      const a = OD.create();
+      while (!a.active) OD.charge(a, 'chargedBreak', {});
+      a.remaining = 5;
+      OD.miss(a, false);
+      check(a.active && a.remaining === 5 && a.meter === O.threshold, 'a miss during Overdrive changes nothing (no free ride, no penalty)');
+      check(OD.crash(a) === true && !a.active && a.fx === 0 && a.remaining === 0, 'a crash ends Overdrive at once');
+      check(a.activations === 0, 'a retry starts with a fresh activation count');
+      OD.charge(a, 'pass', {});
+      check(a.meter > 0 && a.meter <= O.charge.pass, 'after a crash the meter fills from zero');
+    }
+
+    // ---- Clock: duration, frame-rate independence, pause ----
+    for (const fps of [20, 30, 60, 90, 144]) {
+      const od = OD.create();
+      while (!od.active) OD.charge(od, 'chargedBreak', {});
+      const dt = 1 / fps;
+      let t = 0, ends = 0, endedAt = 0;
+      for (let i = 0; i < fps * 12; i++) {
+        t += dt;
+        if (OD.tick(od, dt).ended) { ends++; endedAt = t; }
+      }
+      check(ends === 1, `${fps} fps: Overdrive ends exactly once`);
+      check(Math.abs(endedAt - O.duration) <= dt + 1e-9, `${fps} fps: it lasts ${O.duration} s (${endedAt.toFixed(3)})`);
+      check(!od.active && od.meter === 0 && od.fx === 0, `${fps} fps: it ends clean, with an empty meter and no leftover glow`);
+    }
+    {
+      // The eased intensity matches at every frame rate (exponential easing).
+      const sample = (fps, seconds) => { const od = OD.create(); while (!od.active) OD.charge(od, 'chargedBreak', {}); for (let i = 0; i < Math.round(fps * seconds); i++) OD.tick(od, 1 / fps); return od.fx; };
+      for (const s of [0.5, 1, 2]) {
+        const ref = sample(240, s);
+        for (const fps of [30, 60, 144]) check(near(sample(fps, s), ref, 0.002), `fx after ${s} s at ${fps} fps matches 240 fps (${sample(fps, s).toFixed(4)} vs ${ref.toFixed(4)})`);
+      }
+      const od = OD.create(); while (!od.active) OD.charge(od, 'chargedBreak', {});
+      let prev = 0, mono = true;
+      for (let i = 0; i < 120; i++) { OD.tick(od, 1 / 60); if (od.fx < prev - 1e-12) mono = false; prev = od.fx; }
+      check(mono && od.fx > 0.99, 'the glow rises smoothly to full and never overshoots');
+      check(OD.tick(od, 1 / 60).ended === false, 'no end while time remains');
+      // Fade out after the end is smooth too: no jump down.
+      od.remaining = 0.01; OD.tick(od, 1 / 60);
+      const first = od.fx; let down = first, smooth = true;
+      for (let i = 0; i < 300; i++) { OD.tick(od, 1 / 60); if (od.fx > down + 1e-12) smooth = false; down = od.fx; }
+      check(first > 0.9 && smooth && od.fx === 0, `the glow fades out smoothly after the end (starts at ${first.toFixed(2)})`);
+    }
+    {
+      // Pause: the scene stops calling step (dt = 0); a zero tick changes nothing.
+      const od = OD.create(); while (!od.active) OD.charge(od, 'pass', { combo: 0 }), od.meter += 0;
+      for (let i = 0; i < 60; i++) OD.tick(od, 1 / 60);
+      const snap = JSON.stringify(od);
+      for (let i = 0; i < 1000; i++) OD.tick(od, 0);
+      check(JSON.stringify(od) === snap, 'a paused game (dt 0) freezes Overdrive exactly');
+      OD.tick(od, 1 / 60);
+      check(od.remaining < O.duration - 1 && od.active, 'it resumes where it stopped');
+      check(near(OD.fraction(od), od.remaining / O.duration, 1e-12), 'the bar shows the time left while active');
+      check(OD.warning(od) === false, 'no warning early');
+      od.remaining = O.warn - 0.1;
+      check(OD.warning(od) === true, 'the last moments warn');
+    }
+    // ---- Repeated activation ----
+    {
+      const od = OD.create();
+      let acts = 0;
+      for (let round = 0; round < 5; round++) {
+        let n = 0;
+        while (!od.active && n < 500) { OD.charge(od, ['pass', 'pickup', 'break'][n % 3], {}); n++; }
+        acts++;
+        check(od.active && od.activations === acts, `round ${round + 1}: Overdrive starts again after filling again`);
+        for (let i = 0; i < 60 * 9 && od.active; i++) OD.tick(od, 1 / 60);
+        check(!od.active && od.meter === 0, `round ${round + 1}: it ended and the meter is empty`);
+      }
+    }
+
+    // ---- Combo milestones ----
+    {
+      check(OD.milestone(3, 4) === 4 && OD.milestone(7, 8) === 8 && OD.milestone(15, 16) === 16, 'milestones fire exactly when combo reaches 4, 8, 16');
+      check(OD.milestone(4, 5) === 0 && OD.milestone(8, 9) === 0 && OD.milestone(16, 17) === 0, 'and not again while the streak continues');
+      check(OD.milestone(0, 1) === 0 && OD.milestone(2, 3) === 0 && OD.milestone(9, 10) === 0, 'no milestone between them');
+      check(OD.milestone(5, 3) === 0 && OD.milestone(16, 0) === 0, 'a broken streak fires nothing');
+      let seen = [];
+      for (let c = 0; c < 40; c++) { const m = OD.milestone(c, c + 1); if (m) seen.push(m); }
+      check(JSON.stringify(seen) === '[4,8,16]', 'a streak of 40 passes each milestone once');
+      // After a break the next streak earns them again.
+      seen = [];
+      for (let c = 0; c < 10; c++) { const m = OD.milestone(c, c + 1); if (m) seen.push(m); }
+      for (let c = 0; c < 10; c++) { const m = OD.milestone(c, c + 1); if (m) seen.push(m); }
+      check(JSON.stringify(seen) === '[4,8,4,8]', 'a new streak earns the milestones again');
+    }
+
+    // ---- Musical palette and layers ----
+    const pcOf = (w, hz) => { const midi = Math.round(69 + 12 * Math.log2(hz / 440)); return (((midi - M.WORLDS[w].root) % 12) + 12) % 12; };
+    const inKey = (w, specs) => specs.filter((s) => !s.noise && s.freq > 0).every((s) => M.WORLDS[w].scale.includes(pcOf(w, s.freq)));
+    const sumGain = (specs) => specs.reduce((a, s) => a + s.gain, 0);
+    const KINDS = ['pickup', 'bonus', 'pass', 'break', 'chargedBreak'];
+    for (const w of [1, 2, 3]) {
+      const layersAt = (c, od) => M.hit(w, 'pickup', { combo: c, overdrive: od }).filter((s) => s.layer).length;
+      check(layersAt(1) === 0 && layersAt(3) === 0, `world ${w}: no layer before combo 4`);
+      check(layersAt(4) >= 1 && layersAt(4) < layersAt(8) && layersAt(8) < layersAt(16), `world ${w}: layers: ${layersAt(4)} at 4 < ${layersAt(8)} at 8 < ${layersAt(16)} at 16`);
+      check(layersAt(4) <= 2, `world ${w}: the combo-4 layer is restrained (${layersAt(4)})`);
+      check(layersAt(4, true) > layersAt(4), `world ${w}: Overdrive adds layers`);
+      for (const kind of KINDS) for (const combo of [1, 4, 8, 16, 30]) for (const od of [false, true]) for (const q of [undefined, 'perfect']) {
+        const specs = M.hit(w, kind, { combo, overdrive: od, quality: q, step: 0.1 });
+        const lead = specs.filter((s) => !s.layer);
+        check(lead.length >= 1, `${kind}/c${combo}/od${od}: the lead note is never a delayed layer`);
+        check(lead.every((s) => !s.at), `${kind}/c${combo}/od${od}: the lead has no time offset`);
+        check(sumGain(specs) <= M.GAIN_CEILING + 1e-9, `world ${w} ${kind}/c${combo}/od${od}/${q}: total gain ${sumGain(specs).toFixed(3)} is under the ceiling`);
+        check(inKey(w, specs.filter((s) => !s.glide)), `world ${w} ${kind}/c${combo}/od${od}: every pitched note is in the world's scale`);
+        check(specs.every((s) => !s.at || (s.layer && s.at <= 0.6)), `${kind}: time offsets only on layers and under 0.6 s`);
+      }
+      // The Overdrive lead is the same note as without it: Overdrive never changes the melody.
+      for (const kind of KINDS) {
+        const a = M.hit(w, kind, { combo: 5 }), b = M.hit(w, kind, { combo: 5, overdrive: true });
+        check(a[0].freq === b[0].freq && a[0].wave === b[0].wave, `world ${w} ${kind}: the melody note is unchanged by Overdrive`);
+      }
+      // Milestone phrases.
+      const ms = [4, 8, 16].map((m) => M.milestone(w, m, { step: 0.1 }));
+      check(ms.every((x) => x.length > 0 && x.every((s) => s.layer) && inKey(w, x)), `world ${w}: milestone phrases are in key and are accompaniment`);
+      check(ms[0].length < ms[1].length && ms[1].length < ms[2].length, `world ${w}: phrases grow: ${ms.map((x) => x.length).join(' < ')}`);
+      check(sumGain(ms[2]) <= M.GAIN_CEILING + 1e-9 && sumGain(ms[0]) < sumGain(ms[2]), `world ${w}: the flourish is the biggest yet within the gain ceiling`);
+      check(Math.max(...ms[2].map((s) => (s.at || 0) + s.dur)) <= 1.2, `world ${w}: the flourish is over within 1.2 s`);
+      check(M.milestone(w, 5, {}).length === 0, `world ${w}: no phrase for other combos`);
+      // Overdrive start / end.
+      const st = M.overdriveStart(w), en = M.overdriveEnd(w);
+      check(st.length >= 4 && inKey(w, st.filter((s) => !s.glide)) && sumGain(st) <= M.GAIN_CEILING + 1e-9, `world ${w}: the Overdrive start chord is in key and within the ceiling`);
+      check(st[0].glide > st[0].freq && en[0].glide < en[0].freq, `world ${w}: the start rises and the end falls`);
+      check(en.length >= 2 && sumGain(en) <= M.GAIN_CEILING + 1e-9, `world ${w}: the end release is within the ceiling`);
+      check(JSON.stringify(st) !== JSON.stringify(en), `world ${w}: start and end sound different`);
+    }
+    // Different worlds give different notes for the same event (they follow their own palette).
+    check(new Set([1, 2, 3].map((w) => JSON.stringify(M.milestone(w, 16, {}).map((x) => Math.round(x.freq))))).size === 3, 'the flourish plays in each world\'s own key');
+
+    // ---- Rules are unchanged: score, save, stars, collision ----
+    check(!('overdrive' in Pulse.Save.defaults()) && !('combo' in Pulse.Save.defaults()), 'the save file has no Overdrive data (compatible with old saves)');
+    {
+      const sc = Pulse.Scoring.create();
+      check(!('od' in sc) && !('overdrive' in sc) && Object.keys(sc).every((k) => !/over/i.test(k)), 'Scoring state has no Overdrive fields');
+    }
+    // Bot plays every stage: Overdrive observes the same run as without it, and charges sensibly.
+    function play(stage, withOd) {
+      const orbY = Math.round(960 * C.orb.yRatio);
+      const level = new Pulse.Campaign.CampaignLevel(W, 960, stage);
+      const orb = Pulse.Orb.create();
+      const sc = Pulse.Scoring.create();
+      const od = OD.create();
+      const dt = 1 / 60;
+      let frames = 0, crashed = false, gold = 0, acts = [], odTime = 0, firstAt = null, contacts = 0;
+      while (frames * dt < 300) {
+        const speed = level.speedAt();
+        Pulse.Orb.setTarget(orb, Pulse.autosteer(level, orb.x, orbY, speed), W);
+        Pulse.Orb.step(orb, Pulse.autopilot(level, orbY, speed), dt, W);
+        frames++;
+        level.update(dt, level.speedAt());
+        if (withOd && OD.tick(od, dt).ended) { /* ended */ }
+        if (od.active) odTime += dt;
+        for (const s of level.segments) {
+          if (!s.active) continue;
+          const e = level.resolve(s, orbY, orb.radius, orb.charge, orb.x);
+          if (e === 'crash') { crashed = true; return { crashed, frames, gold, acts, odTime, firstAt, contacts, score: sc.score }; }
+          if (!e) continue;
+          const prev = sc.combo;
+          Pulse.Scoring.apply(sc, e, s);
+          if (e === 'collect' && s.variant !== 'bonus') gold++;
+          if (withOd) {
+            if (e === 'miss') OD.miss(od, s.variant === 'bonus');
+            else {
+              contacts++;
+              const kind = e === 'collect' ? (s.variant === 'bonus' ? 'bonus' : 'pickup') : e === 'break' ? (s.charged ? 'chargedBreak' : 'break') : 'pass';
+              if (OD.charge(od, kind, { quality: s.quality, combo: sc.combo }).started) { acts.push(frames * dt); if (firstAt === null) firstAt = frames * dt; }
+            }
+          }
+        }
+        if (level.finishY() >= orbY) break;
+      }
+      return { crashed, frames, gold, acts, odTime, firstAt, contacts, score: sc.score };
+    }
+    const rows = [];
+    Pulse.STAGES.forEach((stage, i) => {
+      const a = play(stage, false), b = play(stage, true);
+      check(!a.crashed && !b.crashed, `${stage.id}: the bot still completes the stage`);
+      check(a.frames === b.frames && a.gold === b.gold && a.score === b.score, `${stage.id}: Overdrive changes neither the run, the gold count nor the score`);
+      check(b.acts.length >= 1 && b.acts.length <= 5, `${stage.id}: a clean run triggers ${b.acts.length} Overdrive(s) (1–5)`);
+      check(b.firstAt === null || b.firstAt >= 6, `${stage.id}: the first Overdrive comes after ${b.firstAt && b.firstAt.toFixed(1)} s (≥ 6 s)`);
+      check(b.odTime / (b.frames / 60) <= 0.6, `${stage.id}: Overdrive covers at most 60% of the run (${(100 * b.odTime / (b.frames / 60)).toFixed(0)}%)`);
+      rows.push(`${i + 1}: ${(b.frames / 60).toFixed(0)}s ${b.contacts} contacts, ${b.acts.length} OD (first ${b.firstAt ? b.firstAt.toFixed(1) : '-'}s), ${(100 * b.odTime / (b.frames / 60)).toFixed(0)}% active`);
+    });
+    lines.push('bot per stage → ' + rows.join(' | '));
+    document.title = (failures ? 'FAIL ' + failures + ' of ' : 'PASS ') + checks + ' checks';
+    document.getElementById('out').textContent = document.title + '\n' + lines.join('\n') + '\n' + msgs.slice(0, 40).join('\n');
+  </script>
+</body>
+</html>
