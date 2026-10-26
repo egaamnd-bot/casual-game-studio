@@ -1,23 +1,23 @@
-// Landscape menus: mode selection (with skin picker and audio settings) and campaign stage
-// selection by world. Positions follow Gemini's landscape layout guide (960×540), scaled
-// horizontally to the screen width. Uses Gemini's UI frames when loaded (all text rendered
-// here), otherwise simple shapes.
+// Portrait menus (540 wide, taller on tall phones): mode selection (with skin picker and audio
+// settings) and campaign stage selection by world. Everything is stacked in one column and
+// positioned from the screen height, so it fits any portrait phone. Uses Gemini's UI frames when
+// loaded (all text rendered here), otherwise simple shapes.
 (function () {
   const T = Pulse.THEME;
 
-  // Horizontal position from the guide's 960-wide layout.
-  const gx = (scene, x) => Math.round((x * scene.scale.width) / 960);
-
-  // Landscape backdrop matching gameplay: base tile and ceiling/floor ridges.
-  function backdrop(scene, visual) {
-    if (!Pulse.Assets.ok) return;
-    const v = visual || Pulse.Assets.ENDLESS_VISUAL;
+  // The same deep-navy backdrop as gameplay: a faint grid and neon lane rails.
+  function backdrop(scene) {
     const W = scene.scale.width;
     const H = scene.scale.height;
-    const b = Pulse.ART.base;
-    scene.add.tileSprite(0, 0, W, H, v.background).setOrigin(0).setTileScale(b);
-    scene.add.tileSprite(0, H - 128, W, 128, v.mid).setOrigin(0).setTileScale(b).setAlpha(0.5);
-    scene.add.tileSprite(0, 0, W, 128, v.mid).setOrigin(0).setTileScale(b).setFlipY(true).setAlpha(0.5);
+    Pulse.UI.backdropTextures(scene);
+    scene.add.rectangle(0, 0, W, H, T.background).setOrigin(0).setDepth(-3);
+    scene.add.tileSprite(0, 0, W, H, 'pulse_grid').setOrigin(0).setDepth(-2).setAlpha(0.6);
+    const rails = scene.add.graphics().setDepth(-1);
+    for (const [w, al] of [[12, 0.1], [5, 0.25], [2, 0.9]]) {
+      rails.lineStyle(w, 0x1e6bff, al);
+      rails.lineBetween(6, 0, 6, H);
+      rails.lineBetween(W - 6, 0, W - 6, H);
+    }
   }
 
   class MenuScene extends Phaser.Scene {
@@ -28,37 +28,43 @@
     create() {
       const UI = Pulse.UI;
       const sprites = Pulse.Assets.ok;
-      const left = gx(this, 280);
-      const right = gx(this, 700);
+      const W = this.scale.width;
+      const H = this.scale.height;
+      const cx = W / 2;
       this.save = Pulse.Save.load();
       this.input.on('pointerdown', () => Pulse.Sfx.unlock());
       Pulse.Music.play('MENU_THEME');
       backdrop(this);
 
-      // Left column: logo, then the two modes.
-      if (sprites) this.add.image(left, 118, 'pulse_ui', 'ui_logo_pulse').setScale(0.5);
-      else UI.text(this, left, 118, 'PULSE', 80, T.text, true);
-      UI.text(this, left, 182, 'Hold to shrink · Release to grow and smash', 18, T.textDim);
+      // Logo, then the two modes stacked.
+      const logoY = Math.round(H * 0.13);
+      if (sprites) this.add.image(cx, logoY, 'pulse_ui', 'ui_logo_pulse').setScale(0.5);
+      else UI.text(this, cx, logoY, 'PULSE', 80, T.text, true);
+      UI.text(this, cx, logoY + 66, 'Slide to steer · Hold to shrink · Release to smash', 16, T.textDim);
       const stars = Pulse.Campaign.totalStars(this.save);
       const maxStars = Pulse.STAGES.length * 3;
+      const campY = Math.round(H * 0.3);
+      const endY = campY + 130;
       if (sprites) {
-        this.modeCard(left, 285, 'ui_card_mode_campaign_up', 'CAMPAIGN', `${Pulse.STAGES.length} stages · ${stars}/${maxStars} stars`, () => this.go('stages'));
-        this.modeCard(left, 415, 'ui_card_mode_endless_up', 'ENDLESS', `Best ${this.save.endless.best}`,
+        this.modeCard(cx, campY, 'ui_card_mode_campaign_up', 'CAMPAIGN', `${Pulse.STAGES.length} stages · ${stars}/${maxStars} stars`, () => this.go('stages'));
+        this.modeCard(cx, endY, 'ui_card_mode_endless_up', 'ENDLESS', `Best ${this.save.endless.best}`,
           () => this.go('game', { mode: 'endless' }));
       } else {
-        UI.button(this, left, 285, 300, 80, 'Campaign', () => this.go('stages'), { size: 32, edge: T.wallEdge });
-        UI.button(this, left, 395, 300, 80, 'Endless', () => this.go('game', { mode: 'endless' }), { size: 32 });
-        UI.text(this, left, 455, `Endless best ${this.save.endless.best}`, 18, T.textDim);
+        UI.button(this, cx, campY, 340, 90, 'Campaign', () => this.go('stages'), { size: 32, edge: T.wallEdge });
+        UI.button(this, cx, endY, 340, 90, 'Endless', () => this.go('game', { mode: 'endless' }), { size: 32 });
+        UI.text(this, cx, endY + 60, `Endless best ${this.save.endless.best}`, 18, T.textDim);
       }
 
-      // Right column: total stars, then the skin picker.
+      // Total stars, then the skin picker.
+      const starsY = endY + 110;
       const g = this.add.graphics();
-      UI.stars(this, g, right - 48, 110, 16, 1, 1);
-      UI.text(this, right + 14, 110, `${stars} / ${maxStars}`, 28, T.text, true);
+      UI.stars(this, g, cx - 56, starsY, 16, 1, 1);
+      UI.text(this, cx + 8, starsY, `${stars} / ${maxStars}`, 28, T.text, true);
 
       this.skinIndex = Math.max(0, Pulse.SKINS.indexOf(Pulse.Skins.selected(this.save)));
+      const right = cx;
       this.skinX = right;
-      this.skinY = 280;
+      this.skinY = Math.round(Math.max(starsY + 130, H * 0.74));
       if (sprites) {
         this.slot = this.add.image(right, this.skinY + 8, 'pulse_ui', 'ui_skin_slot_selected').setScale(0.5);
         this.previewImgs = ['ring', 'normal'].map(() => this.add.image(right, this.skinY - 6, 'pulse_gameplay', 'player_orb_normal'));
@@ -73,8 +79,7 @@
       this.showSkin();
 
       // Settings (top-right).
-      const sw = this.scale.width;
-      UI.iconButton(this, sw - 56, 44, 48, 'ui_btn_icon_settings_up', '⚙', () => this.openSettings());
+      UI.iconButton(this, W - 56, 44, 48, 'ui_btn_icon_settings_up', '⚙', () => this.openSettings());
     }
 
     modeCard(x, y, frame, title, subtitle, onPress) {
@@ -142,19 +147,19 @@
       parts.push(blocker);
       const cx = W / 2;
       const panel = Pulse.Assets.ok
-        ? this.add.nineslice(cx, H / 2, 'pulse_ui', 'ui_panel_modal_9slice', 880, 600, 40, 40, 40, 40).setScale(0.5)
-        : this.add.rectangle(cx, H / 2, 440, 300, T.panel).setStrokeStyle(2, T.panelEdge);
+        ? this.add.nineslice(cx, H / 2, 'pulse_ui', 'ui_panel_modal_9slice', 960, 640, 40, 40, 40, 40).setScale(0.5)
+        : this.add.rectangle(cx, H / 2, 480, 320, T.panel).setStrokeStyle(2, T.panelEdge);
       parts.push(panel.setDepth(31));
       parts.push(UI.text(this, cx, H / 2 - 110, 'Settings', 30, T.text, true).setDepth(32));
       const row = (label, kind, y) => {
-        parts.push(UI.text(this, cx - 120, y, label, 20, T.text, true).setDepth(32));
-        const value = UI.text(this, cx + 100, y, '', 20, T.textAccent, true).setDepth(32);
+        parts.push(UI.text(this, cx - 150, y, label, 20, T.text, true).setDepth(32));
+        const value = UI.text(this, cx + 90, y, '', 20, T.textAccent, true).setDepth(32);
         parts.push(value);
         const iconFrame = () => `ui_btn_icon_audio_${kind === 'music' ? 'bgm' : 'sfx'}_${Pulse.Audio.volume(kind) > 0 ? 'on' : 'off'}`;
-        const icon = UI.iconButton(this, cx - 10, y, 44, iconFrame(), kind === 'music' ? '♪' : 'fx', () => this.setLevel(kind,
+        const icon = UI.iconButton(this, cx - 30, y, 44, iconFrame(), kind === 'music' ? '♪' : 'fx', () => this.setLevel(kind,
           Pulse.Audio.volume(kind) > 0 ? 0 : (this.lastLevel[kind] || 0.8)));
-        const minus = UI.button(this, cx + 50, y, 40, 40, '−', () => this.setLevel(kind, Pulse.Audio.volume(kind) - 0.2), { size: 22 });
-        const plus = UI.button(this, cx + 150, y, 40, 40, '+', () => this.setLevel(kind, Pulse.Audio.volume(kind) + 0.2), { size: 22 });
+        const minus = UI.button(this, cx + 40, y, 40, 40, '−', () => this.setLevel(kind, Pulse.Audio.volume(kind) - 0.2), { size: 22 });
+        const plus = UI.button(this, cx + 140, y, 40, 40, '+', () => this.setLevel(kind, Pulse.Audio.volume(kind) + 0.2), { size: 22 });
         for (const b of [icon, minus, plus]) b.setDepth(33);
         parts.push(icon, minus, plus);
         return () => {
@@ -211,24 +216,31 @@
       const world = Pulse.WORLDS[this.worldIndex - 1];
       Pulse.Music.play('MENU_THEME');
       this.input.on('pointerdown', () => Pulse.Sfx.unlock());
-      backdrop(this, world.visual);
+      backdrop(this);
 
-      UI.text(this, W / 2, 40, 'Campaign', 34, T.text, true);
-      UI.text(this, W / 2, 74, `${Pulse.Campaign.totalStars(save)} / ${Pulse.STAGES.length * 3} stars`, 16, T.textDim);
-      UI.worldBanner(this, W / 2, 132, world, 400);
+      const H = this.scale.height;
+      UI.text(this, W / 2, 56, 'Campaign', 34, T.text, true);
+      UI.text(this, W / 2, 92, `${Pulse.Campaign.totalStars(save)} / ${Pulse.STAGES.length * 3} stars`, 16, T.textDim);
+      UI.worldBanner(this, W / 2, 168, world, 400);
 
+      // The world's four stages in a 2×2 grid, centred in the space below the banner.
       const stages = Pulse.STAGES.map((s, i) => ({ s, i })).filter(({ s }) => s.world === world);
+      const top = 250;
+      const rowH = Math.min(240, (H - top - 150) / 2);
       stages.forEach(({ s, i }, k) => {
-        const x = W / 2 + (k - (stages.length - 1) / 2) * gx(this, 205);
-        if (Pulse.Assets.ok) this.card(save, s, i, x, 340);
-        else this.box(save, s, i, x, 340);
+        const x = W / 2 + (k % 2 ? 1 : -1) * 108;
+        const y = top + rowH / 2 + Math.floor(k / 2) * rowH;
+        if (Pulse.Assets.ok) this.card(save, s, i, x, y);
+        else this.box(save, s, i, x, y);
       });
 
-      // World arrows and back.
+      // World arrows (bottom) and back (top-left).
       const go = (d) => this.scene.restart({ world: this.worldIndex + d });
-      if (this.worldIndex > 1) this.arrow(36, 340, -1, () => go(-1));
-      if (this.worldIndex < Pulse.WORLDS.length) this.arrow(W - 36, 340, 1, () => go(1));
-      if (Pulse.Assets.ok) UI.iconButton(this, 64, 52, 52, 'ui_btn_icon_back_up', '<', () => this.back());
+      const ay = H - 70;
+      UI.text(this, W / 2, ay, `WORLD ${this.worldIndex} / ${Pulse.WORLDS.length}`, 18, T.textDim, true);
+      if (this.worldIndex > 1) this.arrow(70, ay, -1, () => go(-1));
+      if (this.worldIndex < Pulse.WORLDS.length) this.arrow(W - 70, ay, 1, () => go(1));
+      if (Pulse.Assets.ok) UI.iconButton(this, 56, 52, 52, 'ui_btn_icon_back_up', '<', () => this.back());
       else UI.button(this, 90, 52, 120, 56, 'Back', () => this.back(), { size: 22 });
     }
 
@@ -285,7 +297,7 @@
       const UI = Pulse.UI;
       const unlocked = Pulse.Campaign.isUnlocked(save, i);
       const rec = Pulse.Campaign.stageRecord(save, stage.id);
-      const card = UI.button(this, x, y, 170, 200, '', () => {
+      const card = UI.button(this, x, y, 190, 210, '', () => {
         if (unlocked) this.start(i);
       }, { edge: unlocked ? T.wallEdge : T.panelEdge });
       card.label.setVisible(false);

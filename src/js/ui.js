@@ -1,6 +1,25 @@
 // UI helpers shared by all scenes. With Gemini's assets loaded they use the text-free frames
 // from pulse_ui (all text is rendered here); otherwise they draw simple shapes.
 Pulse.UI = {
+  // The tileable grid used behind menus and gameplay (created once per game).
+  backdropTextures(scene) {
+    const tex = scene.textures;
+    if (tex.exists('pulse_grid')) return;
+    const t = tex.createCanvas('pulse_grid', 90, 90);
+    const g = t.getContext();
+    g.strokeStyle = 'rgba(30,107,255,0.16)';
+    g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(0.5, 0);
+    g.lineTo(0.5, 90);
+    g.moveTo(0, 0.5);
+    g.lineTo(90, 0.5);
+    g.stroke();
+    g.fillStyle = 'rgba(80,160,255,0.35)';
+    g.fillRect(0, 0, 3, 3);
+    t.refresh();
+  },
+
   sprites() {
     return !!Pulse.Assets.ok;
   },
@@ -8,7 +27,7 @@ Pulse.UI = {
   text(scene, x, y, str, size, color, bold) {
     return scene.add.text(x, y, str, {
       fontFamily: Pulse.THEME.font, fontSize: `${size}px`, color, fontStyle: bold ? 'bold' : 'normal',
-      align: 'center', wordWrap: { width: 520 },
+      align: 'center', wordWrap: { width: 500 },
     }).setOrigin(0.5);
   },
 

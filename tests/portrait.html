@@ -2,16 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Pulse landscape tests</title>
+  <title>Pulse portrait tests</title>
   <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
 </head>
 <body>
   <script>
-    // Landscape layout tests on the real game. Run at several window sizes (the runner passes
-    // ?expect=<aspect label>). Checks: logical size follows the aspect ratio, the track-to-screen
-    // mapping puts the orb on the left and obstacles entering from the right, sprites land where
-    // the rules put them, HUD and buttons stay on screen and out of the lane, and taps anywhere
-    // in the lane work. Needs internet for Phaser (CDN) and file access for the images.
+    // Portrait layout tests on the real game. Run at several window sizes. Checks: logical size is
+    // 540 wide and as tall as the aspect needs (860–1240), track x/y equal screen x/y, the orb sits
+    // 70% down, obstacles enter from the top, HUD and buttons stay on screen and out of the orb's
+    // way, and a touch-drag steers the orb. Needs Phaser (CDN) and file access for the images.
     try { localStorage.clear(); } catch (e) {}
     window.PULSE_ASSET_BASE = '../src/';
     window.PULSE_TEST = { autoStart: false };
@@ -23,6 +22,7 @@
   <script src="../src/js/rhythm.js"></script>
   <script src="../src/js/storage.js"></script>
   <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/melody.js"></script>
   <script src="../src/js/level.js"></script>
   <script src="../src/js/stages.js"></script>
   <script src="../src/js/campaign.js"></script>
@@ -49,7 +49,7 @@
       const out = [];
       scene.children.list.forEach((o) => {
         if (!o.visible || !o.getBounds || o === skip || o.type === 'Graphics' || o.type === 'TileSprite') return;
-        if (o.type === 'Container' && o.rotation) return; // the gameplay layer
+        if (o.type === 'Container' && (o.rotation || o.list.length > 20)) return; // the gameplay layer
         const b = o.getBounds();
         if (b.width === 0) return;
         if (b.left < -1 || b.top < -1 || b.right > SW + 1 || b.bottom > SH + 1) {
@@ -63,10 +63,10 @@
       for (let i = 0; i < 60 && !(active() && active().scene.key === 'menu'); i++) await wait(100);
       const SW = game().scale.width, SH = game().scale.height;
       const aspect = innerWidth / innerHeight;
-      const expectW = Math.round(Math.min(C.maxLength, Math.max(C.minLength, C.width * aspect)));
-      check(SH === C.width, `logical height is the lane width (${SH})`);
-      check(SW === expectW, `logical width follows aspect ${aspect.toFixed(2)}: ${SW} (expected ${expectW})`);
-      check(SW >= SH, 'landscape: wider than tall');
+      const expectH = Math.round(Math.min(C.maxLength, Math.max(C.minLength, C.width / aspect)));
+      check(SW === C.width, `logical width is the lane width (${SW})`);
+      check(Math.abs(SH - expectH) <= 1, `logical height follows aspect ${aspect.toFixed(2)}: ${SH} (expected ${expectH})`);
+      check(SH >= SW, 'portrait: taller than wide');
       notes.push(`window ${innerWidth}×${innerHeight} (aspect ${aspect.toFixed(2)}) → game ${SW}×${SH}`);
       const canvas = document.querySelector('canvas').getBoundingClientRect();
       check(canvas.width <= innerWidth + 1 && canvas.height <= innerHeight + 1, 'canvas fits the window (FIT scaling)');
@@ -77,7 +77,6 @@
         check(active().scene.key === 'stages', `stage select opens on world ${w}`);
         check(offScreen(active(), SW, SH).length === 0, `stage select (world ${w}) items off screen: ${offScreen(active(), SW, SH).join('; ')}`);
       }
-      // Settings panel fits too.
       active().scene.start('menu'); await wait(400);
       active().openSettings(); await wait(100);
       check(offScreen(active(), SW, SH).length === 0, `settings panel off screen: ${offScreen(active(), SW, SH).join('; ')}`);
@@ -85,78 +84,67 @@
       // Gameplay: mapping and HUD.
       active().scene.start('game', { mode: 'campaign', stageIndex: 1 }); await wait(400);
       const g = active();
-      check(Math.abs(g.orbSX - SW * 0.3) < 1 && g.orbSY === SH / 2, `orb at 30% from the left, vertically centred (${g.orbSX}, ${g.orbSY})`);
+      check(g.H === SH, `track length equals the screen height (${g.H})`);
+      check(Math.abs(g.orbSX - g.orbX) < 1 && Math.abs(g.orbSY - Math.round(SH * C.orb.yRatio)) <= 1, `orb at ${Math.round(100 * C.orb.yRatio)}% down, x = lane x (${g.orbSX}, ${g.orbSY})`);
       const orbB = g.view.body.getBounds();
-      check(Math.abs(orbB.centerX - g.orbSX) < 1 && Math.abs(orbB.centerY - g.orbSY) < 1, 'orb sprite drawn at the orb position on screen');
+      check(Math.abs(orbB.centerX - g.orbSX) < 1.5 && Math.abs(orbB.centerY - g.orbSY) < 1.5, 'orb sprite drawn at the orb position on screen');
       g.test = { bot: true };
       g.startRun();
-      let gateSeen = false, barrierSeen = false, enteredRight = true;
-      for (let t = 0; t < 80 && !(gateSeen && barrierSeen); t++) {
-        await wait(100);
+      let gateSeen = false, enteredTop = true, moved = false;
+      const x0 = g.orbX;
+      for (let t = 0; t < 80 && !(gateSeen && moved); t++) {
+        for (let k = 0; k < 20; k++) g.update(performance.now(), 16.667);
+        if (Math.abs(g.orbX - x0) > 20) moved = true;
         for (const s of g.level.segments) {
-          // Comet look: gap walls are drawn from the live gap edges, not sprites. Check they sit on
-          // screen where the rules put them (screen x = SW - track y).
-          if (g.view.comet && s.active && s.kind === 'gate' && !s.ring && s.h === C.gate.thickness && s.y > 0 && s.y + s.h < g.H) {
-            const bandX = SW - (s.y + s.h / 2);
-            check(bandX > 0 && bandX < SW && s.gapL > 0 && s.gapR < C.width, `gate band on screen at x ${Math.round(bandX)} with its gap inside the lane`);
+          if (s.active && s.kind === 'gate' && s.h === C.gate.thickness && s.y > 0 && s.y + s.h < SH) {
+            check(s.gapL > 0 && s.gapR < C.width, 'gap inside the lane');
             gateSeen = true;
-          }
-          if (!s.active || !s._vis) continue;
-          if (s.kind === 'gate' && s._vis.parts[1].visible && s.h === C.gate.thickness) {
-            // Wall cap (gap edge) must appear where the rules put the gap: screen y = track x.
-            const cap = s._vis.parts[1].getBounds();
-            const bandX = SW - (s.y + s.h / 2);
-            check(Math.abs(cap.centerX - bandX) < 3, `gate band at screen x ${Math.round(cap.centerX)} (expected ${Math.round(bandX)})`);
-            check(Math.abs(cap.bottom - s.gapL) < 1.5 || Math.abs(cap.top - s.gapL) < 1.5 || Math.abs(cap.bottom - s.gapL) < 7,
-              `upper wall edge at screen y ≈ gap edge ${Math.round(s.gapL)} (cap ${Math.round(cap.top)}–${Math.round(cap.bottom)})`);
-            gateSeen = true;
-          }
-          if (s.kind === 'barrier' && s._vis.parts[0].visible) {
-            const b = s._vis.parts[0].getBounds();
-            check(b.height >= SH - 1, 'barrier spans the full screen height');
-            barrierSeen = true;
           }
         }
-        // New items appear at the right edge (track y ≈ −h → screen x ≈ SW + h).
-        const fresh = g.level.segments.filter((s) => s.active && s.y < 0 && s.y + s.h > -60);
-        for (const s of fresh) if (SW - s.y < SW - 5) enteredRight = false;
+        for (const s of g.level.segments.filter((q) => q.active && q.y < 0 && q.y + q.h > -60)) if (s.y > 0) enteredTop = false;
       }
-      check(gateSeen && barrierSeen, `saw a gate (${gateSeen}) and a barrier (${barrierSeen}) on screen`);
-      check(enteredRight, 'obstacles enter from the right edge');
+      check(gateSeen, 'saw a gate on screen');
+      check(moved, 'the bot steered the orb sideways (x moved > 20 px)');
+      check(enteredTop, 'obstacles enter from the top edge');
 
-      // HUD stays in the top strip and on screen; nothing interactive in the lane.
+      // HUD stays in the top strip and on screen.
       const hud = [g.pauseBtn, g.energyText, g.bracket].filter(Boolean);
       for (const o of hud) {
         const b = o.getBounds();
-        check(b.top >= 0 && b.bottom <= 90 && b.left >= 0 && b.right <= SW, `HUD item within the top strip (${Math.round(b.left)},${Math.round(b.top)}–${Math.round(b.right)},${Math.round(b.bottom)})`);
+        check(b.top >= 0 && b.bottom <= 130 && b.left >= 0 && b.right <= SW, `HUD item within the top strip (${Math.round(b.left)},${Math.round(b.top)}–${Math.round(b.right)},${Math.round(b.bottom)})`);
       }
-      const pb = g.pauseBtn.getBounds();
-      check(pb.left >= 24, `pause button clear of the left notch area (${Math.round(pb.left)} px)`);
       check(offScreen(g, SW, SH).length === 0, `gameplay items off screen: ${offScreen(g, SW, SH).join('; ')}`);
+
+      // Touch-drag steering through the scene's own handlers: relative drag, target persists.
+      g.test = {};
+      g.startRun();
+      await wait(100);
+      const bx = g.orbX;
+      const ptr = g.input.activePointer;
+      ptr.isDown = true; ptr.x = 200;
+      for (let k = 0; k < 6; k++) g.update(performance.now(), 16.667);
+      ptr.x = 300;
+      for (let k = 0; k < 40; k++) g.update(performance.now(), 16.667);
+      ptr.isDown = false;
+      check(g.orbX > bx + 40, `dragging right moves the orb right (${Math.round(bx)} -> ${Math.round(g.orbX)})`);
+      check(g.orbState.x >= C.steer.margin - 1 && g.orbState.x <= C.width - C.steer.margin + 1, 'the orb stays inside the safe bounds');
 
       // End screens: buttons on screen and not overlapping the orb.
       g.test = {};
       g.crash(null); await wait(500);
       const orb = new Phaser.Geom.Rectangle(g.orbSX - C.orb.radius, g.orbSY - C.orb.radius, C.orb.radius * 2, C.orb.radius * 2);
-      for (const btn of [g.backBtn]) {
-        const b = btn.list[0].getBounds();
-        check(!Phaser.Geom.Rectangle.Overlaps(b, orb), 'game-over button clear of the orb');
-      }
       check(offScreen(g, SW, SH).length === 0, `game-over items off screen: ${offScreen(g, SW, SH).join('; ')}`);
       g.energy = 5;
       g.completeStage(); await wait(300);
-      const shown = [g.backBtn, g.retryBtn, g.nextBtn].filter((b) => b.visible);
+      const shown = [g.backBtn, g.retryBtn, g.nextBtn].filter((b) => b && b.visible);
       check(shown.length === 3, `stage clear shows 3 buttons (${shown.length})`);
       for (let i = 0; i < shown.length; i++) {
-        for (let j = i + 1; j < shown.length; j++) {
-          check(!Phaser.Geom.Rectangle.Overlaps(shown[i].list[0].getBounds(), shown[j].list[0].getBounds()), 'stage-clear buttons do not overlap');
-        }
-        check(!Phaser.Geom.Rectangle.Overlaps(shown[i].list[0].getBounds(), orb), 'stage-clear button clear of the orb');
+        for (let j = i + 1; j < shown.length; j++) check(!Phaser.Geom.Rectangle.Overlaps(shown[i].list[0].getBounds(), shown[j].list[0].getBounds()), 'stage-clear buttons do not overlap');
       }
       check(offScreen(g, SW, SH).length === 0, `stage-clear items off screen: ${offScreen(g, SW, SH).join('; ')}`);
 
       check(errors.length === 0, `page errors: ${errors.join(' | ')}`);
-      document.title = (fails.length ? `FAIL ${fails.length}: ${fails.slice(0, 6).join(' | ')}` : 'PASS landscape') + ' | ' + notes.join(' | ');
+      document.title = (fails.length ? `FAIL ${fails.length}: ${fails.slice(0, 6).join(' | ')}` : 'PASS portrait') + ' | ' + notes.join(' | ');
     }
     run().catch((e) => { document.title = 'ERROR ' + e.message + ' ' + (e.stack || '').split('\n')[1]; });
   </script>

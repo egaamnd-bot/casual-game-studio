@@ -6,6 +6,7 @@ Add new entries at the top.
 
 | # | Date | Decision | Approved by | Link |
 |---|------|----------|-------------|------|
+| 14 | 2026-10-26 | **Portrait transformation** (producer brief "Full trailer-inspired gameplay transformation"): portrait gameplay and menus, one-finger lateral steering on top of hold-to-shrink / release-to-grow, denser and fairer obstacle layouts, musical hit feedback. Supersedes #9 (landscape) for the new branch only; the landscape build stays in history. Intentional rule change: **gold notes are collected at any orb size** (no longer "must be full size"). Barriers, charged barriers, scoring, stage ids, star thresholds and save format are unchanged. Not merged; awaits Producer phone test and approval. | Human Producer (brief); merge NOT approved | [PORTRAIT_REWORK.md](PORTRAIT_REWORK.md) |
 | 13 | 2026-10-25 | Monetization **after** gameplay and content are polished. Target audience: children and teens with general appeal, which means Google Play Families requirements apply. Nothing implemented. | Human Producer | [MONETIZATION_FUTURE.md](MONETIZATION_FUTURE.md) |
 | 12 | 2026-10-25 | Campaign expands to **12 stages** (3 worlds × 4); balanced priority across gameplay, content and reliability; electronic/synthwave music. Original three stage ids, stars, unlock order and saves preserved. | Human Producer | [CAMPAIGN.md](CAMPAIGN.md) |
 | 11 | 2026-10-25 | Integrate Gemini's v4.0 art and audio pack: three worlds, two new cosmetic skins (12★ / 15★), original synthwave music and sound effects | Human Producer | [AUDIO.md](AUDIO.md) |

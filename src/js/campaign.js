@@ -9,16 +9,29 @@
   // Items give either `space` (px) or `t` (seconds of clear time before the item, converted
   // at the stage's top speed so the real time is never shorter than written).
   //
-  // Beat alignment: an item with `beat: n` (see `on()` in stages.js) is nudged later, never
-  // earlier, until it reaches the orb on a multiple of n beats of the stage's tempo, so clear
-  // times only ever grow. The speed ramp of such a stage is fixed to its unsnapped length
-  // (`speedLength`), so an item's arrival time is an exact function of its position. The orb
-  // sits at `height × orb.yRatio`, so the alignment holds on any screen length.
+  // Beat alignment: every item is nudged later, never earlier, until its HIT MOMENT falls on the
+  // stage's beat grid (`stage.grid` beats, default an eighth note; an item's own `beat` overrides
+  // it), so clear times only ever grow. The hit moment is when the player feels the contact: a
+  // note pickup at its collect radius, a barrier at the orb's edge, a gate at the wall's middle
+  // (see `lead`). The speed ramp of the stage is fixed to its unsnapped length (`speedLength`), so
+  // an item's arrival time is an exact function of its position. The orb sits at `height ×
+  // orb.yRatio`, so the alignment holds on any screen length. Sounds are NOT delayed to the beat:
+  // the obstacles are placed so that the contact itself lands on it.
   function compile(stage, width, height) {
     const orbY = Math.round((height || C.rhythm.refLength) * C.orb.yRatio);
     const bpm = stage.bpm || stage.world.bpm;
-    if (!stage.items.some((it) => it.beat)) return build(stage, width, orbY, bpm, null);
-    return build(stage, width, orbY, bpm, build(stage, width, orbY, bpm, null).finishAt);
+    const grid = stage.grid === undefined ? C.rhythm.grid : stage.grid;
+    const first = build(stage, width, orbY, bpm, null, grid);
+    if (!grid && !stage.items.some((it) => it.beat)) return first;
+    return build(stage, width, orbY, bpm, first.finishAt, grid);
+  }
+
+  // Distance past the item's near edge at which the orb and the item make contact.
+  function lead(item) {
+    if (item.ring) return C.ring.thickness / 2;
+    if (item.type === 'gate') return item.h / 2;
+    if (item.type === 'barrier') return -C.orb.radius;
+    return -C.pickup.collectRadius;
   }
 
   // Ring geometry. The ring turns half a revolution in `beats` beats while the orb is inside it, so
@@ -37,32 +50,46 @@
     item.h = span + t;
   }
 
-  function build(stage, width, orbY, bpm, speedLength) {
+  function build(stage, width, orbY, bpm, speedLength, grid) {
     const items = [];
     const prof = speedLength ? Pulse.Rhythm.profile(stage.speed.start, stage.speed.end, speedLength) : null;
     const beatSec = Pulse.Rhythm.beatSeconds(bpm);
     let prevTop = 0;
     let prevType = 'start';
+    const fair = Pulse.Track.fairState();
     for (let i = 0; i < stage.items.length; i++) {
       const src = stage.items[i];
       const space = src.space !== undefined ? src.space
-        : Pulse.Track.spaceFor(prevType, src.type, src.t, stage.speed.end);
-      const item = Pulse.Track.placeItem(Object.assign({}, src, { space }), prevTop, width);
+        : Pulse.Track.spaceFor(prevType, src.type, src.t * (stage.pace || 1), stage.speed.end);
+      const sp = stage.spread === undefined ? 1 : stage.spread;
+      const placed = Object.assign({}, src, { space, x: (src.x || 0) * sp });
+      if (src.slide && sp !== 1) placed.slide = Object.assign({}, src.slide, { amp: src.slide.amp * sp });
+      const item = Pulse.Track.placeItem(placed, prevTop, width);
+      // Fairness floor: the authored `t` is a request, never less than a fair spacing (level.js).
+      const topSpeed = stage.speed.end;
+      const need = Pulse.Track.floorSpace(fair, item, topSpeed, bpm, false);
+      if (need > item.space) {
+        item.at += need - item.space;
+        item.space = need;
+      }
       if (prof) {
-        // A ring is aligned on the moment the orb meets the centre line of its front arc.
-        const lead = item.ring ? C.ring.thickness / 2 : 0;
-        const arrive = prof.time(item.at + orbY + lead);
-        if (src.beat) {
-          const grid = beatSec * src.beat;
-          const onGrid = Math.ceil(arrive / grid - 1e-6) * grid;
-          item.at = prof.dist(onGrid) - orbY - lead;
+        const ld = lead(item);
+        const sub = src.beat !== undefined ? src.beat : grid;
+        if (sub) {
+          const step = beatSec * sub;
+          const arrive = prof.time(item.at + orbY + ld);
+          const onGrid = Math.ceil(arrive / step - 1e-6) * step;
+          item.at = prof.dist(onGrid) - orbY - ld;
           item.space = item.at - prevTop;
         }
-        item.arrive = prof.time(item.at + orbY);
+        item.arrive = prof.time(item.at + orbY); // leading edge reaches the orb's centre
         item.arriveBeat = item.arrive / beatSec;
+        item.hit = prof.time(item.at + orbY + ld); // the moment of contact
+        item.hitBeat = item.hit / beatSec;
         if (item.ring) buildRing(item, src.need, prof, orbY, beatSec);
       }
       item.index = i;
+      Pulse.Track.commitFair(fair, item, stage.speed.end, bpm, false);
       items.push(item);
       prevTop = item.at + item.h;
       prevType = src.type;
@@ -99,6 +126,7 @@
     for (const it of stage.items) {
       if (!ITEM_TYPES.includes(it.type)) err(`unknown item type "${it.type}"`);
       if (!(it.space > 0) && !(it.t >= 0)) err(`item ${stage.items.indexOf(it)} needs space > 0 or t >= 0`);
+      if (it.x !== undefined && !(Math.abs(it.x) <= C.orb.x - C.steer.margin)) err(`item ${stage.items.indexOf(it)} x is outside the lane`);
       if (it.type === 'gate' && !(typeof it.need === 'number')) err(`gate ${stage.items.indexOf(it)} needs a numeric need`);
       if (it.ring) {
         const n = stage.items.indexOf(it);
@@ -113,10 +141,12 @@
         if (it.type !== 'gate' || it.length) err(`item ${n}: only plain gaps can move`);
         if (!it.beat) err(`item ${n}: a moving gap must be beat-aligned (use on())`);
         if (!(s.amp > 0) || !(s.beats >= C.motion.minBeats)) err(`item ${n}: slide needs amp > 0 and beats >= ${C.motion.minBeats}`);
-        else if (Pulse.Rhythm.motionRate(s, bpm) > C.motion.maxRate) {
-          err(`item ${n}: gap moves ${Pulse.Rhythm.motionRate(s, bpm).toFixed(0)} px/s, above the ${C.motion.maxRate} limit`);
+        else if (Pulse.Rhythm.motionRate({ amp: s.amp * (stage.spread === undefined ? 1 : stage.spread), beats: s.beats, kind: s.kind }, bpm) > C.motion.maxRate) {
+          err(`item ${n}: gap moves ${Pulse.Rhythm.motionRate({ amp: s.amp * (stage.spread === undefined ? 1 : stage.spread), beats: s.beats, kind: s.kind }, bpm).toFixed(0)} px/s, above the ${C.motion.maxRate} limit`);
         }
-        if (it.need + (s && s.amp) > C.orb.x - C.wallMinWidth) err(`item ${n}: swing leaves the lane`);
+        const cx = C.orb.x + (it.x || 0);
+        const reach = it.need + (s && s.amp) + C.wallMinWidth;
+        if (cx - reach < 0 || cx + reach > width) err(`item ${n}: swing leaves the lane`);
         if (s && s.kind !== undefined && s.kind !== 'slide' && s.kind !== 'breathe') err(`item ${n}: unknown motion kind`);
       }
     }
@@ -132,7 +162,7 @@
       if (r.alpha > C.ring.maxAlpha) err(`item ${n}: ring notch ${(r.alpha * 57.3).toFixed(0)} degrees half-width is too wide for the need`);
     }
     if (errors.length) return errors;
-    return Pulse.Track.validateItems(track.items, (it) => speedAtDistance(stage, track.speedLength, it.at), stage.id);
+    return Pulse.Track.validateItems(track.items, (it) => speedAtDistance(stage, track.speedLength, it.at), stage.id, { bpm: track.bpm, width });
   }
 
   function starRules(stage) {

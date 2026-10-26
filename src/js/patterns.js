@@ -10,20 +10,23 @@
 //   intensity  0 = recovery, 1 = single decision, 2 = pair, 3+ = combo; intense stretches are
 //              followed by a recovery pattern once their total passes a budget
 //   recovery   true for patterns that can serve as that recovery
-//   build(rng, d, first) → steps { type, t, need?, length?, charged? }; `t` is the clear time in
+//   build(rng, d, first) → steps { type, t, need?, length?, charged? }; the level adds each step's
+//              lateral position `x` (a drifting lane line: gaps wander across the lane, notes follow
+//              it, bonuses sit off it). `t` is the clear time in
 //              seconds before the step (Pulse.Track.spaceFor); `first` is true the first time
 //              the pattern appears in a run, for a gentler introduction.
 (function () {
   const C = Pulse.CONFIG;
   const R = C.orb.radius;
   const lerp = (a, b, t) => a + (b - a) * t;
-  const MIN_NEED = C.orb.minRadius + C.fairMargin;
+  const MIN_NEED = C.orb.minRadius + C.lateral.minWindow;
+  const PACE = 0.78; // Endless clear times are the old ones x PACE (closer together); fairness floors still apply
 
   // Gap clearances. `tight` gets narrower more often as difficulty rises; `easy` needs only a
   // short tap; `wide` needs no shrink at all.
   const tight = (rng, d) => (R - 8) - (R - 8 - MIN_NEED) * Math.pow(rng(), lerp(1.4, 0.55, d));
   const easy = (rng) => R - 10 - rng() * 6;
-  const wide = (rng) => R + 14 + rng() * 30;
+  const wide = (rng) => R + C.lateral.minWindow + 16 + rng() * 24;
   const gate = (rng, d, t) => ({ type: 'gate', need: tight(rng, d), t });
 
   const PATTERNS = [
@@ -143,6 +146,8 @@
       this.seen = new Set();
       this.heat = 0;
       this.queue = OPENING.slice();
+      this.laneX = 0; // the drifting lane line (offset from the lane centre) the next gap grows from
+      this.fair = Pulse.Track.fairState();
     }
 
     // Intensity a stretch may build before a recovery pattern is forced (grows with difficulty).
@@ -185,7 +190,7 @@
       this.patternTimes.push(elapsed);
       const steps = chosen.build(this.rng, d, first).map((s) => Object.assign({ pattern: chosen.id }, s));
       // Gap before the pattern: a breather that shrinks with difficulty, sometimes with gold.
-      const between = lerp(0.9, 0.55, d);
+      const between = lerp(0.7, 0.42, d);
       if (this.rng() < 0.45 && steps[0].type !== 'energy' && !steps[0].charged) {
         steps.unshift({ type: 'energy', t: Math.max(0.36, between / 2), pattern: 'between' });
         steps[1].t = Math.max(0.36, between / 2);
@@ -195,17 +200,43 @@
       return steps;
     }
 
+    // Lateral position of the next step. Gaps wander across the lane, further and faster as the run
+    // goes on; notes ride the lane line; a bonus sits to one side of it (the risky detour).
+    lateralFor(step, d) {
+      const limit = lerp(80, 190, d);
+      if (step.pattern === 'opening') return 0;
+      if (step.type === 'gate') {
+        if (step.length) return this.laneX; // a tunnel does not bend
+        const swing = lerp(60, 150, d);
+        const x = Math.max(-limit, Math.min(limit, this.laneX + (this.rng() * 2 - 1) * swing));
+        return x;
+      }
+      if (step.type === 'bonus') return Math.max(-limit - 30, Math.min(limit + 30, this.laneX + (this.rng() < 0.5 ? -1 : 1) * lerp(70, 130, d)));
+      if (step.type === 'energy') return Math.max(-limit, Math.min(limit, this.laneX + (this.rng() * 2 - 1) * 30));
+      return this.laneX;
+    }
+
     // Converts a step's clear time to a distance using the speed the orb will have when it gets
-    // there (rounded up, so real reaction time is never less than designed).
+    // there (rounded up, so real reaction time is never less than designed), then pushes it back
+    // to the fairness floor (size switches and sideways moves, see Pulse.Track.floorSpace).
     append(step, elapsed, speed) {
       const ahead = (this.genTop - this.travelled + this.height) / Math.max(1, speed);
       const speedThere = this.speedAt(elapsed + ahead + 1);
-      const shift = step.type === 'gate' ? (this.rng() * 2 - 1) * C.gate.maxShift : 0;
-      const src = Object.assign({ shift }, step, {
-        space: Pulse.Track.spaceFor(this.lastType, step.type, step.t || 0, speedThere),
+      const d = this.difficulty(elapsed);
+      const x = this.lateralFor(step, d);
+      const src = Object.assign({}, step, {
+        x,
+        space: Pulse.Track.spaceFor(this.lastType, step.type, (step.t || 0) * PACE, speedThere),
       });
       const item = Pulse.Track.placeItem(src, this.genTop, this.width);
+      const need = Pulse.Track.floorSpace(this.fair, item, speedThere, null, false);
+      if (need > item.space) {
+        item.at += need - item.space;
+        item.space = need;
+      }
       item.speed = speedThere;
+      Pulse.Track.commitFair(this.fair, item, speedThere, null, false);
+      if (item.type === 'gate' && !step.length) this.laneX = item.cx0 - C.orb.x;
       this.items.push(item);
       this.genTop = item.at + item.h;
       this.lastType = step.type;

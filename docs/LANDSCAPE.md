@@ -1,5 +1,7 @@
 # Landscape Conversion + Gemini v3 Art
 
+> **Superseded for the new branch** by [PORTRAIT_REWORK.md](PORTRAIT_REWORK.md) (decision #14). This page describes the landscape build.
+
 > Status: **built and tested automatically; not yet tested on a phone; not merged.** Branch `feature/pulse-landscape`, started from **`e8790cf`** (Gameplay Evolution v2, verified as the head of `origin/feature/pulse-gameplay-evolution`). `e8790cf` stays as the recoverable portrait version. Approved by the producer (DECISIONS.md #9).
 
 ## How It Works
