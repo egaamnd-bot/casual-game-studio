@@ -65,10 +65,13 @@
           `${stage.id}: world background images are known`);
         check(Pulse.Assets.IMAGES.includes(stage.arc.banner), `${stage.id}: world banner is known`);
       }
-      for (const key of ['anim_orb_gold', 'anim_orb_mint', ...Pulse.SKINS.map((s) => `anim_arcs_${s.id}`)]) {
+      // Every skin whose atlas has tension-arc frames has a 4-frame arc animation; the expansion skins have none (and no animation).
+      for (const key of ['anim_orb_gold', 'anim_orb_mint', ...Pulse.SKINS.filter((s) => s.sprite.arcPrefix).map((s) => `anim_arcs_${s.id}`)]) {
         const anim = active().anims.get(key);
         check(anim && anim.frames.length === 4, `animation ${key} has 4 frames`);
       }
+      for (const s of Pulse.SKINS.filter((k) => !k.sprite.arcPrefix)) check(!active().anims.exists(`anim_arcs_${s.id}`), `${s.id}: no arc animation is registered for a skin without arc frames`);
+      check(Pulse.SKINS.filter((k) => k.sprite.arcPrefix).length === 6, 'the six original skins keep their arc animations');
 
       // Audio: every effect and sting decodes; every music track the game asks for exists.
       await Pulse.Audio.loading;

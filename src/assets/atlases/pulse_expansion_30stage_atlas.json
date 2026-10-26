@@ -1,0 +1,435 @@
+{
+  "frames": {
+    "mirror_axis_tile": {
+      "frame": {
+        "x": 4,
+        "y": 4,
+        "w": 32,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 128
+      }
+    },
+    "mirror_gate_cap_left": {
+      "frame": {
+        "x": 40,
+        "y": 4,
+        "w": 64,
+        "h": 96
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 96
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 96
+      }
+    },
+    "mirror_gate_cap_right": {
+      "frame": {
+        "x": 108,
+        "y": 4,
+        "w": 64,
+        "h": 96
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 96
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 96
+      }
+    },
+    "route_chevron_risk": {
+      "frame": {
+        "x": 176,
+        "y": 4,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      }
+    },
+    "route_chevron_safe": {
+      "frame": {
+        "x": 244,
+        "y": 4,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      }
+    },
+    "route_divider_pillar": {
+      "frame": {
+        "x": 312,
+        "y": 4,
+        "w": 64,
+        "h": 96
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 96
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 96
+      }
+    },
+    "skin_aether_crown_normal": {
+      "frame": {
+        "x": 380,
+        "y": 4,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      }
+    },
+    "skin_aether_crown_ring": {
+      "frame": {
+        "x": 512,
+        "y": 4,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      }
+    },
+    "skin_aether_crown_shrunk": {
+      "frame": {
+        "x": 644,
+        "y": 4,
+        "w": 76,
+        "h": 76
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 76,
+        "h": 76
+      },
+      "sourceSize": {
+        "w": 76,
+        "h": 76
+      }
+    },
+    "skin_chrono_shard_normal": {
+      "frame": {
+        "x": 724,
+        "y": 4,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      }
+    },
+    "skin_chrono_shard_ring": {
+      "frame": {
+        "x": 856,
+        "y": 4,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      }
+    },
+    "skin_chrono_shard_shrunk": {
+      "frame": {
+        "x": 4,
+        "y": 136,
+        "w": 76,
+        "h": 76
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 76,
+        "h": 76
+      },
+      "sourceSize": {
+        "w": 76,
+        "h": 76
+      }
+    },
+    "skin_cyber_katana_normal": {
+      "frame": {
+        "x": 84,
+        "y": 136,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      }
+    },
+    "skin_cyber_katana_ring": {
+      "frame": {
+        "x": 216,
+        "y": 136,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      }
+    },
+    "skin_cyber_katana_shrunk": {
+      "frame": {
+        "x": 348,
+        "y": 136,
+        "w": 76,
+        "h": 76
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 76,
+        "h": 76
+      },
+      "sourceSize": {
+        "w": 76,
+        "h": 76
+      }
+    },
+    "skin_plasma_singularity_normal": {
+      "frame": {
+        "x": 428,
+        "y": 136,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      }
+    },
+    "skin_plasma_singularity_ring": {
+      "frame": {
+        "x": 560,
+        "y": 136,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      }
+    },
+    "skin_plasma_singularity_shrunk": {
+      "frame": {
+        "x": 692,
+        "y": 136,
+        "w": 76,
+        "h": 76
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 76,
+        "h": 76
+      },
+      "sourceSize": {
+        "w": 76,
+        "h": 76
+      }
+    },
+    "wall_w1_chevron_cap": {
+      "frame": {
+        "x": 772,
+        "y": 136,
+        "w": 64,
+        "h": 96
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 96
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 96
+      }
+    },
+    "wall_w2_prism_cap": {
+      "frame": {
+        "x": 840,
+        "y": 136,
+        "w": 64,
+        "h": 96
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 96
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 96
+      }
+    },
+    "wall_w3_reactor_cap": {
+      "frame": {
+        "x": 908,
+        "y": 136,
+        "w": 64,
+        "h": 96
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 96
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 96
+      }
+    }
+  },
+  "meta": {
+    "app": "PULSE Master Production Pipeline",
+    "version": "6.0-30stage",
+    "image": "pulse_expansion_30stage_atlas.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 1024,
+      "h": 1024
+    },
+    "scale": "1"
+  }
+}

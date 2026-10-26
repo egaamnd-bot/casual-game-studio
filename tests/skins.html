@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse skin tests</title>
+  <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
+</head>
+<body>
+  <script>
+    // Skins: the original six are untouched, Gemini's four expansion skins are valid and cosmetic only (docs/ASSET_MANIFEST.md).
+    try { localStorage.clear(); } catch (e) {}
+    window.PULSE_ASSET_BASE = '../src/';
+    window.PULSE_TEST = { autoStart: true, holdReady: true, bot: false, mode: 'campaign', stageIndex: 0 };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/melody.js"></script>
+  <script src="../src/js/overdrive.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/mirror.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/patterns.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script src="../src/js/render.js"></script>
+  <script src="../src/js/ui.js"></script>
+  <script src="../src/js/assets.js"></script>
+  <script src="../src/js/trail.js"></script>
+  <script src="../src/js/sprite-view.js"></script>
+  <script src="../src/js/game-scene.js"></script>
+  <script src="../src/js/menu-scenes.js"></script>
+  <script src="../src/js/main.js"></script>
+  <script>
+    const C = Pulse.CONFIG;
+    const fails = [];
+    let checks = 0;
+    const check = (ok, msg) => { checks++; if (!ok) fails.push(msg); };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const scene = () => window.__pulseScene;
+    const fake = new WeakMap();
+    const clockOf = (sc) => { let c = fake.get(sc); if (!c) { c = { now: sc.time.now }; fake.set(sc, c); Object.defineProperty(sc.time, 'now', { get: () => c.now, set: () => {}, configurable: true }); } return c; };
+    const frames = (sc, n, until) => { const c = clockOf(sc); for (let i = 0; i < n; i++) { c.now += 16.667; sc.update(c.now, 16.667); sc.draw && sc.draw(); if (until && until()) return true; } return !until; };
+    const errors = [];
+    window.addEventListener('error', (e) => errors.push(e.message));
+    const pixels = (img) => { const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height; const cx = cv.getContext('2d'); cx.drawImage(img, 0, 0); return cx.getImageData(0, 0, img.width, img.height); };
+    const game = () => window.__pulseGame;
+    const writeSave = (stars) => { // a save with `stars` total stars, via real completions
+      localStorage.clear();
+      const sv = Pulse.Save.load();
+      let left = stars;
+      for (let i = 0; i < Pulse.STAGES.length && left > 0; i++) { const n = Math.min(3, left); Pulse.Campaign.recordCompletion(sv, Pulse.STAGES[i].id, n); left -= n; }
+      Pulse.Save.write(sv);
+      return Pulse.Save.load();
+    };
+    async function startStage(idx) { scene().scene.start('game', { mode: 'campaign', stageIndex: idx }); await wait(350); const q = scene(); q.test.holdReady = true; return q; }
+
+    async function run() {
+      for (let i = 0; i < 200 && !(scene() && scene().state); i++) await wait(100);
+      await wait(300);
+      const ids = Pulse.SKINS.map((s) => s.id);
+
+      // ---- The original six are exactly as shipped ----
+      const original = [
+        ['classic', 'Classic', 0, 0x00f0ff, 0xe0ffff, 0xffffff, 'pulse_gameplay', 'player_orb_', 'player_tension_arcs_'],
+        ['solar-flare', 'Solar Flare', 3, 0xff7a00, 0xfff3b0, 0xfff3b0, 'pulse_skins', 'skin_solar_flare_', 'skin_solar_flare_tension_arcs_'],
+        ['void-prism', 'Void Prism', 6, 0xa855f7, 0xf3e8ff, 0xf3e8ff, 'pulse_skins', 'skin_void_prism_', 'skin_void_prism_tension_arcs_'],
+        ['retro-green', 'Retro Green', 9, 0x00ff66, 0xccffe0, 0xccffe0, 'pulse_skins', 'skin_retro_green_', 'skin_retro_green_tension_arcs_'],
+        ['violet-nova', 'Violet Nova', 12, 0xd946ef, 0xfae8ff, 0xffffff, 'pulse_skins', 'skin_violet_nova_', 'skin_violet_nova_tension_arcs_'],
+        ['whiteout', 'Whiteout', 15, 0xf1f5f9, 0xffffff, 0x0f172a, 'pulse_skins', 'skin_whiteout_', 'skin_whiteout_tension_arcs_'],
+      ];
+      original.forEach((o, i) => {
+        const s = Pulse.SKINS[i];
+        check(s && s.id === o[0] && s.name === o[1] && s.unlockStars === o[2] && s.colors.orb === o[3] && s.colors.shrunk === o[4] && s.colors.core === o[5]
+          && s.sprite.atlas === o[6] && s.sprite.prefix === o[7] && s.sprite.arcPrefix === o[8], `${o[0]}: id, name, unlock (${o[2]} stars), colours and sprite unchanged, in the same position`);
+      });
+      const added = Pulse.SKINS.slice(6);
+      check(added.map((s) => s.id).join() === 'cyber-katana,chrono-shard,plasma-singularity,aether-crown', 'four skins added after the original six');
+      check(added.map((s) => s.unlockStars).join() === '24,36,54,72', 'with Gemini\'s thresholds 24, 36, 54, 72');
+      check(Pulse.SKINS.every((s, i) => i === 0 || s.unlockStars > Pulse.SKINS[i - 1].unlockStars), 'thresholds strictly ascend');
+      check(new Set(ids).size === ids.length && new Set(Pulse.SKINS.map((s) => s.colors.orb)).size === ids.length, 'ids and comet orb colours are unique, so every skin reads differently in play');
+      check(added.every((s) => Object.keys(s).sort().join() === 'colors,id,name,sprite,unlockStars' && Object.keys(s.sprite).sort().join() === 'arcPrefix,atlas,prefix'), 'new skins carry looks only (same schema as the old ones)');
+
+      // ---- Atlas: JSON vs PNG, and the frames the skins name ----
+      const json = await (await fetch('../src/assets/atlases/pulse_expansion_30stage_atlas.json')).json();
+      const fr = Array.isArray(json.frames) ? json.frames : Object.entries(json.frames).map(([k, v]) => Object.assign({ filename: k }, v));
+      const tex = scene().textures.get('pulse_expansion'); const src = tex.getSourceImage();
+      check(fr.length === 21, `expansion atlas lists 21 frames (${fr.length})`);
+      check(src.width === json.meta.size.w && src.height === json.meta.size.h, `atlas PNG ${src.width}x${src.height} matches its JSON`);
+      const px = pixels(src);
+      for (const f of fr) {
+        const fm = tex.get(f.filename);
+        check(tex.has(f.filename) && fm.width === f.frame.w && fm.height === f.frame.h, `${f.filename}: ${f.frame.w}x${f.frame.h} in the texture`);
+        check(f.frame.x + f.frame.w <= src.width && f.frame.y + f.frame.h <= src.height, `${f.filename}: inside the atlas`);
+        let a = 0, n = 0;
+        for (let y = f.frame.y; y < f.frame.y + f.frame.h; y++) for (let x = f.frame.x; x < f.frame.x + f.frame.w; x++) { a += px.data[(y * px.width + x) * 4 + 3]; n++; }
+        check(a / n > 8, `${f.filename}: the cell has visible pixels`);
+      }
+      for (const s of added) {
+        const dims = { normal: 128, ring: 128, shrunk: 76 };
+        for (const k of Object.keys(dims)) check(tex.has(`${s.sprite.prefix}${k}`) && tex.get(`${s.sprite.prefix}${k}`).width === dims[k], `${s.id}: ${k} frame is ${dims[k]} px`);
+        check(Pulse.Assets.requiredFrames().pulse_expansion.includes(`${s.sprite.prefix}normal`), `${s.id}: its frames are checked at start-up`);
+      }
+      check(Pulse.Assets.ok, 'the asset check passes with the new atlas');
+
+      // ---- Saves and unlocks ----
+      {
+        const sv0 = writeSave(0);
+        check(sv0.skins.selected === 'classic' && sv0.skins.unlocked.join() === 'classic', 'a new save starts with Classic only');
+        // A save made before these skins existed loads unchanged.
+        localStorage.clear();
+        localStorage.setItem('pulse.save.v1', JSON.stringify({ version: 1, campaign: { stages: { 's1-first-pulse': { completed: true, bestStars: 3 } } }, skins: { selected: 'whiteout', unlocked: ['classic', 'solar-flare', 'void-prism', 'retro-green', 'violet-nova', 'whiteout'] } }));
+        const old = Pulse.Save.load();
+        check(old.skins.selected === 'whiteout' && old.skins.unlocked.length === 6 && old.campaign.stages['s1-first-pulse'].bestStars === 3, 'an old save loads with its skins and stars intact');
+        check(Pulse.Skins.selected(old).id === 'whiteout', 'and its selected skin is still selected');
+        check(!Pulse.Skins.select(old, 'cyber-katana') && old.skins.selected === 'whiteout', 'a locked new skin cannot be selected');
+        // Unlock thresholds in the real completion flow.
+        for (const [stars, id] of [[24, 'cyber-katana'], [36, 'chrono-shard'], [54, 'plasma-singularity']]) {
+          const s1 = writeSave(stars - 1);
+          check(!Pulse.Skins.isUnlocked(s1, Pulse.Skins.byId(id)), `${id}: still locked at ${stars - 1} stars`);
+          const s2 = writeSave(stars);
+          check(Pulse.Skins.isUnlocked(s2, Pulse.Skins.byId(id)) && s2.skins.unlocked.includes(id), `${id}: unlocked by completing stages at ${stars} stars`);
+        }
+        const s72 = writeSave(54);
+        check(!Pulse.Skins.isUnlocked(s72, Pulse.Skins.byId('aether-crown')), 'Aether Crown (72) stays locked with all 18 current stages at 3 stars: it needs the stages still to be built');
+        const gr = Pulse.Skins.grantUnlocks(s72, 72);
+        check(gr.map((s) => s.id).join() === 'aether-crown' && Pulse.Skins.isUnlocked(s72, Pulse.Skins.byId('aether-crown')), 'and unlocks at 72 stars');
+        // Earned skins stay earned; a selected new skin survives save and load.
+        const s3 = writeSave(36); Pulse.Skins.select(s3, 'chrono-shard'); Pulse.Save.write(s3);
+        const back = Pulse.Save.load();
+        check(back.skins.selected === 'chrono-shard' && Pulse.Skins.selected(back).id === 'chrono-shard', 'a selected new skin survives save and load');
+        // A skin id from the future (downgrade) falls back to Classic.
+        localStorage.setItem('pulse.save.v1', JSON.stringify(Object.assign(JSON.parse(localStorage.getItem('pulse.save.v1')), { skins: { selected: 'nope', unlocked: ['classic', 'nope'] } })));
+        const odd = Pulse.Save.load();
+        check(Pulse.Skins.selected(odd).id === 'classic', 'an unknown skin id falls back to Classic');
+      }
+
+      // ---- The picker shows every skin, locked ones as locked ----
+      {
+        writeSave(30);
+        game().scene.start('menu'); await wait(500);
+        const m = game().scene.getScenes(true)[0];
+        check(m.scene.key === 'menu' && m.skinIndex === 0, 'the menu opens on the selected skin');
+        const seen = [];
+        for (let i = 0; i < Pulse.SKINS.length; i++) {
+          const skin = Pulse.SKINS[m.skinIndex];
+          const unlocked = Pulse.Skins.isUnlocked(Pulse.Save.load(), skin);
+          seen.push(skin.id);
+          check(m.previewImgs[1].frame.name === `${skin.sprite.prefix}normal` && m.previewImgs[0].frame.name === `${skin.sprite.prefix}ring`, `${skin.id}: the picker shows its art`);
+          check(m.lockIcon.visible === !unlocked, `${skin.id}: lock icon ${unlocked ? 'hidden' : 'shown'} at 30 stars`);
+          check(unlocked ? m.skinNote.text === (Pulse.Skins.selected(Pulse.Save.load()).id === skin.id ? 'Selected' : '') : m.skinNote.text === `Unlocks at ${skin.unlockStars} stars`, `${skin.id}: note "${m.skinNote.text}"`);
+          check(m.skinName.text === skin.name, `${skin.id}: name shown`);
+          m.browse(1); await wait(30);
+        }
+        check(seen.join() === ids.join() && m.skinIndex === 0, 'browsing goes through all ten skins and wraps');
+        const sel = Pulse.Save.load().skins.selected;
+        check(Pulse.Skins.isUnlocked(Pulse.Save.load(), Pulse.Skins.byId(sel)), `browsing never leaves a locked skin selected (${sel})`);
+      }
+
+      // ---- In play: colours in the comet look, art in the sprite look, nothing else changes ----
+      writeSave(54); { const sv = Pulse.Save.load(); sv.skins.unlocked = ids.slice(); Pulse.Save.write(sv); } // every skin unlocked, to compare looks
+      const sig = async (skinId, cometOn) => {
+        const sv = Pulse.Save.load(); Pulse.Skins.select(sv, skinId); Pulse.Save.write(sv);
+        C.comet.enabled = cometOn;
+        try {
+          const q = await startStage(0);
+          check(q.skin.id === skinId, `${skinId}: the scene uses it`);
+          const v = q.view;
+          if (cometOn) check(v.cometColor(0, false) === Pulse.Skins.byId(skinId).colors.orb, `${skinId}: comet orb colour is its own`);
+          else {
+            const s = Pulse.Skins.byId(skinId).sprite;
+            check(v.body.frame.name === `${s.prefix}normal` && v.ring.frame.name === `${s.prefix}ring` && v.core.frame.name === `${s.prefix}shrunk`, `${skinId}: sprite look uses its frames`);
+          }
+          q.test.bot = true; q.test.route = 'safe'; q.startRun();
+          frames(q, 40000, () => q.state !== 'playing');
+          if (!cometOn) {
+            const hasArcs = !!Pulse.Skins.byId(skinId).sprite.arcPrefix;
+            check(hasArcs ? true : v.arcs.alpha === 0, `${skinId}: no arcs are shown for a skin without arc frames`);
+          }
+          return { state: q.state, score: q.score, energy: q.energy, t: +q.elapsed.toFixed(3), stars: q.result && q.result.stars };
+        } finally { C.comet.enabled = true; }
+      };
+      const base = await sig('classic', true);
+      check(base.state === 'complete', 'classic completes stage 1');
+      for (const id of ids) {
+        const a = await sig(id, true);
+        check(JSON.stringify(a) === JSON.stringify(base), `${id}: stage 1 plays identically to Classic (comet look)`);
+      }
+      for (const id of ['classic', 'violet-nova', ...added.map((s) => s.id)]) {
+        const a = await sig(id, false);
+        check(a.state === 'complete' && a.score === base.score && a.stars === base.stars, `${id}: the sprite look plays the same too`);
+      }
+      // Endless with a new skin.
+      { const sv = Pulse.Save.load(); Pulse.Skins.select(sv, 'aether-crown'); Pulse.Save.write(sv);
+        scene().scene.start('game', { mode: 'endless' }); await wait(350);
+        const q = scene(); q.test.holdReady = true; q.startRun(); frames(q, 300);
+        check(q.mode === 'endless' && q.skin.id === 'aether-crown' && q.state === 'over' || q.state === 'playing', 'Endless runs with a new skin'); }
+      check(errors.length === 0, `page errors: ${errors.join(' | ')}`);
+    }
+    run().then(() => { document.title = fails.length ? `FAIL ${fails.length}: ${fails.join(' | ')}` : `PASS skin tests ${checks} checks`; })
+      .catch((e) => { document.title = 'FAIL error ' + e.message + ' ' + (e.stack || '').split('\n')[1]; });
+  </script>
+</body>
+</html>

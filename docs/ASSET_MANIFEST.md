@@ -33,9 +33,22 @@ Runtime: `src/assets/backgrounds/bg_portrait_*.png`, 540x960 RGBA, optional load
 
 Arcs, not the shipped audio worlds, choose the backdrop (see DECISIONS #17); stages 11 and 12 keep world-3 music but get the arc 2 backdrop.
 
+## Expansion skins: INTEGRATED
+Runtime: `src/assets/atlases/pulse_expansion_30stage_atlas.png` + `.json` (21 frames, verified against the PNG by `tests/skins.html`: names, sizes, bounds, non-empty cells). Key `pulse_expansion`, now a required atlas. Source: master library ZIP, expansion atlas.
+
+| Skin id | Frames (normal 128, ring 128, shrunk 76) | Unlocks at |
+|---|---|---|
+| cyber-katana | `skin_cyber_katana_*` | 24 stars |
+| chrono-shard | `skin_chrono_shard_*` | 36 stars |
+| plasma-singularity | `skin_plasma_singularity_*` | 54 stars |
+| aether-crown | `skin_aether_crown_*` | 72 stars (needs stages beyond 18; unreachable today) |
+
+No tension-arc frames exist for these, so `arcPrefix` is null and no arcs animation is made. Device appearance NOT DEVICE-TESTED.
+
 ## VALIDATED in the ZIP, NOT integrated (reason)
 - `wall_w1_chevron_cap`, `wall_w2_prism_cap`, `wall_w3_reactor_cap`, `mirror_gate_cap_left/right`, `route_chevron_risk/safe`, `route_divider_pillar`, `mirror_axis_tile` (expansion atlas): the shipping comet look draws walls, forks and the mirror axis procedurally from the collision numbers (`Render.cometGate`, `forkGate`, `mirrorAxis`); the sprite caps are only used by the non-comet path. The prism and reactor caps also have notched edges that sit up to 6 px inside the collision edge on some rows, which would misstate where a wall collides. Revisit only as a deliberate wall-style change.
-- 4 skins + 21-frame expansion atlas, 12 SFX, 3 Overdrive stems: next batches.
+- 12 SFX, 3 Overdrive stems: next batch.
+- The 9 non-skin frames of the expansion atlas stay in the atlas (loaded, unused), see above.
 
 ## MISSING from Gemini's proposal
 Alternate base gameplay loops, finale tracks, world-completion and campaign-completion stings, completion UI art.
