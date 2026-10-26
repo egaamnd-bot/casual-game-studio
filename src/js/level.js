@@ -472,6 +472,7 @@
       seg.ring = it.ring || null;
       seg.pinged = false;
       seg.whooshed = false;
+      if (Pulse.Graze) Pulse.Graze.reset(seg); // cosmetic graze tracking restarts with the segment (docs/NEAR_MISS.md)
       seg.arriveBeat = it.arriveBeat || 0;
       seg.quality = null;
       // Segments are pooled: reset flags a previous use may have left (a recycled charged
