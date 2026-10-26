@@ -4,6 +4,7 @@
 // loaded (all text rendered here), otherwise simple shapes.
 (function () {
   const T = Pulse.THEME;
+  const C = Pulse.CONFIG;
 
   // The same deep-navy backdrop as gameplay: a faint grid and neon lane rails.
   function backdrop(scene) {
@@ -77,6 +78,9 @@
       this.arrow(right - 140, -1);
       this.arrow(right + 140, 1);
       this.showSkin();
+
+      // LAB (bottom-left): the prototypes, only when the build has any (docs/LAB.md).
+      if (C.lab.enabled && Pulse.Lab && Pulse.Lab.list().length) UI.button(this, 76, H - 44, 112, 48, 'LAB', () => this.go('lab'), { size: 20 });
 
       // Settings (top-right).
       UI.iconButton(this, W - 56, 44, 48, 'ui_btn_icon_settings_up', '⚙', () => this.openSettings());

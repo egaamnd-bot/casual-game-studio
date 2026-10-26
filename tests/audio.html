@@ -180,7 +180,7 @@
       await settle(q); odOn(q); frames(q, 3); check(!!Pulse.Sfx.stemActive(), `on before mute (aligned ${q.aligned()}, started ${Pulse.Music.started}, track ${Pulse.Music.track})`);
       Pulse.Audio.setVolume('music', 0); check(!Pulse.Sfx.stemActive(), 'music mute stops the stem');
       frames(q, 5); check(!Pulse.Sfx.stemActive(), 'and it does not come back while muted');
-      Pulse.Audio.setVolume('music', 0.8); frames(q, 3); check(!!Pulse.Sfx.stemActive(), 'unmuting during Overdrive brings it back');
+      Pulse.Audio.setVolume('music', 0.8); await settle(q); frames(q, 3); check(!!Pulse.Sfx.stemActive(), 'unmuting during Overdrive brings it back');
       played.length = 0; Pulse.Audio.setVolume('sfx', 0); q.comboMilestone(16); check(played.filter((p) => /^pack/.test(p.name)).every((p) => !p.ok), 'sfx volume 0 silences the samples');
       Pulse.Audio.setVolume('sfx', 1);
       q.od.active = false; frames(q, 2);
