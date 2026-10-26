@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse hazard palette tests</title>
+  <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
+</head>
+<body>
+  <script>
+    // Hazard palette comfort (docs/PALETTE_SOFT.md): colours only; the old look stays exactly reachable.
+    try { localStorage.clear(); } catch (e) {}
+    window.PULSE_ASSET_BASE = '../src/';
+    window.PULSE_TEST = { autoStart: true, holdReady: true, bot: false, mode: 'campaign', stageIndex: 0 };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/melody.js"></script>
+  <script src="../src/js/overdrive.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/graze.js"></script>
+  <script src="../src/js/mirror.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/patterns.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script src="../src/js/render.js"></script>
+  <script src="../src/js/ui.js"></script>
+  <script src="../src/js/assets.js"></script>
+  <script src="../src/js/trail.js"></script>
+  <script src="../src/js/sprite-view.js"></script>
+  <script src="../src/js/game-scene.js"></script>
+  <script src="../src/js/menu-scenes.js"></script>
+  <script src="../src/js/main.js"></script>
+  <script>
+    const C = Pulse.CONFIG;
+    const T = Pulse.THEME;
+    const fails = [];
+    let checks = 0;
+    const check = (ok, msg) => { checks++; if (!ok) fails.push(msg); };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const scene = () => window.__pulseScene;
+    const errors = [];
+    window.addEventListener('error', (e) => errors.push(e.message));
+    const rgb = (n) => [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    const lum = (n) => { const [r, g, b] = rgb(n); return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b); };
+    const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+    const hue = (n) => { const [r, g, b] = rgb(n).map((v) => v / 255); const mx = Math.max(r, g, b), d = mx - Math.min(r, g, b); if (!d) return 0; let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return ((h * 60) + 360) % 360; };
+    const hueDist = (a, b) => { const d = Math.abs(hue(a) - hue(b)); return Math.min(d, 360 - d); };
+    const sat = (n) => { const [r, g, b] = rgb(n); const mx = Math.max(r, g, b); return mx ? (mx - Math.min(r, g, b)) / mx : 0; };
+
+    // The classic theme: evaluate config.js with the flag off in a fresh namespace.
+    async function classicTheme() {
+      const text = await (await fetch('../src/js/config.js')).text();
+      const P = {};
+      new Function('Pulse', text.replace('palette: { soft: true }', 'palette: { soft: false }'))(P);
+      return P.THEME;
+    }
+    const loadPixels = async (url) => { const img = new Image(); img.src = url; await img.decode(); const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0); return { w: img.width, h: img.height, d: g.getImageData(0, 0, img.width, img.height).data }; };
+
+    async function run() {
+      for (let i = 0; i < 200 && !(scene() && scene().state); i++) await wait(100);
+      await Pulse.Audio.loading; await wait(300);
+
+      // ---- Theme: soft is the default, classic is exactly the earlier look ----
+      check(C.palette && C.palette.soft === true, 'CONFIG.palette.soft is on by default');
+      const old = await classicTheme();
+      check(old.wall === 0x2b111b && old.wallEdge === 0xff2a54 && old.hull === 0x16060f && old.glowAlpha === 0.14 && old.ringGlowAlpha === 0.12 && old.rimAlpha === 0.95 && old.chevronAlpha === 0.6, 'soft: false reproduces the earlier code-drawn values exactly (wall 2b111b, rim ff2a54, hull 16060f, alphas .14 / ring .12 / .95 / .6)');
+      check(old.gapEdge === T.gapEdge && old.orb === T.orb && old.pickup === T.pickup && old.bonus === T.bonus && old.danger === T.danger && old.background === T.background, 'nothing else in the theme changed (gap edge, orb, pickups, danger, background)');
+      const bg = T.background;
+      // Softer: lower saturation and glow, lighter hull than the near-black one.
+      check(sat(T.wallEdge) < sat(old.wallEdge) - 0.1, `rim is gentler: saturation ${sat(T.wallEdge).toFixed(2)} vs ${sat(old.wallEdge).toFixed(2)}`);
+      check(T.glowAlpha < old.glowAlpha && T.ringGlowAlpha < old.ringGlowAlpha && T.rimAlpha < old.rimAlpha && T.chevronAlpha < old.chevronAlpha, 'glow, rim and chevron alphas are lower');
+      check(lum(T.hull) > lum(old.hull) && hueDist(T.hull, 0xa03090) < hueDist(old.hull, 0xa03090) + 1, 'the hull is lighter and moves toward burgundy/plum');
+      // Readability: the hazard keeps strong contrast against the field and its own hull.
+      const rimBg = contrast(T.wallEdge, bg), rimHull = contrast(T.wallEdge, T.hull), hullBg = contrast(T.hull, bg);
+      const oldRimBg = contrast(old.wallEdge, bg), oldRimHull = contrast(old.wallEdge, old.hull);
+      check(rimBg >= 4.5, `rim against the field: ${rimBg.toFixed(2)}:1 (earlier ${oldRimBg.toFixed(2)}:1; floor 4.5)`);
+      check(rimHull >= 3.5, `rim against its hull: ${rimHull.toFixed(2)}:1 (earlier ${oldRimHull.toFixed(2)}:1; floor 3.5)`);
+      check(hullBg >= 1.1, `hull is distinguishable from the field: ${hullBg.toFixed(2)}:1 (earlier ${contrast(old.hull, bg).toFixed(2)}:1)`);
+      // Distinct from everything that must not be confused with a hazard.
+      const cyan = 0x00f0ff, amber = T.gapEdge, risk = 0xff5ac8, safe = 0x35c8ff;
+      check(hueDist(T.wallEdge, cyan) > 120 && hueDist(T.wallEdge, safe) > 120, 'rim is far from the cyan smashable barrier and the safe-route cyan in hue');
+      check(hueDist(T.wallEdge, amber) >= 30, `rim is distinct from the amber gap edge (${hueDist(T.wallEdge, amber).toFixed(0)} deg; earlier ${hueDist(old.wallEdge, amber).toFixed(0)})`);
+      check(hueDist(T.wallEdge, risk) >= hueDist(old.wallEdge, risk) - 1 && hueDist(T.wallEdge, risk) >= 20, `rim is no closer to the pink risk lane than before (${hueDist(T.wallEdge, risk).toFixed(0)} deg vs ${hueDist(old.wallEdge, risk).toFixed(0)})`);
+      check(contrast(T.wallEdge, cyan) > 1.0 && Math.abs(lum(T.wallEdge) - lum(cyan)) > 0.2, 'and in luminance from the cyan barrier / orb');
+      // Against the world backdrops: the rim must contrast with the average colour of each portrait backdrop.
+      const arts = Pulse.Assets.ART_IMAGES;
+      for (const key of arts) {
+        const px = await loadPixels(`../src/assets/backgrounds/${key}.png`);
+        let r = 0, g = 0, b = 0, n = 0; for (let i = 0; i < px.d.length; i += 4 * 97) { r += px.d[i]; g += px.d[i + 1]; b += px.d[i + 2]; n++; }
+        const avg = (Math.round(r / n) << 16) | (Math.round(g / n) << 8) | Math.round(b / n);
+        const cNew = contrast(T.wallEdge, avg), cOld = contrast(old.wallEdge, avg), hNew = contrast(T.hull, avg);
+        check(cNew >= 3 && cNew >= cOld * 0.8, `${key}: rim vs average backdrop ${cNew.toFixed(2)}:1 (earlier ${cOld.toFixed(2)}:1), hull vs backdrop ${hNew.toFixed(2)}:1`);
+      }
+
+      // ---- The recoloured atlas: only red hazard pixels of the hazard frames differ ----
+      const base = '../src/assets/atlases/pulse_gameplay_atlas';
+      const [A, S, J] = await Promise.all([loadPixels(base + '.png'), loadPixels(base + '_soft.png'), fetch(base + '.json').then((r) => r.json())]);
+      check(A.w === S.w && A.h === S.h, `same atlas size (${A.w}x${A.h})`);
+      const frames = Array.isArray(J.frames) ? Object.fromEntries(J.frames.map((f) => [f.filename, f])) : J.frames;
+      const targets = ['barrier_smash_danger_tile', 'barrier_charged_danger_tile', 'barrier_charged_emblem_danger', 'tunnel_wall_edge_tile', 'wall_body_tile', 'wall_cap_left', 'wall_cap_right', 'wall_joint_divider'];
+      const inTarget = new Uint8Array(A.w * A.h);
+      for (const n of targets) { const f = frames[n].frame; for (let y = f.y; y < f.y + f.h; y++) for (let x = f.x; x < f.x + f.w; x++) inTarget[y * A.w + x] = 1; }
+      let alphaDiff = 0, outsideDiff = 0, insideDiff = 0, nonRedChanged = 0, redUnchanged = 0, redTotal = 0;
+      const hsv = (r, g, b) => { r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0; if (d) h = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return [h / 6, mx ? d / mx : 0, mx]; };
+      for (let p = 0; p < A.w * A.h; p++) {
+        const i = p * 4;
+        if (A.d[i + 3] !== S.d[i + 3]) alphaDiff++;
+        const same = A.d[i] === S.d[i] && A.d[i + 1] === S.d[i + 1] && A.d[i + 2] === S.d[i + 2];
+        if (!inTarget[p]) { if (!same) outsideDiff++; continue; }
+        if (A.d[i + 3] !== 255) continue; // canvas read-back of translucent pixels is premultiplied and lossy; alpha is compared above for all
+        const [h, s] = hsv(A.d[i], A.d[i + 1], A.d[i + 2]);
+        const red = (h <= 22 / 360 || h >= 325 / 360) && s > 0.35;
+        if (!same) insideDiff++;
+        if (red) { redTotal++; if (same) redUnchanged++; } else if (!same) nonRedChanged++;
+      }
+      check(alphaDiff === 0, `alpha identical everywhere (${alphaDiff} differences): shape and transparency unchanged`);
+      check(outsideDiff === 0, `every pixel outside the hazard frames is identical (${outsideDiff} differences)`);
+      check(nonRedChanged === 0, `inside the hazard frames only red-family pixels changed (${nonRedChanged} others changed; opaque pixels; orange gap edges and cyan untouched)`);
+      check(insideDiff > 1000 && redUnchanged <= redTotal * 0.02, `the red pixels were remapped (${insideDiff} changed, ${redUnchanged}/${redTotal} unchanged)`);
+      // The ready (cyan) barrier tiles are bit-identical.
+      for (const n of ['barrier_smash_ready_tile', 'barrier_charged_ready_tile', 'barrier_charged_emblem_ready']) { const f = frames[n].frame; let d = 0; for (let y = f.y; y < f.y + f.h; y++) for (let x = f.x; x < f.x + f.w; x++) { const i = (y * A.w + x) * 4; if (A.d[i] !== S.d[i] || A.d[i + 1] !== S.d[i + 1] || A.d[i + 2] !== S.d[i + 2] || A.d[i + 3] !== S.d[i + 3]) d++; } check(d === 0, `${n} (cyan, smash-ready) is unchanged`); }
+      // A soft hazard pixel stays red-family, readable on the field.
+      const f0 = frames.barrier_smash_danger_tile.frame; let rimPx = null, best = 0;
+      for (let y = f0.y; y < f0.y + f0.h; y++) for (let x = f0.x; x < f0.x + f0.w; x++) { const i = (y * A.w + x) * 4; const m = Math.max(S.d[i], S.d[i + 1], S.d[i + 2]); if (S.d[i + 3] === 255 && m > best) { best = m; rimPx = (S.d[i] << 16) | (S.d[i + 1] << 8) | S.d[i + 2]; } }
+      check(rimPx !== null && hueDist(rimPx, cyan) > 120 && contrast(rimPx, bg) >= 4.5, `a soft danger-tile rim pixel (${rimPx !== null ? rimPx.toString(16) : 'none'}) is far from cyan and keeps ${rimPx !== null ? contrast(rimPx, bg).toFixed(1) : '-'}:1 against the field`);
+
+      // ---- The game uses it, and still runs ----
+      const tex = scene().textures.get('pulse_gameplay');
+      check(tex && targets.concat(['barrier_smash_ready_tile']).every((n) => tex.has(n)), 'the game loaded the gameplay atlas with every hazard frame');
+      check(Pulse.Assets.ok === true && Pulse.Assets.failed.length === 0, `assets loaded without failures (${Pulse.Assets.failed.join(',')})`);
+      let soft = 0, orig = 0;
+      const fb = frames.barrier_smash_danger_tile.frame;
+      for (let y = 0; y < fb.h; y += 3) for (let x = 0; x < fb.w; x += 3) {
+        const col = scene().textures.getPixel(x, y, 'pulse_gameplay', 'barrier_smash_danger_tile'); if (!col || col.alpha !== 255) continue;
+        const i = ((fb.y + y) * A.w + fb.x + x) * 4;
+        if (col.red === S.d[i] && col.green === S.d[i + 1] && col.blue === S.d[i + 2]) soft++;
+        if (col.red === A.d[i] && col.green === A.d[i + 1] && col.blue === A.d[i + 2]) orig++;
+      }
+      check(soft > 20 && orig < soft, `the game's loaded gameplay atlas is the soft one (${soft} sampled pixels match soft, ${orig} match the original)`);
+      check(errors.length === 0, `page errors: ${errors.join(' | ')}`);
+    }
+    run().then(() => { document.title = fails.length ? `FAIL ${fails.length}: ${fails.join(' | ')}` : `PASS palette tests ${checks} checks`; })
+      .catch((e) => { document.title = 'FAIL error ' + e.message + ' ' + (e.stack || '').split('\n')[1]; });
+  </script>
+</body>
+</html>
