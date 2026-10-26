@@ -676,9 +676,10 @@
         let event = this.level.resolve(s, this.orbY, r, this.orbState.charge, ox);
         let byEcho = false;
         // Mirror Pulse: the echo is checked on its own against the paired obstacles of the zone.
-        if (!event && this.echoOn) {
-          event = this.level.resolveEcho(s, this.orbY, r, this.orbState.charge, this.echoX);
-          byEcho = !!event;
+        if (this.echoOn && event !== 'crash') {
+          const echoEvent = this.level.resolveEcho(s, this.orbY, r, this.orbState.charge, this.echoX);
+          if (echoEvent === 'crash') { event = 'crash'; byEcho = true; } // the echo's crash wins even on the frame the orb clears the row
+          else if (echoEvent && !event) event = echoEvent;
         }
         if (!event) continue;
 
