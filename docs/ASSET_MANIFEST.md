@@ -19,5 +19,23 @@ Runtime: `src/assets/atlases/pulse_comet_vfx_atlas.png` (1024x1024 RGBA) + `.jso
 | mirror_echo_ribbon_seg | 128x128 | echo ribbon |
 | mirror_echo_fold_burst | 160x160 | echo appears |
 
-## Not yet integrated (next batches)
-World backgrounds (6 x 540x960), world wall/route/mirror silhouettes (9), 4 skins + 21-frame expansion atlas, 12 SFX (WAV masters + OGG runtime) and 3 Overdrive stems: VALIDATED in the ZIP only, see the handoff for their status. Still MISSING from Gemini's proposal: alternate base gameplay loops, finale tracks, world-completion and campaign-completion stings, completion UI art.
+## Portrait world backdrops: INTEGRATED (stages that exist today)
+Runtime: `src/assets/backgrounds/bg_portrait_*.png`, 540x960 RGBA, optional load. Each repeats every 192 px, so it tiles vertically with no seam at any screen height (checked in `tests/worldart.html`); mean luminance 12-21 of 255 and under 2 % bright pixels, so they sit quietly behind the lane. Drawn as a tile layer under the grid, scrolling at 0.3x the distance travelled. Campaign only; Endless keeps the plain backdrop.
+
+| File | Source | Used for |
+|---|---|---|
+| bg_portrait_w1_neon_circuit | Master ZIP, batch2_worlds_and_backgrounds/backgrounds_portrait | arc 1, stages 1-9 |
+| bg_portrait_w1_finale_s10 | same | stage 10 (arc 1 finale) |
+| bg_portrait_w2_chromatic_overdrive | same | arc 2, stages 11-19 (11-18 exist) |
+| bg_portrait_w2_finale_s20 | same | stage 20 (arc 2 finale): PROVISIONAL, stage not built yet |
+| bg_portrait_w3_pulse_collapse | same | arc 3, stages 21-29: PROVISIONAL, stages not built yet |
+| bg_portrait_w3_finale_s30 | same | stage 30: PROVISIONAL, stage not built yet |
+
+Arcs, not the shipped audio worlds, choose the backdrop (see DECISIONS #17); stages 11 and 12 keep world-3 music but get the arc 2 backdrop.
+
+## VALIDATED in the ZIP, NOT integrated (reason)
+- `wall_w1_chevron_cap`, `wall_w2_prism_cap`, `wall_w3_reactor_cap`, `mirror_gate_cap_left/right`, `route_chevron_risk/safe`, `route_divider_pillar`, `mirror_axis_tile` (expansion atlas): the shipping comet look draws walls, forks and the mirror axis procedurally from the collision numbers (`Render.cometGate`, `forkGate`, `mirrorAxis`); the sprite caps are only used by the non-comet path. The prism and reactor caps also have notched edges that sit up to 6 px inside the collision edge on some rows, which would misstate where a wall collides. Revisit only as a deliberate wall-style change.
+- 4 skins + 21-frame expansion atlas, 12 SFX, 3 Overdrive stems: next batches.
+
+## MISSING from Gemini's proposal
+Alternate base gameplay loops, finale tracks, world-completion and campaign-completion stings, completion UI art.

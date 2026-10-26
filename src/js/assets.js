@@ -15,6 +15,23 @@ Pulse.Assets = {
   OPTIONAL_ATLASES: {
     pulse_comet_vfx: 'assets/atlases/pulse_comet_vfx_atlas',
   },
+  // The six portrait world backdrops (Gemini, 540x960). Optional like the comet kit: a failed load leaves the plain
+  // backdrop. `noArt` (tests) skips them.
+  ART_IMAGES: [
+    'bg_portrait_w1_neon_circuit', 'bg_portrait_w1_finale_s10', 'bg_portrait_w2_chromatic_overdrive',
+    'bg_portrait_w2_finale_s20', 'bg_portrait_w3_pulse_collapse', 'bg_portrait_w3_finale_s30',
+  ],
+  // Which portrait backdrop a campaign stage uses: its arc's, and the arc finale's on stages 10 / 20 / 30.
+  // (Stages 19-30 do not exist yet; their entries are ready for them.) Endless keeps the plain backdrop.
+  worldBackdrop(stageIndex) {
+    const st = Pulse.STAGES[stageIndex];
+    if (!st || !st.arc) return null;
+    const finale = (stageIndex + 1) % Pulse.ARC_SIZE === 0;
+    const n = st.arc.index - 1;
+    return (finale
+      ? ['bg_portrait_w1_finale_s10', 'bg_portrait_w2_finale_s20', 'bg_portrait_w3_finale_s30']
+      : ['bg_portrait_w1_neon_circuit', 'bg_portrait_w2_chromatic_overdrive', 'bg_portrait_w3_pulse_collapse'])[n] || null;
+  },
   VFX_FRAMES: [
     'comet_core_disc', 'comet_halo_bloom', 'comet_overdrive_corona', 'comet_ribbon_seg', 'comet_spark_micro',
     'comet_spark_star', 'comet_streak_fine', 'comet_taper_long', 'comet_taper_med', 'comet_taper_short',
@@ -110,6 +127,9 @@ Pulse.Assets = {
     if (!(window.PULSE_TEST && window.PULSE_TEST.noVfx)) for (const key of Object.keys(this.OPTIONAL_ATLASES)) {
       const base = this.OPTIONAL_ATLASES[key];
       scene.load.atlas(key, `${base}.png`, `${base}.json`);
+    }
+    if (!(window.PULSE_TEST && window.PULSE_TEST.noArt)) {
+      for (const key of this.ART_IMAGES) scene.load.image(key, `assets/backgrounds/${key}.png`);
     }
     for (const key of this.IMAGES) scene.load.image(key, `assets/backgrounds/${key}.png`);
     for (const key of this.STAGE_PLATES) scene.load.image(key, `assets/stage_cards/${key}.png`);
