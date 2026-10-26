@@ -28,7 +28,7 @@
 
     // ---- 1. Authoring: where routes are, and what makes each lane what it claims to be ----
     // Route stages are a deliberate list: add a stage here only together with its fairness and playthrough tests (section 8).
-    const ROUTE_STAGE_IDS = ['s4-split-decision', 's14-safe-or-sorry'];
+    const ROUTE_STAGE_IDS = ['s4-split-decision', 's14-safe-or-sorry', 's20-chromatic-overload', 's22-fracture'];
     check(forkStages.map((s) => s.id).join() === ROUTE_STAGE_IDS.join() && forkStages[0] === STAGE, `route forks appear in exactly these stages: ${ROUTE_STAGE_IDS.join(', ')} (found ${forkStages.map((s) => s.id).join(', ')})`);
     check(Pulse.STAGES.findIndex((s) => s === STAGE) === 3, 'the prototype stage keeps its place (stage 4) and id');
     const ids = [...new Set(STAGE.items.filter((it) => it.fork).map((it) => it.route))];
@@ -398,7 +398,7 @@
       const tr = Pulse.Campaign.compile(st, W, 960);
       check(Pulse.Campaign.validate(st, W).length === 0, `${st.id}: validates`);
       const rids = Object.keys(tr.routes);
-      check(rids.length >= 2 && rids.every((id) => tr.routes[id].rows >= 4 && tr.routes[id].riskNotes >= 3), `${st.id}: every fork has at least 4 rows and 3 risk notes (${rids.map((id) => tr.routes[id].rows + 'r/' + tr.routes[id].riskNotes + 'n').join(', ')})`);
+      check(rids.length >= (st.id === 's20-chromatic-overload' ? 1 : 2) && rids.every((id) => tr.routes[id].rows >= 4 && tr.routes[id].riskNotes >= 3), `${st.id}: every fork has at least 4 rows and 3 risk notes (${rids.map((id) => tr.routes[id].rows + 'r/' + tr.routes[id].riskNotes + 'n').join(', ')})`);
       for (const h of HEIGHTS) {
         for (const route of ['safe', 'risk']) {
           const a = play(st, route, h);

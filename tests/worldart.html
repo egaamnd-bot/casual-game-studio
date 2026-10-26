@@ -74,7 +74,7 @@
       }
 
       // ---- Which backdrop each stage uses ----
-      const exp = (i) => (NOART ? null : (i === 9 ? 'bg_portrait_w1_finale_s10' : i < 10 ? 'bg_portrait_w1_neon_circuit' : 'bg_portrait_w2_chromatic_overdrive'));
+      const exp = (i) => (NOART ? null : (i === 9 ? 'bg_portrait_w1_finale_s10' : i < 10 ? 'bg_portrait_w1_neon_circuit' : i === 19 ? 'bg_portrait_w2_finale_s20' : i < 20 ? 'bg_portrait_w2_chromatic_overdrive' : i === 29 ? 'bg_portrait_w3_finale_s30' : 'bg_portrait_w3_pulse_collapse'));
       for (let i = 0; i < Pulse.STAGES.length; i++) {
         q = await startStage(i);
         const want = exp(i);
@@ -82,6 +82,11 @@
         if (q.view.worldBg) check(q.view.worldBg.depth < q.view.grid.depth && q.view.worldBg.width === q.SW && q.view.worldBg.height === q.SH, `stage ${i + 1}: backdrop sits under the grid and covers the screen`);
       }
       check(Pulse.Assets.worldBackdrop(9) === 'bg_portrait_w1_finale_s10' && Pulse.Assets.worldBackdrop(10) === 'bg_portrait_w2_chromatic_overdrive', 'stage 10 is arc 1\'s finale backdrop; stage 11 opens arc 2');
+      // World finales (stages 10 / 20 / 30): their own title; every other stage keeps "Stage clear".
+      for (const [idx, want] of [[0, 'Stage clear'], [8, 'Stage clear'], [9, 'World 1 complete'], [10, 'Stage clear'], [19, 'World 2 complete'], [20, 'Stage clear']]) {
+        q = await startStage(idx); q.completeStage();
+        check(q.state === 'complete' && q.titleText.text === want, `stage ${idx + 1} clear title is "${want}" (got "${q.titleText.text}")`);
+      }
       // Endless keeps the plain backdrop.
       scene().scene.start('game', { mode: 'endless' }); await wait(350);
       q = scene(); check(q.mode === 'endless' && !q.view.worldBg, 'Endless keeps its plain backdrop');

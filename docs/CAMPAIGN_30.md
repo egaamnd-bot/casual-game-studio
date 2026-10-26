@@ -167,3 +167,24 @@ Measured by the stats script (bot path length / mean speed). Existing stages run
 | 18 | Mint Rush | 385-430 | 68 | 18 | 34 mint notes, combo-first | ~33 s |
 
 Validator rule added in this batch: a route's risk/safe note may not come after the route's last row (it could never count).
+
+## Batch 2 as built (stages 19-24, status: IMPLEMENTED, NOT DEVICE-TESTED)
+
+Measured by the campaign bots (perfect run, 540x960). All six pass validation, finish with all gold for the perfect, cautious (hold 0.75) and sloppy-steer bots, and at 30/60/144 fps. Durations are again shorter than the design targets above (as in Batch 1); item counts follow the stage text.
+
+| # | Stage | Audio | Speed px/s | Gold | Signature | Measured |
+|---|-------|-------|-----------|------|-----------|----------|
+| 19 | Off-Beat | Chromatic Overdrive 133 | 390-430 | 33 | gate-gate-barrier phrases that repeat once, then break; off-beat sways | ~42 s |
+| 20 | Chromatic Overload (arc 2 finale) | Pulse Collapse 140 | 395-430 | 29 | four movements: sway, one Mirror zone, charge chain with tunnels, a last fork | ~48 s |
+| 21 | Static | Pulse Collapse 140 | 380-425 | 30 | slalom of half-width 38-40 gates, a wide breather after every four | ~44 s |
+| 22 | Fracture | Pulse Collapse 140 | 385-430 | 14 | three forks with two different prices (tight lane vs far-over wide lane), mint on both | ~33 s |
+| 23 | Feedback | Pulse Collapse 140 | 390-430 | 16 | two Mirror zones with a barrier cadence between, the second ends in a centre pinch | ~27 s |
+| 24 | Cascade | Pulse Collapse 140 | 395-440 | 28 | four phrases of 8-10 walls, a gold trail after each | ~52 s |
+
+Deviations from the design text above (all conservative, none touch stages 1-18):
+- **Speed**: stages 19, 20 and 23 are capped at 430 px/s. A Mirror Pulse telegraph is a fixed 560 px, and the validator requires 1.3 s of warning, which limits any stage with a zone to 430 px/s. Stage 20 is therefore not faster than 19. Stage 24 (no zone) reaches 440.
+- **Stage 20** has one Mirror zone and one fork (as designed), so the mirror/route tests accept one zone/fork for it (two for every other zone/fork stage). It is shorter than the 68-76 s target.
+- **Stage 22**: a fork's rows are shared by both lanes, so "wider lane with more rows" became "wide lane that needs a long sideways move": the tight lane (half-width 38-40) is the risk lane and carries the route clear.
+- **World finale moment**: the last stage of each arc shows "World n complete" (stage 10, 20) and "Campaign complete" (stage 30) on the clear panel with the existing max-multiplier sting after 0.9 s. There is no dedicated finale music or completion art (not supplied).
+- Backdrops: stage 20 uses `bg_portrait_w2_finale_s20`, stages 21-24 `bg_portrait_w3_pulse_collapse` (both PROVISIONAL per the manifest).
+
