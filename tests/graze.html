@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse graze (near-miss to Overdrive) tests</title>
+  <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
+</head>
+<body>
+  <script>
+    // Near-miss -> Overdrive prototype (docs/NEAR_MISS.md): closest approach of the collision body, capped Overdrive charge, stage-limited.
+    try { localStorage.clear(); } catch (e) {}
+    window.PULSE_ASSET_BASE = '../src/';
+    window.PULSE_TEST = { autoStart: true, holdReady: true, bot: false, mode: 'campaign', stageIndex: 0 };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/melody.js"></script>
+  <script src="../src/js/overdrive.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/graze.js"></script>
+  <script src="../src/js/mirror.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/patterns.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script src="../src/js/render.js"></script>
+  <script src="../src/js/ui.js"></script>
+  <script src="../src/js/assets.js"></script>
+  <script src="../src/js/trail.js"></script>
+  <script src="../src/js/sprite-view.js"></script>
+  <script src="../src/js/game-scene.js"></script>
+  <script src="../src/js/menu-scenes.js"></script>
+  <script src="../src/js/main.js"></script>
+  <script>
+    const C = Pulse.CONFIG;
+    const G = Pulse.Graze;
+    const fails = [];
+    let checks = 0;
+    const check = (ok, msg) => { checks++; if (!ok) fails.push(msg); };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const scene = () => window.__pulseScene;
+    const fake = new WeakMap();
+    const clockOf = (sc) => { let c = fake.get(sc); if (!c) { c = { now: sc.time.now }; fake.set(sc, c); Object.defineProperty(sc.time, 'now', { get: () => c.now, set: () => {}, configurable: true }); } return c; };
+    const frames = (sc, n, until, ms) => { const c = clockOf(sc); const dt = ms || 16.667; for (let i = 0; i < n; i++) { c.now += dt; sc.update(c.now, dt); sc.draw && sc.draw(); if (until && until()) return true; } return !until; };
+    const errors = [];
+    window.addEventListener('error', (e) => errors.push(e.message));
+    const W = C.width;
+    const Lv = Pulse.Level.prototype;
+    const hits = (seg, x, y, r) => Lv.hitsWall.call({ width: W }, seg, x, y, r);
+    const mkGate = (o) => Object.assign({ kind: 'gate', y: 0, h: 36, gapL: 200, gapR: 340, active: true }, o);
+    // Deterministic pseudo-random numbers.
+    let seed = 12345; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    const ORB_Y = 700;
+
+    // Drives one wall past a static orb, `ms` per frame at `speed` px/s, calling Graze.observe as the scene does.
+    const sweep = (gate, x, r, speed, ms, y0 = ORB_Y - 140, y1 = ORB_Y + 140, orbPath) => {
+      const seg = Object.assign({}, gate); G.reset(seg); seg.y = y0;
+      const dtv = (speed * ms) / 1000;
+      let t = 0;
+      for (; seg.y < y1; seg.y += dtv, t += ms) { G.observe(seg, orbPath ? orbPath(seg.y) : x, ORB_Y, r, W); }
+      return seg;
+    };
+
+    async function run() {
+      for (let i = 0; i < 200 && !(scene() && scene().state); i++) await wait(100);
+      await Pulse.Audio.loading; await wait(300); Pulse.Audio.unlock();
+
+      // ---- Geometry: the clearance IS the collision rule ----
+      let agree = 0, mism = 0;
+      for (let i = 0; i < 6000; i++) {
+        const fork = rnd() < 0.3;
+        const cx = 120 + rnd() * 300, half = 30 + rnd() * 60;
+        const seg = mkGate({ y: ORB_Y - 36 - 60 + rnd() * 160, h: 20 + rnd() * 80, gapL: cx - half, gapR: cx + half });
+        if (fork) { seg.fork = true; seg.gapL = 90 + rnd() * 60; seg.gapR = seg.gapL + 60 + rnd() * 40; seg.gap2L = seg.gapR + 30 + rnd() * 30; seg.gap2R = seg.gap2L + 60 + rnd() * 60; }
+        const x = rnd() * W, r = 20 + rnd() * 36;
+        const c = G.clearance(seg, x, ORB_Y, r, W);
+        if (hits(seg, x, ORB_Y, r) === (c < 0)) agree++; else mism++;
+      }
+      check(mism === 0, `clearance < 0 exactly when Level.hitsWall says hit (${agree} agree, ${mism} differ, plain and fork gates)`);
+      // Exact boundaries: left wall edge at x = 200, orb radius 30 centred at 200 + 30 + d.
+      const gate = mkGate({ y: ORB_Y - 18, h: 36, gapL: 200, gapR: 340 });
+      for (const [d, hit, graze] of [[-0.01, true, false], [0, false, true], [0.01, false, true], [8, false, true], [8.01, false, false]]) {
+        const s = Object.assign({}, gate); G.reset(s); G.observe(s, 230 + d, ORB_Y, 30, W);
+        check(hits(s, 230 + d, ORB_Y, 30) === hit && G.isGraze(s, 8) === graze, `clearance ${d}: hit ${hit}, graze ${graze} (got hit ${hits(s, 230 + d, ORB_Y, 30)}, graze ${G.isGraze(s, 8)}, gz ${s.gz.toFixed(3)})`);
+      }
+      // The right wall and the sign of the side.
+      let s = Object.assign({}, gate); G.reset(s); G.observe(s, 340 - 30 - 5, ORB_Y, 30, W); check(Math.abs(s.gz - 5) < 1e-9 && s.gzSide === 1, 'right wall: clearance 5, side +1');
+      s = Object.assign({}, gate); G.reset(s); G.observe(s, 200 + 30 + 5, ORB_Y, 30, W); check(Math.abs(s.gz - 5) < 1e-9 && s.gzSide === -1, 'left wall: clearance 5, side -1');
+      s = Object.assign({}, gate, { gapL: 200 }); G.reset(s); G.observe(s, 230, ORB_Y - 18 - 40, 30, W);
+
+      // ---- Swept: the same closest approach at any frame rate ----
+      for (const [x, r, want] of [[230 + 5, 30, 5], [340 - 20 - 3, 20, 3], [270, 56, 14]]) {
+        const out = [];
+        for (const ms of [33.333, 16.667, 6.944, 4]) out.push(sweep(gate, x, r, 420, ms).gz);
+        check(out.every((v) => Math.abs(v - want) < 0.05), `static orb, wall at 420 px/s: closest ${out.map((v) => v.toFixed(2)).join(' / ')} px at 30 / 60 / 144 / 250 fps (want ${want})`);
+      }
+      // Fast wall + big frame: still found (the sample is every <= 4 px of travel).
+      check(Math.abs(sweep(gate, 235, 30, 460, 50).gz - 5) < 0.05, 'a 50 ms frame at 460 px/s (23 px per frame) still finds the closest approach');
+      // A wall that is only close in the middle of the crossing, by an orb that moves: path as a function of the wall's position.
+      const path = (y) => 270 + 40 * Math.sin((y - (ORB_Y - 140)) / 35); // wiggles while the wall passes
+      const ref = sweep(gate, 0, 30, 420, 1, ORB_Y - 140, ORB_Y + 140, path).gz;
+      for (const ms of [33.333, 16.667, 6.944]) check(Math.abs(sweep(gate, 0, 30, 420, ms, ORB_Y - 140, ORB_Y + 140, path).gz - ref) < 0.6, `a moving orb: closest approach within 0.6 px of the 1 ms reference at ${(1000 / ms).toFixed(0)} fps (ref ${ref.toFixed(2)})`);
+      // The orb brushes the wall and then drifts to the middle before the wall has passed: the old end-of-crossing check misses it, the sweep does not.
+      const drift = (y) => (y < ORB_Y - 10 ? 233 : 270);
+      s = sweep(gate, 0, 30, 420, 16.667, ORB_Y - 140, ORB_Y + 140, drift);
+      check(G.isGraze(s, 8), `brush then drift away: graze found (closest ${s.gz.toFixed(2)})`);
+      // A hit is never a graze, wherever it happens in the crossing.
+      s = sweep(gate, 228, 30, 420, 16.667); check(s.gz < 0 && !G.isGraze(s, 8), `an overlap is not a graze (closest ${s.gz.toFixed(2)})`);
+      // A gap that closes on the orb (a sliding gate): the closest approach is tracked while the wall moves.
+      const slide = (ms) => { const seg = Object.assign({}, gate); G.reset(seg); seg.y = ORB_Y - 140; const dtv = (420 * ms) / 1000; let tm = 0; for (; seg.y < ORB_Y + 140; seg.y += dtv, tm += ms) { const off = 25 * Math.sin(tm / 300); seg.gapL = 200 + off + 25; seg.gapR = 340 + off + 25; G.observe(seg, 280, ORB_Y, 30, W); } return seg.gz; };
+      const sl = [slide(33.333), slide(16.667), slide(6.944)];
+      check(Math.max(...sl) - Math.min(...sl) < 1.5, `a swaying gap: closest approach agrees across frame rates (${sl.map((v) => v.toFixed(2)).join(' / ')})`);
+      // Fork gates: the divider and both outer walls count.
+      const fork = mkGate({ fork: true, gapL: 100, gapR: 180, gap2L: 260, gap2R: 340, y: ORB_Y - 18 });
+      s = Object.assign({}, fork); G.reset(s); G.observe(s, 180 - 30 - 4, ORB_Y, 30, W); check(Math.abs(s.gz - 4) < 1e-9, 'fork: the divider counts (4 px from its edge, got ' + s.gz + ')');
+      s = Object.assign({}, fork); G.reset(s); G.observe(s, 340 + 30 + 4 - 60, ORB_Y, 30, W); check(s.gz < 0 || s.gz >= 0, 'fork: right opening evaluated');
+      // Ring gates and non-gates are ignored.
+      s = { kind: 'barrier', y: 0, h: 22 }; G.reset(s); G.observe(s, 270, ORB_Y, 30, W); check(s.gz === Infinity, 'barriers are not grazed (lateral gaps only)');
+      // reset between uses
+      s = Object.assign({}, gate); G.reset(s); G.observe(s, 235, ORB_Y, 30, W); G.reset(s); check(s.gz === Infinity && s.gpy !== s.gpy, 'reset clears the tracking');
+
+      // ---- In the game ----
+      const startStage = async (idx, opts) => { scene().scene.start('game', { mode: 'campaign', stageIndex: idx }); await wait(400); const q = scene(); q.test = Object.assign({ holdReady: true }, opts || {}); return q; };
+      const S10 = Pulse.STAGES.findIndex((x) => x.id === 's10-precision');
+      check(C.graze.stageIds.join() === 's10-precision' && S10 === 9, 'the prototype is limited to stage 10 (Precision)');
+      check(C.graze.margin === C.nearMissMargin && C.graze.charge === 3 && C.graze.runCap === 15, `margin ${C.graze.margin} px (the existing near-miss margin), ${C.graze.charge} per graze, ${C.graze.runCap} per run`);
+      const pin = (q, r) => Object.defineProperty(q, 'radius', { get: () => r, set: () => {}, configurable: true });
+      const unpin = (q) => { delete q.radius; };
+      // A scripted crossing: a gate falls past a pinned orb at lateral clearance `cl` from the chosen wall.
+      // The world is otherwise frozen (no spawns), the orb pinned, so the only variable is the clearance.
+      const crossing = async (q, { cl, side = -1, r = 30, ms = 16.667, length = 36, od = false, pre = 0, pause = false }) => {
+        const restoreSpawn = q.level.nextIndex; q.level.nextIndex = q.level.items.length;
+        pin(q, r); q.orbState.charge = 1; q.orbState.x = 270; q.orbState.tx = 270;
+        const half = r + 40; // the opening is 40 px wider than the orb on each side...
+        const cx = side < 0 ? 270 + (half - r - cl) : 270 - (half - r - cl); // ...shifted so the chosen wall is `cl` px from the orb's edge
+        const seg = Object.assign(q.level.obtain(), { kind: 'gate', active: true, scored: false, resolved: false, broken: false, y: q.orbY - 300, h: length, cx, cx0: cx, half, need: half, gapL: cx - half, gapR: cx + half, slide: null, ring: null, fork: false, arriveBeat: 0 });
+        G.reset(seg);
+        if (od) { q.od.active = true; q.od.remaining = C.overdrive.duration; q.od.meter = 100; }
+        const m0 = q.od.meter, n0 = q.grazes, nm0 = q.nearMisses;
+        const level = q.level; const realUpdate = level.update;
+        level.update = function (dt) { seg.y += 420 * dt; this.travelled += 420 * dt; }; // only this gate moves
+        const done = () => seg.scored || q.state !== 'playing';
+        let paused = false;
+        for (let i = 0; i < 400 && !done(); i++) {
+          frames(q, 1, null, ms);
+          if (pause && !paused && seg.y > q.orbY - 40) { paused = true; q.pause(); frames(q, 30, null, ms); q.setState('playing'); }
+        }
+        frames(q, 2, null, ms);
+        level.update = realUpdate; unpin(q); q.level.nextIndex = restoreSpawn;
+        const out = { state: q.state, meter: q.od.meter - m0, grazes: q.grazes - n0, near: q.nearMisses - nm0, gz: seg.gz, scored: seg.scored };
+        seg.active = false;
+        return out;
+      };
+      const freshRun = async (idx = S10, opts) => { const q = await startStage(idx, opts); q.startRun(); frames(q, 3); q.od.meter = 0; q.od.run = 0; q.od.lastKind = null; q.od.active = false; q.grazeCharge = 0; q.grazes = 0; return q; };
+      let q = await freshRun();
+      // The same crossing with and without a graze: the Overdrive difference is exactly the graze charge.
+      const far = await crossing(q, { cl: 14 });
+      q = await freshRun();
+      const near5 = await crossing(q, { cl: 5 });
+      check(far.state === 'playing' && far.scored && far.grazes === 0 && far.near === 0, `a clean pass 14 px from the wall: no graze (closest ${far.gz.toFixed(2)})`);
+      check(near5.scored && near5.grazes === 1 && near5.near === 1, `a pass 5 px from the wall: one graze (closest ${near5.gz.toFixed(2)})`);
+      check(Math.abs((near5.meter - far.meter) - C.graze.charge) < 1e-6, `and exactly ${C.graze.charge} more Overdrive (${near5.meter.toFixed(2)} vs ${far.meter.toFixed(2)})`);
+      for (const [cl, want, label] of [[0, true, 'touching (0 px)'], [8, true, '8 px (the margin)'], [8.5, false, '8.5 px'], [0.01, true, '0.01 px']]) {
+        q = await freshRun(); const o = await crossing(q, { cl });
+        check(o.state === 'playing' && (o.grazes === 1) === want, `${label}: ${want ? 'graze' : 'no graze'} (closest ${o.gz.toFixed(3)}, grazes ${o.grazes})`);
+      }
+      q = await freshRun(); let crash = await crossing(q, { cl: -1.5 });
+      check(crash.state === 'over' && crash.grazes === 0 && crash.meter <= 0, `a lethal overlap (-1.5 px) is a crash, never a graze (state ${crash.state}, grazes ${crash.grazes})`);
+      // Both sides, and different orb sizes.
+      for (const side of [-1, 1]) for (const r of [20, 30, 45, 56]) {
+        q = await freshRun(); const o = await crossing(q, { cl: 4, side, r });
+        check(o.state === 'playing' && o.grazes === 1 && Math.abs(o.gz - 4) < 0.06, `${side < 0 ? 'left' : 'right'} wall, orb radius ${r}: one graze (closest ${o.gz.toFixed(2)})`);
+      }
+      // Prolonged overlap in y: a tall gate (a tunnel) hugged the whole way pays once.
+      q = await freshRun(); let o = await crossing(q, { cl: 4, length: 320 });
+      check(o.state === 'playing' && o.grazes === 1 && Math.abs(o.meter - far.meter - C.graze.charge) < 1e-6, `a 320 px tunnel hugged all the way: one graze, ${C.graze.charge} charge (grazes ${o.grazes})`);
+      // Frame rate does not change the reward.
+      const byFps = [];
+      for (const ms of [33.333, 16.667, 6.944]) { q = await freshRun(); byFps.push(await crossing(q, { cl: 5, ms })); }
+      check(byFps.every((x) => x.grazes === 1 && Math.abs(x.meter - byFps[0].meter) < 1e-6), `30 / 60 / 144 fps: the same single graze and charge (${byFps.map((x) => x.meter.toFixed(2)).join(' / ')})`);
+      // Pausing mid-crossing changes nothing.
+      q = await freshRun(); o = await crossing(q, { cl: 5, pause: true });
+      check(o.state === 'playing' && o.grazes === 1 && Math.abs(o.meter - near5.meter) < 1e-6, 'pause and resume in the middle of the crossing: the same single graze');
+      // Cap: the charge from grazes stops at the run cap, and nothing is added while Overdrive is on.
+      q = await freshRun();
+      let total = 0, count = 0; for (let i = 0; i < 12; i++) { const g = await crossing(q, { cl: 3 }); count += g.grazes; }
+      check(q.grazeCharge === C.graze.runCap && count === C.graze.runCap / C.graze.charge, `12 grazes in a row: charge stops at the cap ${C.graze.runCap} (${q.grazeCharge}), ${count} paid`);
+      check(q.nearMisses >= 12, 'the graze effect still shows after the cap');
+      q = await freshRun(); o = await crossing(q, { cl: 3, od: true });
+      check(o.grazes === 0 && q.grazeCharge === 0 && o.near === 1, 'while Overdrive is on: the effect shows, no charge is added and the cap is not used');
+      // A graze alone can never fill the meter.
+      check(C.graze.runCap < C.overdrive.threshold, `the cap (${C.graze.runCap}) is far below the threshold (${C.overdrive.threshold})`);
+      // Retry: counters restart; repeated runs give the same result.
+      q = await freshRun(); await crossing(q, { cl: 3 }); check(q.grazeCharge === 3, 'one graze counted'); q.startRun(); frames(q, 2);
+      check(q.grazeCharge === 0 && q.grazes === 0, 'a retry starts with a clean graze count');
+      const rep = []; for (let i = 0; i < 5; i++) { q = await freshRun(); rep.push((await crossing(q, { cl: 5 })).meter.toFixed(4)); }
+      check(new Set(rep).size === 1, `five repeated runs: identical (${rep.join(' ')})`);
+      // Limited to the stage list: the same crossing elsewhere is the old behaviour.
+      for (const [idx, label] of [[0, 'stage 1'], [8, 'stage 9'], [10, 'stage 11']]) { q = await freshRun(idx); o = await crossing(q, { cl: 5 }); check(o.grazes === 0 && q.grazeCharge === 0, `${label}: the experiment is off`); }
+      scene().scene.start('game', { mode: 'endless' }); await wait(400); q = scene(); q.test = { holdReady: true }; q.startRun(); frames(q, 5);
+      check(!q.grazeOn(), 'Endless: off');
+      C.graze.enabled = false; q = await freshRun(); o = await crossing(q, { cl: 5 }); check(o.grazes === 0, 'CONFIG.graze.enabled = false turns it off'); C.graze.enabled = true;
+
+      // ---- The old cosmetic near-miss is unchanged outside the experiment ----
+      q = await startStage(0, { holdReady: true }); q.startRun(); const nm = q.nearMisses; q.checkNearMiss({ gapL: q.orbX - q.radius - 3, gapR: q.orbX + 200 }, q.radius);
+      check(q.nearMisses === nm + 1, 'checkNearMiss still works for every other stage');
+
+      // ---- Nothing else changes: score, stars, completion identical with and without it ----
+      const runStage = async (idx) => { const x = await startStage(idx, { bot: true, route: 'safe' }); x.startRun(); frames(x, 40000, () => x.state !== 'playing'); return { s: x.state, sc: x.score, e: x.energy, t: +x.elapsed.toFixed(3), st: x.result && x.result.stars, gr: x.grazes, gc: x.grazeCharge, od: x.od.activations }; };
+      for (const idx of [S10, 8, 11]) {
+        C.graze.enabled = true; const a = await runStage(idx);
+        C.graze.enabled = false; const b = await runStage(idx);
+        C.graze.enabled = true;
+        const same = a.s === b.s && a.sc === b.sc && a.e === b.e && a.t === b.t && a.st === b.st;
+        check(same && a.s === 'complete', `stage ${idx + 1}: state, score, energy, time and stars identical with the prototype on and off (${a.s}, score ${a.sc}, ${a.st}★; grazes ${a.gr}, charge ${a.gc}, Overdrives ${a.od} vs ${b.od})`);
+      }
+      const d1 = await runStage(S10), d2 = await runStage(S10);
+      check(JSON.stringify(d1) === JSON.stringify(d2), 'two identical bot runs give identical graze results (deterministic)');
+      notes.push(`stage 10 bot: ${d1.gr} grazes, ${d1.gc} charge, ${d1.od} Overdrives`);
+      check(errors.length === 0, `page errors: ${errors.join(' | ')}`);
+    }
+    const notes = [];
+    run().then(() => { document.title = fails.length ? `FAIL ${fails.length}: ${fails.join(' | ')}` : `PASS graze tests ${checks} checks | ${notes.join(' | ')}`; })
+      .catch((e) => { document.title = 'FAIL error ' + e.message + ' ' + (e.stack || '').split('\n')[1]; });
+  </script>
+</body>
+</html>

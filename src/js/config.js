@@ -139,6 +139,13 @@ Pulse.CONFIG = {
   // orb could smash it right now (Level.canSmash, the collision rule itself), the orb gets a restrained corona.
   barrierCue: { enabled: true, lookAhead: 420 },
 
+  // Near-miss -> Overdrive prototype (docs/NEAR_MISS.md; Issue #24, priority B). EXPERIMENT, limited to `stageIds`
+  // until the Producer has tried it on a phone. A graze = the orb's collision circle came within `margin` px of a
+  // gate wall at its closest during the crossing and was not hit. Each graze adds `charge` units to the existing
+  // Overdrive meter (Overdrive.award), at most `runCap` units per run, nothing while Overdrive is already on.
+  // Feedback only: no score, stars or collision change. enabled=false (or an empty list) turns it off.
+  graze: { enabled: true, stageIds: ['s10-precision'], margin: 8, charge: 3, runCap: 15 },
+
   // Gemini audio pack (docs/ASSET_MANIFEST.md): short event samples and the per-world Overdrive stems.
   // Audio only; switch either off to hear the earlier mix.
   audioPack: { samples: true, stems: true },
