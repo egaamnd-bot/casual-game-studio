@@ -59,6 +59,8 @@
       this.forkCued = {};
       this.smashReady = false;
       this.cuedBarrier = null;
+      this.grazeCharge = 0;
+      this.grazes = 0;
     }
 
     create() {
@@ -396,6 +398,8 @@
       this.forkCued = {};
       this.smashReady = false;
       this.cuedBarrier = null;
+      this.grazeCharge = 0; // Overdrive units earned from grazes this run (capped)
+      this.grazes = 0;
       this.routeClears = 0;
       this.resetMirror();
       this.mirrorClears = 0;
@@ -689,9 +693,11 @@
       const segs = this.level.segments;
       const r = this.radius;
       const ox = this.orbX;
+      const grazing = this.grazeOn();
       for (let i = 0; i < segs.length; i++) {
         const s = segs[i];
         if (!s.active) continue;
+        if (grazing && s.kind === 'gate' && !s.ring && !s.scored) Pulse.Graze.observe(s, ox, this.orbY, r, this.level.width); // swept closest approach (feedback only)
         let event = this.level.resolve(s, this.orbY, r, this.orbState.charge, ox);
         let byEcho = false;
         // Mirror Pulse: the echo is checked on its own against the paired obstacles of the zone.
@@ -768,7 +774,8 @@
             if (this.view) this.view.smash(s);
           } else {
             this.contact('pass', s, prevCombo);
-            this.checkNearMiss(s, r);
+            if (grazing) this.graze(s, r);
+            else this.checkNearMiss(s, r);
             if (s.fork && s.route) this.routePassed(s);
           }
         }
@@ -1126,6 +1133,32 @@
 
     // Cosmetic only: flashes a graze arc when the orb squeezed past a wall edge with little room.
     // It reads state after scoring is done and never touches score, stars or the multiplier.
+    // The prototype runs only in the campaign stages listed in CONFIG.graze.stageIds.
+    grazeOn() {
+      const G = C.graze;
+      return !!G.enabled && this.mode === 'campaign' && G.stageIds.indexOf(this.stage.id) >= 0;
+    }
+
+    // Near-miss -> Overdrive prototype (docs/NEAR_MISS.md). Called once when a gate has been cleared. A graze is the
+    // orb's collision circle having come within C.graze.margin px of the wall at its CLOSEST during the whole crossing
+    // (Pulse.Graze, same rectangles and strict rule as the collision) without a hit. The effect always shows; the
+    // charge is a small, capped award to the existing Overdrive meter (never while Overdrive is on).
+    graze(s, r) {
+      const G = C.graze;
+      if (!Pulse.Graze.isGraze(s, G.margin)) return;
+      this.nearMisses++;
+      Pulse.Sfx.play('nearMiss');
+      if (this.view) this.view.nearMiss(s.gzSide, r);
+      const room = G.runCap - this.grazeCharge;
+      if (room <= 0 || this.od.active) return;
+      const res = Pulse.Overdrive.award(this.od, Math.min(G.charge, room));
+      if (res.added <= 0) return;
+      this.grazeCharge += res.added;
+      this.grazes++;
+      this.quality('GRAZE', '#FFB020');
+      if (res.started) this.overdriveStarted();
+    }
+
     checkNearMiss(s, r) {
       const o = Pulse.Track.openingAt(s, this.orbX, this.W);
       const left = this.orbX - r - o.gapL;
