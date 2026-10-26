@@ -15,3 +15,6 @@
 
 ## Not done / unknown
 Nothing from the three prototypes or Batch 3 has been merged or built yet. Main `4b06814` is built by run #84 (success). Lab tree full suites after the merge: 360×640 and 412×915 both 17/18 PASS (`gameplay.html` known manual failure).
+
+## Update: barrier palette merged
+PR #36 (`feature/barrier-palette`, head `e742a756`) merged as main `f49e6bd`; integrated main build run #88: success. Full suite on the earlier head `51ffe688` PASS at 540×960, 360×640, 412×915 (`gameplay.html` known); final commit re-verified with `palette.html` + `scene.html`. NOT DEVICE-TESTED.
