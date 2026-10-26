@@ -135,6 +135,10 @@ Pulse.CONFIG = {
   // At ~300 px/s that is about 1.9 s of warning, 0.6 s of intro, 1.4 s of lead and 0.5 s of outro.
   mirror: { telegraphPx: 560, introPx: 170, leadPx: 420, outroPx: 140, minRows: 3, color: 0xb98bff, alpha: 0.72 },
 
+  // Gemini audio pack (docs/ASSET_MANIFEST.md): short event samples and the per-world Overdrive stems.
+  // Audio only; switch either off to hear the earlier mix.
+  audioPack: { samples: true, stems: true },
+
   // Overdrive meter and combo milestones (src/js/overdrive.js, docs/OVERDRIVE.md). Feedback only:
   // nothing here touches collision, orb size, obstacle layout, score or stars.
   overdrive: {

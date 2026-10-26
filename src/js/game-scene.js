@@ -53,6 +53,7 @@
       this.mirrorClears = 0;
       this.crashedByEcho = false;
       this.resetMirror(); // a new scene never inherits an echo
+      this.forkCued = {};
     }
 
     create() {
@@ -280,6 +281,7 @@
       if (this.bannerParts) this.bannerParts.forEach((o) => o.setVisible(state === 'ready'));
       if (state !== 'playing' && state !== 'ready') this.endHold();
       if (state !== 'paused') Pulse.Music.duck(false);
+      if (state !== 'playing') Pulse.Sfx.stemStop(60);
       this.hintText.setY(Math.round(this.H * 0.47));
       this.titleText.setFontSize(64);
       this.overlay.clear();
@@ -380,6 +382,9 @@
       this.crashedByEcho = false;
       this.combo = 0;
       Pulse.Overdrive.reset(this.od);
+      Pulse.Sfx.stemStop(0);
+      Pulse.Sfx.stemPrepare(this.worldIndex()); // decode this world's Overdrive stem now, not when it is needed
+      this.forkCued = {};
       this.routeClears = 0;
       this.resetMirror();
       this.mirrorClears = 0;
@@ -562,6 +567,7 @@
           const q = segs[i];
           if (q.active && q.fork && q.firstRow && rh[q.route] && q.y + q.h > 0 && q.y < this.orbY - 150) {
             h = rh[q.route];
+            if (!this.forkCued[q.route]) { this.forkCued[q.route] = true; Pulse.Sfx.play('packForkDiscover'); }
             routeFade = Math.min(1, (q.y + q.h) / 60, (this.orbY - 150 - q.y) / 60);
             break;
           }
@@ -647,6 +653,7 @@
     step(dt) {
       this.elapsed += dt;
       if (Pulse.Overdrive.tick(this.od, dt).ended) this.overdriveEnded();
+      this.updateStem();
       const campaign = this.mode === 'campaign';
       const track = this.musicTrack();
       if (track !== this.playingTrack) {
@@ -794,6 +801,7 @@
     comboMilestone(m) {
       const wait = this.aligned() ? Pulse.Rhythm.Groove.delay(this.clock, true, 0.08) : 0;
       Pulse.Sfx.notes(Pulse.Melody.milestone(this.worldIndex(), m, { step: this.stepSeconds() }), wait);
+      Pulse.Sfx.play(m >= C.combo.flourish ? 'packCombo16' : m >= C.combo.layerB ? 'packCombo8' : 'packCombo4', { delay: wait });
       if (this.view && this.view.comboMilestone) this.view.comboMilestone(m);
       const K = C.combo;
       const label = m === K.flourish ? 'FLOURISH!' : m === K.layerB ? 'ENERGY!' : 'LAYER';
@@ -828,6 +836,7 @@
     routeClear(seg) {
       const wait = this.aligned() ? Pulse.Rhythm.Groove.delay(this.clock, true, 0.08) : 0;
       Pulse.Sfx.notes(Pulse.Melody.routeClear(this.worldIndex(), { step: this.stepSeconds() }), wait);
+      Pulse.Sfx.play('packRouteClear', { delay: wait });
       if (this.view && this.view.comboMilestone) this.view.comboMilestone(C.combo.layerB);
       this.quality('ROUTE CLEAR!', '#FF5AC8');
       this.popup('ROUTE CLEAR', T.textBonus);
@@ -862,29 +871,51 @@
       if (m.phase === 'telegraph' && !seen.tele) {
         seen.tele = true;
         Pulse.Sfx.notes(Pulse.Melody.mirrorTelegraph(w, { step: this.stepSeconds() }), wait);
+        Pulse.Sfx.play('packMirrorWarn', { delay: wait });
       }
       if ((m.phase === 'intro' || m.phase === 'active') && !seen.intro) {
         seen.intro = true;
         Pulse.Sfx.notes(Pulse.Melody.mirrorStart(w, { step: this.stepSeconds() }), wait);
+        Pulse.Sfx.play('packMirrorAppear', { delay: wait });
         if (this.view && this.view.mirrorBurst) this.view.mirrorBurst();
       }
       if (m.phase === 'outro' && !seen.outro) {
         seen.outro = true;
         this.mirrorClears++;
         Pulse.Sfx.notes(Pulse.Melody.mirrorEnd(w, { step: this.stepSeconds() }), wait);
+        Pulse.Sfx.play('packMirrorExit', { delay: wait });
         this.quality('IN SYNC', '#B98BFF');
+      }
+    }
+
+    // The Overdrive stem (Gemini pack): on while Overdrive is active during a run whose music is in
+    // step with the run clock; off on pause, crash, clear, retry, the end of Overdrive or a world change.
+    // Audio only; it never touches the meter, speed or collision.
+    updateStem() {
+      const Sfx = Pulse.Sfx;
+      const world = this.worldIndex();
+      const on = Sfx.stemActive();
+      // Needs the music in step with the run clock to START (so the loop lands in phase); once running it
+      // is independent of the streamed music, so a re-alignment seek does not make it blip.
+      const want = this.state === 'playing' && this.od.active && (on === world || this.aligned());
+      if (on && (!want || on !== world)) Sfx.stemStop(this.state === 'playing' ? 300 : 60);
+      else if (want && !on) {
+        if (!Sfx.stemFits(world, this.trackBpm())) Sfx.stemPrepare(world);
+        else Sfx.stemStart(world, this.trackBpm(), Pulse.Rhythm.trackTime(this.clock));
       }
     }
 
     overdriveStarted() {
       const wait = this.aligned() ? Pulse.Rhythm.Groove.delay(this.clock, true, 0.08) : 0;
       Pulse.Sfx.notes(Pulse.Melody.overdriveStart(this.worldIndex()), wait);
+      Pulse.Sfx.play('packOdOn', { delay: wait });
       if (this.view && this.view.overdriveBurst) this.view.overdriveBurst();
       this.popup('OVERDRIVE!', T.textBonus);
     }
 
     overdriveEnded() {
       Pulse.Sfx.notes(Pulse.Melody.overdriveEnd(this.worldIndex()), 0);
+      Pulse.Sfx.play('packOdOff');
     }
 
     // The Overdrive bar: fills as you play, turns gold and drains while active, blinks in the last
