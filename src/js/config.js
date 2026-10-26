@@ -111,6 +111,8 @@ Pulse.CONFIG = {
     nodes: 10, // pooled sparkle nodes behind the orb (never more)
     nodeIntervalMs: 28,
     backdropAlpha: 0.5, // dims the v4 background so the sphere and walls pop
+    // Ribbon trail (src/js/trail.js, docs/COMET_TRAIL.md): pooled overlapping stamps along the orb's recent path.
+    ribbon: { stamps: 20, coreStamps: 12, echoStamps: 12, overlap: 2.35, alpha: 0.46, echoAlpha: 0.5, echoLen: 0.8 },
   },
 
   // Sound timing (docs/PORTRAIT_REWORK.md). Nothing the player does or hits waits for the beat:

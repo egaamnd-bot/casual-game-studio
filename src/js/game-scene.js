@@ -1117,7 +1117,8 @@
         }
       }
 
-      if (mir && this.echoK > 0) Pulse.Render.echo(g, this.echoX, this.orbY, this.radius, this.echoK, this.orbX, 60 + 0.2 * (this.speedNow || 200));
+      if (mir && this.echoK > 0) Pulse.Render.echo(g, this.echoX, this.orbY, this.radius, this.echoK, this.orbX, 60 + 0.2 * (this.speedNow || 200), this.view && this.view.echoParts);
+      if (this.view && this.view.renderEcho) this.view.renderEcho(mir && this.echoK > 0, this.radius);
 
       this.drawOverdrive();
 

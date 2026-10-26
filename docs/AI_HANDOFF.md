@@ -1,14 +1,13 @@
 # Current AI Handoff
 
-> Status snapshot. Historical handoffs live in [`docs/ai-handoffs/`](ai-handoffs/); structure per [AI_HANDOFF_PROTOCOL.md](AI_HANDOFF_PROTOCOL.md). Full note: [2026-10-26-mirror-pulse.md](ai-handoffs/2026-10-26-mirror-pulse.md).
+> Status snapshot. Historical handoffs live in [`docs/ai-handoffs/`](ai-handoffs/); structure per [AI_HANDOFF_PROTOCOL.md](AI_HANDOFF_PROTOCOL.md). Latest notes: [campaign batch 1](ai-handoffs/2026-10-26-campaign-batch-1.md), [comet trail](ai-handoffs/2026-10-26-comet-trail-ribbon.md).
 
 - Updated: 2026-10-26 (UTC)
 - Project: PULSE
-- Status: MILESTONES 1 AND 2 MERGED AND VERIFIED. MILESTONE 3 (30-stage campaign) in progress: design + Batch 1 (stages 13-18) built, awaiting CI/merge. Note: [2026-10-26-campaign-batch-1.md](ai-handoffs/2026-10-26-campaign-batch-1.md). Batch 1 PR/APK details are filled in after the build.
-- `main` @ `908e51a3c77ffd61bfe04e969b382f0b49a4f5f0` (PR #18 merge of head `c0dfc0c0bc20329e4f5c7d4b622ee9aa4fda030b`; PR #17 merged earlier as `ad9bd4c`)
-- Integrated build: [run #62](https://github.com/egaamnd-bot/casual-game-studio/actions/runs/40306086598) success on `908e51a`; artifact `pulse-debug-apk-run62` (latest APK for playtesting)
-- Tests (at code head `b226474`, identical code to merge head): all suites PASS at 540x960 and 360x640 (412x915 for assets, melody, rhythm, portrait, scene); campaign 1874, mirror 961, routes 335, overdrive 1690, melody 809, rhythm 10101. `gameplay.html` (manual `?bot=1`) NOT RUN. Suites were not re-run on the merge commit itself; the merge head's tree equals the tested tree plus docs.
-- Device testing: Producer phone-tested run #49 (routes: 36/36 stars, fun and fair). Mirror Pulse and every later APK: NOT DEVICE-TESTED.
+- Status: MILESTONES 1, 2 AND CAMPAIGN BATCH 1 (stages 13-18, PR #20) MERGED AND VERIFIED. IN PROGRESS: Gemini asset integration, Phase 1 comet ribbon trail on `feature/comet-tail-ribbon` (note: [2026-10-26-comet-trail-ribbon.md](ai-handoffs/2026-10-26-comet-trail-ribbon.md)); PR/build details are filled in once the build finishes.
+- `main` @ `735e02ebae7a8a2ec8e4543293dcb45625a4651f` (PR #20 merge); integrated build [run #67](https://github.com/egaamnd-bot/casual-game-studio/actions/runs/40320019275) success, artifact `pulse-debug-apk-run67`
+- Tests: at the Batch 1 merge (PR #20 head `dc3fa47`) all suites PASS at 540x960, 360x640 and 412x915 (campaign 3073, mirror 1083, routes 382, overdrive 1720, melody 809, rhythm 16754). The comet-trail branch adds `tests/trail.html`; its results are in its note. `gameplay.html` (manual `?bot=1`) NOT RUN.
+- Device testing: Producer phone-tested run #49 (routes: 36/36 stars, fun and fair). Mirror Pulse, campaign stages 13-18 and every later APK: NOT DEVICE-TESTED.
 - Workflow: Claude is Lead Developer, reviewer and merge operator (permanent since 2026-10-26); ChatGPT is a report reviewer, not a merge gate; Producer decides product/gameplay and releases.
 
 ## Known limitations

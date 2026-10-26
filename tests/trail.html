@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse trail tests</title>
+  <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
+</head>
+<body>
+  <script>
+    // The comet / echo ribbon trail (src/js/trail.js + SpriteView.renderComet / renderEcho).
+    // Part A: the path history as pure logic. Part B: the real scene (atlas, path following, shrink/grow,
+    // Overdrive, Mirror Pulse echo, crash / retry / pause / stage change, object counts, collision and score
+    // untouched). ?novfx=1 re-runs part B with the optional comet atlas missing (procedural fallback).
+    try { localStorage.clear(); } catch (e) {}
+    window.PULSE_ASSET_BASE = '../src/';
+    const NOVFX = new URLSearchParams(location.search).get('novfx') === '1';
+    window.PULSE_TEST = { autoStart: true, holdReady: true, bot: false, mode: 'campaign', stageIndex: 0, noVfx: NOVFX };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/melody.js"></script>
+  <script src="../src/js/overdrive.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/mirror.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/patterns.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script src="../src/js/render.js"></script>
+  <script src="../src/js/ui.js"></script>
+  <script src="../src/js/assets.js"></script>
+  <script src="../src/js/trail.js"></script>
+  <script src="../src/js/sprite-view.js"></script>
+  <script src="../src/js/game-scene.js"></script>
+  <script src="../src/js/menu-scenes.js"></script>
+  <script src="../src/js/main.js"></script>
+  <script>
+    const C = Pulse.CONFIG;
+    const Tr = Pulse.Trail;
+    const fails = [];
+    const notes = [];
+    let checks = 0;
+    const check = (ok, msg) => { checks++; if (!ok) fails.push(msg); };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const scene = () => window.__pulseScene;
+    // Frames are stepped by hand, so the scene's clock (used by the cosmetic springs) is stepped too.
+    const fake = new WeakMap();
+    const clockOf = (sc) => { let c = fake.get(sc); if (!c) { c = { now: sc.time.now }; fake.set(sc, c); Object.defineProperty(sc.time, 'now', { get: () => c.now, set: () => {}, configurable: true }); } return c; };
+    const frames = (sc, n, until) => { const c = clockOf(sc); for (let i = 0; i < n; i++) { c.now += 16.667; sc.update(c.now, 16.667); sc.draw && sc.draw(); if (until && until()) return true; } return !until; };
+    const errors = [];
+    window.addEventListener('error', (e) => errors.push(e.message));
+
+    // ---------------- Part A: path history ----------------
+    function partA() {
+      // Straight motion: a straight tail at every length, zero slope.
+      {
+        const t = Tr.create(); Tr.reset(t, 270, 0);
+        for (let d = 7; d <= 900; d += 6.7) Tr.push(t, 270, d);
+        let ok = true;
+        for (let s = 0; s <= 600; s += 13) if (Math.abs(Tr.xAt(t, s) - 270) > 1e-4 || Math.abs(Tr.slopeAt(t, s)) > 1e-4) ok = false;
+        check(ok, 'straight motion leaves a straight tail');
+      }
+      // The path is followed at any frame rate: x recorded per frame at the distance the world moved.
+      const paths = {
+        'gentle sine': (d) => 270 + 150 * Math.sin(d / 90),
+        'S-turns at the steering limit': (d) => 270 + 200 * Math.sin(d / 40), // |dx/dd| up to 5 (far beyond what the orb can do)
+      };
+      for (const [name, f] of Object.entries(paths)) {
+        const worst = [];
+        for (const fps of [30, 60, 144]) {
+          const t = Tr.create();
+          const speed = 400; const dt = 1 / fps;
+          let d = 0; Tr.reset(t, f(0), 0);
+          let err = 0;
+          while (d < 1500) {
+            d += speed * dt;
+            Tr.push(t, f(d), d);
+            if (d > 700) for (let s = 0; s <= 520; s += 3.7) err = Math.max(err, Math.abs(Tr.xAt(t, s) - f(d - s)));
+          }
+          worst.push(err);
+          check(err < (name === 'S-turns at the steering limit' ? 14 : 4), `${name} @${fps} fps: the tail stays on the path (max error ${err.toFixed(2)} px)`);
+        }
+        notes.push(`${name}: worst path error ${Math.max(...worst).toFixed(1)} px`);
+      }
+      // Rapid reversals by the game's own steering (speed and acceleration limits): the orb is simulated
+      // finely and sampled per frame at the distance the world moved; the tail must match the dense truth.
+      for (const fps of [30, 60, 144]) {
+        const o = Pulse.Orb.create(); const t = Tr.create();
+        const dense = []; let d = 0; let clock = 0; Tr.reset(t, o.x, 0);
+        const speed = 420; const dt = 1 / fps; let err = 0;
+        const target = () => (Math.floor(clock / 0.22) % 2 ? 60 : 480); // edge to edge every 220 ms
+        for (let sub = 0; sub < 1; sub++) dense.push([0, o.x]);
+        while (d < 2500) {
+          // fine steps inside the frame, as the game integrates the orb
+          const n = Math.max(1, Math.round(dt / 0.002));
+          for (let i = 0; i < n; i++) { Pulse.Orb.setTarget(o, target(), 540); Pulse.Orb.slide(o, dt / n, 540); clock += dt / n; d += speed * dt / n; dense.push([d, o.x]); }
+          Tr.push(t, o.x, d);
+          if (d > 800) for (let s = 0; s <= 520; s += 5) {
+            const dd = d - s; let lo = 0, hi = dense.length - 1;
+            while (hi - lo > 1) { const m = (lo + hi) >> 1; if (dense[m][0] <= dd) lo = m; else hi = m; }
+            const A = dense[lo], B = dense[hi]; const tx = B[0] > A[0] ? A[1] + (B[1] - A[1]) * ((dd - A[0]) / (B[0] - A[0])) : A[1];
+            err = Math.max(err, Math.abs(Tr.xAt(t, s) - tx));
+          }
+        }
+        check(err < 14, `rapid reversals with the game's steering @${fps} fps: the tail stays on the path (max error ${err.toFixed(2)} px)`);
+        notes.push(`reversals @${fps}: ${err.toFixed(1)} px`);
+      }
+      // A smooth tail has no kinks: tangent angle between neighbouring stamps never jumps (compared with the true path).
+      {
+        const f = paths['gentle sine']; const t = Tr.create(); let d = 0; Tr.reset(t, f(0), 0);
+        while (d < 1500) { d += 6.7; Tr.push(t, f(d), d); }
+        const out = Tr.makeOut(20); Tr.ribbon(t, 260, 20, out, 12);
+        let maxTurn = 0;
+        for (let i = 1; i < 20; i++) maxTurn = Math.max(maxTurn, Math.abs(out.rot[i] - out.rot[i - 1]));
+        check(maxTurn < 0.35, `stamp angles change smoothly along a curve (max step ${maxTurn.toFixed(3)} rad)`);
+        check(out.s.every((v, i) => i === 0 || v > out.s[i - 1]) && out.s[0] === 12, 'stamps are ordered behind the orb, the first at the requested offset');
+        check(out.gap.every((g) => g >= 260 / 19 - 1e-6), 'a stamp always spans at least the distance to its neighbour');
+        check(out.rot.every((r) => Math.abs(r) < Math.PI / 2), 'no stamp is turned beyond a quarter turn');
+      }
+      // Sign: moving right leaves the tail leaning left going back, and the stamp rotation matches the path.
+      {
+        const t = Tr.create(); let d = 0; Tr.reset(t, 100, 0);
+        while (d < 400) { d += 4; Tr.push(t, 100 + d * 0.5, d); }
+        check(Tr.xAt(t, 100) < t.x - 49 && Tr.xAt(t, 100) > t.x - 51, 'moving right: the tail is to the left behind the orb');
+        const out = Tr.makeOut(5); Tr.ribbon(t, 100, 5, out, 0);
+        // Phaser rotation r maps the stamp's down axis (0,1) to (-sin r, cos r); the path goes back toward (-0.5, 1).
+        const ax = -Math.sin(out.rot[2]); const ay = Math.cos(out.rot[2]);
+        check(Math.abs(ax / ay + 0.5) < 0.02, `the stamp's long axis lies along the path (${(ax / ay).toFixed(3)} vs -0.5)`);
+      }
+      // History edges: a retry rewinds travelled; a pause adds nothing; huge jumps restart.
+      {
+        const t = Tr.create(); let d = 0; Tr.reset(t, 100, 0);
+        while (d < 300) { d += 5; Tr.push(t, 100 + d, d); }
+        const latest = t.latest;
+        for (let i = 0; i < 50; i++) Tr.push(t, t.x, 300);
+        check(t.latest === latest, 'no travel, no new samples (pause)');
+        Tr.push(t, 270, 0);
+        check(Math.abs(Tr.xAt(t, 200) - 270) < 1e-6, 'a rewind restarts the history as a straight tail');
+        Tr.reset(t, 50, 0); Tr.push(t, 400, 1e6);
+        check(Math.abs(Tr.xAt(t, 300) - 400) < 1e-6, 'a huge jump restarts the history');
+        const fresh = Tr.create(); Tr.reset(fresh, 33, 10);
+        check(Tr.xAt(fresh, 999) === 33 && Tr.xAt(fresh, 0) === 33, 'beyond the recorded history the tail is straight');
+      }
+      // Ring buffer: long runs never grow anything and stay correct after wrapping.
+      {
+        const t = Tr.create(); let d = 0; Tr.reset(t, 270, 0);
+        const f = paths['gentle sine'];
+        while (d < 200000) { d += 6.1; Tr.push(t, f(d), d); }
+        let err = 0; for (let s = 0; s <= 500; s += 7) err = Math.max(err, Math.abs(Tr.xAt(t, s) - f(d - s)));
+        check(err < 4 && t.xs.length === Tr.CAP, `after the ring wraps hundreds of times the path is still right (error ${err.toFixed(2)}, size ${t.xs.length})`);
+      }
+    }
+
+    // ---------------- Part B: the real scene ----------------
+    const MARGIN = C.steer.margin;
+    async function startStage(idx, opts) {
+      scene().scene.start('game', { mode: 'campaign', stageIndex: idx }); await wait(350);
+      const q = scene();
+      q.test.holdReady = true; q.test.autoStart = false;
+      return q;
+    }
+    const quadTop = (img) => { // highest point of the rotated stamp
+      const w = img.displayWidth, h = img.displayHeight, r = img.rotation;
+      return img.y - (h * Math.abs(Math.cos(r)) + w * Math.abs(Math.sin(r))) / 2;
+    };
+
+    async function partB() {
+      for (let i = 0; i < 200 && !(scene() && scene().state); i++) await wait(100);
+      await wait(300);
+      let q = await startStage(0);
+      const V = () => q.view;
+      check(!!V() && V().comet, 'sprite view with the comet look');
+      check(V().vfx === !NOVFX, `comet atlas ${NOVFX ? 'skipped: procedural fallback in use' : 'loaded and in use'}`);
+
+      if (!NOVFX) {
+        // Atlas: the JSON frame names, sizes and pixels match the PNG, and every frame the trail uses exists.
+        const json = await (await fetch('../src/assets/atlases/pulse_comet_vfx_atlas.json')).json();
+        const fr = Array.isArray(json.frames) ? json.frames : Object.entries(json.frames).map(([k, v]) => Object.assign({ filename: k }, v));
+        check(fr.length === 13, `atlas lists 13 frames (${fr.length})`);
+        const tex = q.textures.get('pulse_comet_vfx');
+        const src = tex.getSourceImage();
+        check(src.width === json.meta.size.w && src.height === json.meta.size.h, `atlas PNG is ${src.width}x${src.height}, JSON says ${json.meta.size.w}x${json.meta.size.h}`);
+        for (const f of fr) {
+          const fm = tex.get(f.filename);
+          check(tex.has(f.filename) && fm.width === f.frame.w && fm.height === f.frame.h, `${f.filename}: frame ${f.frame.w}x${f.frame.h} present in the texture`);
+          check(f.frame.x + f.frame.w <= src.width && f.frame.y + f.frame.h <= src.height, `${f.filename}: inside the atlas`);
+        }
+        check(Pulse.Assets.VFX_FRAMES.length === 13 && Pulse.Assets.VFX_FRAMES.every((n) => fr.some((f) => f.filename === n)), 'every frame the code names is in the atlas JSON');
+        // The atlas cells are not empty (a blank or shifted atlas would still "load").
+        const cv = document.createElement('canvas'); cv.width = src.width; cv.height = src.height;
+        const cx = cv.getContext('2d'); cx.drawImage(src, 0, 0);
+        for (const f of fr) {
+          const d = cx.getImageData(f.frame.x, f.frame.y, f.frame.w, f.frame.h).data;
+          let a = 0; for (let i = 3; i < d.length; i += 4) a += d[i];
+          check(a / (d.length / 4) > 8, `${f.filename}: the atlas cell has visible pixels`);
+        }
+      }
+      check(V().ribbon.length === C.comet.ribbon.stamps && V().echoRibbon.length === C.comet.ribbon.echoStamps, 'ribbon pools have their fixed sizes');
+
+      // --- Path following in the real scene: independent record of (travelled, orbX) per frame ---
+      q.crash = function () {}; // exercise the view only: let the orb pass through hazards
+      q.startRun();
+      const rec = [];
+      const stepRec = (n) => { for (let i = 0; i < n; i++) { frames(q, 1); rec.push([q.level.travelled, q.orbX]); } };
+      const trueX = (travel) => { // interpolate the recorded orb positions at a travelled distance
+        let lo = 0, hi = rec.length - 1;
+        if (travel <= rec[0][0]) return rec[0][1];
+        while (hi - lo > 1) { const m = (lo + hi) >> 1; if (rec[m][0] <= travel) lo = m; else hi = m; }
+        const a = rec[lo], b = rec[hi]; const u = b[0] > a[0] ? (travel - a[0]) / (b[0] - a[0]) : 0;
+        return a[1] + (b[1] - a[1]) * u;
+      };
+      const tgt = (x) => Pulse.Orb.setTarget(q.orbState, x, q.W);
+      stepRec(40);
+      let worst = 0, topMost = 1e9, widest = 0, checks = 0;
+      const sweep = () => {
+        const v = V(); const rib = v.rib;
+        for (let i = 0; i < v.ribbon.length; i++) {
+          const st = v.ribbon[i];
+          if (!st.visible) continue;
+          const s = st.y - q.orbY;
+          const want = trueX(q.level.travelled - s);
+          worst = Math.max(worst, Math.abs(st.x - want));
+          topMost = Math.min(topMost, quadTop(st) - q.orbY);
+          widest = Math.max(widest, st.displayWidth);
+          checks++;
+        }
+      };
+      // Rapid S-turns: slam the target from edge to edge, then gentle drifts.
+      for (let k = 0; k < 8; k++) { tgt(k % 2 ? MARGIN : q.W - MARGIN); for (let j = 0; j < 12; j++) { stepRec(1); sweep(); } }
+      for (let k = 0; k < 120; k++) { tgt(270 + 180 * Math.sin(k / 12)); stepRec(1); sweep(); }
+      check(checks > 1000, `swept ${checks} stamp positions`);
+      check(worst < 4, `every ribbon stamp sits where the orb was (max error ${worst.toFixed(2)} px over S-turns)`);
+      check(topMost >= -C.orb.radius, `no stamp reaches ahead of the orb (highest point ${topMost.toFixed(1)} px relative to the orb centre)`);
+      notes.push(`stamp path error ${worst.toFixed(2)} px, highest stamp ${topMost.toFixed(1)} px`);
+      check(widest <= 2 * (C.orb.radius + Pulse.Rhythm.OrbFx.maxExtra) * 1.15, `the ribbon is never wider than the orb (${widest.toFixed(0)} px vs a ${2 * C.orb.radius} px orb)`);
+      // The ribbon is continuous: stamps overlap along the path (each reaches the next).
+      {
+        const v = V(); let gapOk = true;
+        for (let i = 0; i < v.ribbon.length - 1; i++) {
+          const a = v.ribbon[i], b = v.ribbon[i + 1];
+          const dist = Math.hypot(a.x - b.x, a.y - b.y);
+          if (dist > (a.displayHeight + b.displayHeight) / 2 * 0.62) gapOk = false;
+        }
+        check(gapOk, 'neighbouring stamps overlap, so there are no beads or gaps');
+      }
+
+      // --- Shrink and grow ---
+      tgt(270); stepRec(60);
+      const longTail = V().ribbon.filter((s) => s.visible).length ? V().ribbon[V().ribbon.length - 1].y - q.orbY : 0;
+      const bigW = V().ribbon[2].displayWidth;
+      const holdOn = () => { q.isHeld = () => true; }; const holdOff = () => { delete q.isHeld; };
+      holdOn(); stepRec(60);
+      check(q.radius === C.orb.minRadius, `the orb is shrunk (r ${q.radius})`);
+      const smallW = V().ribbon[2].displayWidth;
+      const shortTail = V().ribbon[V().ribbon.length - 1].y - q.orbY;
+      check(smallW < bigW * 0.75, `the ribbon is narrower while shrunk (${smallW.toFixed(0)} vs ${bigW.toFixed(0)} px)`);
+      check(shortTail < longTail, `and shorter (${shortTail.toFixed(0)} vs ${longTail.toFixed(0)} px)`);
+      check(V().cometBody.displayWidth / 2 >= q.radius - 0.01 && V().cometBody.displayWidth / 2 <= q.radius + Pulse.Rhythm.OrbFx.maxExtra + 0.01, 'the disc still covers the collision circle exactly');
+      holdOff(); stepRec(90);
+      check(q.radius === C.orb.radius, 'and it regrows');
+
+      // --- Overdrive: look only ---
+      {
+        const before = { r: q.radius, trav: q.level.travelled, score: q.score, speed: q.speedNow };
+        const a0 = V().ribbon[3].alpha, w0 = V().ribbon[3].displayWidth;
+        q.od.fx = 1; // the glow state only
+        const trav1 = q.level.travelled; frames(q, 1);
+        check(V().odCorona ? V().odCorona.visible : true, 'the Overdrive corona shows');
+        check(V().ribbon[3].alpha > a0 && V().ribbon[3].displayWidth > w0, 'the ribbon is brighter and a little wider in Overdrive');
+        check(q.radius === before.r && q.score === before.score, 'Overdrive styling leaves the collision radius and score alone');
+        q.od.fx = 0; frames(q, 1);
+        check(!V().odCorona || !V().odCorona.visible, 'the corona is gone when Overdrive ends');
+      }
+
+      // --- Pause freezes the whole trail; resume continues it ---
+      {
+        tgt(100); stepRec(10);
+        q.pause();
+        const snap = V().ribbon.map((s) => [s.x, s.y, s.rotation, s.alpha].join());
+        const nodes = V().nodes.map((n) => [n.x, n.y, n.visible].join());
+        frames(q, 40);
+        check(q.state === 'paused' && V().ribbon.map((s) => [s.x, s.y, s.rotation, s.alpha].join()).join('|') === snap.join('|'), 'pause freezes the ribbon');
+        check(V().nodes.map((n) => [n.x, n.y, n.visible].join()).join('|') === nodes.join('|'), 'and the sparks');
+        q.onPointerDown({ id: 1, x: 100, y: 400 }, []);
+        check(q.state === 'playing', 'resume');
+        tgt(400); stepRec(30); sweep();
+        check(worst < 4, `the path is still right after a pause (max error ${worst.toFixed(2)})`);
+      }
+
+      // --- Crash and retry ---
+      {
+        q.state = 'playing';
+        const crash = Object.getPrototypeOf(q).crash;
+        crash.call(q, null);
+        frames(q, 3);
+        check(q.state === 'over' && V().ribbon.every((s) => !s.visible) && V().nodes.every((n) => !n.visible), 'a crash hides the tail and sparks');
+        await wait(700);
+        q.startRun(); frames(q, 1);
+        check(q.state === 'playing', 'retry starts');
+        const xs = V().ribbon.map((s) => s.x);
+        check(Math.max(...xs) - Math.min(...xs) < 1.5, 'after a retry the tail starts straight: nothing of the old path survives');
+        check(V().trail.latest === Math.floor(q.level.travelled / Tr.STEP), 'the history was restarted at the new run');
+      }
+
+      // --- Repeated retries and no growth ---
+      {
+        q.crash = function () {};
+        const count = () => ({ layer: q.layer.list.length, children: q.children.list.length, tw: q.tweens.getTweens().length, tex: q.textures.getTextureKeys().length, nodes: V().nodes.length });
+        for (let i = 0; i < 3; i++) { q.startRun(); frames(q, 30); }
+        const c0 = count();
+        let maxVisibleNodes = 0;
+        for (let i = 0; i < 60; i++) {
+          q.startRun(); tgt(i % 2 ? 60 : 480);
+          for (let j = 0; j < 25; j++) { frames(q, 1); maxVisibleNodes = Math.max(maxVisibleNodes, V().nodes.filter((n) => n.visible).length); }
+          const cr = Object.getPrototypeOf(q).crash; cr.call(q, null);
+          frames(q, 3);
+          await wait(30);
+        }
+        await wait(600);
+        const c1 = count();
+        check(c1.layer === c0.layer && c1.children === c0.children && c1.tex === c0.tex && c1.nodes === c0.nodes, `60 crash/retry cycles add no objects or textures (layer ${c0.layer}→${c1.layer}, scene ${c0.children}→${c1.children}, textures ${c0.tex}→${c1.tex})`);
+        check(c1.tw <= c0.tw + 12, `and no tween build-up (${c0.tw}→${c1.tw})`);
+        check(maxVisibleNodes <= C.comet.nodes, `sparks never exceed the pool (${maxVisibleNodes} of ${C.comet.nodes})`);
+        await wait(700); delete q.crash; q.startRun(); // (the scene object is reused for every stage: drop the test double)
+      }
+
+      // --- Collision, score and stars do not depend on the trail ---
+      {
+        const play = async (idx, stub) => {
+          const s = await startStage(idx);
+          if (stub) { const v = s.view; v.renderOrb = () => {}; v.renderEcho = () => {}; }
+          s.test.bot = true; s.test.route = 'safe'; s.startRun();
+          frames(s, 40000, () => s.state !== 'playing');
+          return { state: s.state, score: s.score, energy: s.energy, t: +s.elapsed.toFixed(3), trav: +s.level.travelled.toFixed(2), stars: s.result && s.result.stars };
+        };
+        const a = await play(0, false); const b = await play(0, true);
+        check(a.state === 'complete' && JSON.stringify(a) === JSON.stringify(b), `stage 1 plays identically with and without the trail (${JSON.stringify(a)})`);
+        const c = await play(6, false); const d = await play(6, true);
+        check(c.state === 'complete' && JSON.stringify(c) === JSON.stringify(d), `stage 7 (Mirror Pulse) plays identically with and without the trail (${JSON.stringify(c)})`);
+        const e = await play(11, false); const f = await play(11, true);
+        check(e.state === 'complete' && JSON.stringify(e) === JSON.stringify(f), `stage 12 plays identically with and without the trail`);
+      }
+
+      // --- Mirror Pulse echo trail (stage 7) ---
+      {
+        q = await startStage(6);
+        const V2 = () => q.view;
+        check(V2().echoRibbon.every((s) => !s.visible) && (!V2().echoOrb || !V2().echoOrb.visible), 'no echo ribbon before the event');
+        q.test.bot = true; q.startRun();
+        const echoRec = []; const orbRec = [];
+        let activeSeen = 0;
+        const track = () => { orbRec.push([q.level.travelled, q.orbX]); echoRec.push([q.level.travelled, q.echoX, q.echoK]); };
+        let sweepErr = 0, shown = false, sprOk = true, disjoint = true, mirrorSum = 0, mirrorTests = 0;
+        const interp = (rec, travel) => {
+          let lo = 0, hi = rec.length - 1; if (travel <= rec[0][0]) return rec[0][1];
+          while (hi - lo > 1) { const m = (lo + hi) >> 1; if (rec[m][0] <= travel) lo = m; else hi = m; }
+          const a = rec[lo], b = rec[hi]; const u = b[0] > a[0] ? (travel - a[0]) / (b[0] - a[0]) : 0; return a[1] + (b[1] - a[1]) * u;
+        };
+        frames(q, 30000, () => {
+          track();
+          if (q.echoOn) {
+            const v = V2();
+            const rs = v.echoRibbon.filter((s) => s.visible);
+            if (rs.length === C.comet.ribbon.echoStamps) shown = true;
+            for (const st of rs) { const s = st.y - q.orbY; const want = interp(echoRec.map((r) => [r[0], r[1]]), q.level.travelled - s); if (q.level.travelled - s >= echoRec[0][0] && s > 0) sweepErr = Math.max(sweepErr, Math.abs(st.x - want)); }
+            if (v.echoOrb) { sprOk = sprOk && v.echoOrb.visible && Math.abs(v.echoOrb.x - q.echoX) < 1e-6 && Math.abs(v.echoOrb.y - q.orbY) < 1e-6 && Math.abs(v.echoOrb.displayWidth * 105 / 128 / 2 - q.radius) < 0.01; }
+            if (q.echoK >= 0.999) activeSeen++;
+            if (q.echoK >= 0.999 && activeSeen > 40) { // deep in the zone: both trails are mirror images over the last stretch
+              for (let s = 5; s <= 120; s += 15) { mirrorSum = Math.max(mirrorSum, Math.abs(Tr.xAt(v.trail, s) + Tr.xAt(v.echoTrail, s) - 2 * 270)); mirrorTests++; }
+            }
+            // The two ribbons are different colours.
+            disjoint = disjoint && rs[0].tintTopLeft !== v.ribbon[0].tintTopLeft;
+          }
+          return q.mirror && q.mirror.phase === 'outro' && q.echoK < 0.4;
+        });
+        check(shown, 'the echo ribbon is drawn with all its stamps during the event');
+        check(sweepErr < 4, `the echo ribbon follows the echo's own path (max error ${sweepErr.toFixed(2)} px)`);
+        check(sprOk, 'the echo orb sprite sits on the echo and spans exactly the collision circle');
+        check(mirrorTests > 0 && mirrorSum < 3, `deep in the zone the echo trail mirrors the player trail across the centreline (max error ${mirrorSum.toFixed(2)} px, ${mirrorTests} samples)`);
+        check(disjoint, 'the echo ribbon is tinted differently from the player ribbon');
+        // Finish the zone: everything hides and the history is dropped.
+        frames(q, 30000, () => !q.echoOn || q.state !== 'playing');
+        frames(q, 2);
+        check(q.state === 'playing' && !q.echoOn, 'the zone ended');
+        check(V2().echoRibbon.every((s) => !s.visible) && (!V2().echoOrb || !V2().echoOrb.visible) && !V2().echoLive, 'when the echo ends its ribbon and orb are hidden and its history is dropped');
+        // Second zone: starts from a clean, straight echo tail.
+        let firstFrame = null;
+        frames(q, 30000, () => { if (q.echoOn && firstFrame === null) { const xs = V2().echoRibbon.map((s) => s.x); firstFrame = Math.max(...xs) - Math.min(...xs); return true; } return q.state !== 'playing'; });
+        frames(q, 1);
+        check(firstFrame !== null && firstFrame < 3, `the next event starts with a fresh tail (spread ${firstFrame === null ? 'n/a' : firstFrame.toFixed(1)} px)`);
+        // Crash by the echo hides it at once.
+        const gate = q.level.segments.find((g) => g.active && g.zone && g.kind === 'gate');
+        q.test.bot = false; q.crash(gate, true); frames(q, 2);
+        check(q.state === 'over' && V2().echoRibbon.every((s) => !s.visible), `a crash hides the echo trail (state ${q.state}, visible ${V2().echoRibbon.filter((s) => s.visible).length}, live ${V2().echoLive}, mirror ${q.mirror && q.mirror.phase})`);
+        await wait(700); q.startRun(); frames(q, 3);
+        check(!V2().echoLive && V2().echoRibbon.every((s) => !s.visible), 'a retry starts without echo trail');
+        // Mirror stages are not the only place the echo pool exists: other stages never show it.
+        q = await startStage(2); q.test.bot = true; q.startRun();
+        let any = false; frames(q, 20000, () => { if (q.view.echoRibbon.some((s) => s.visible) || (q.view.echoOrb && q.view.echoOrb.visible)) any = true; return q.state !== 'playing'; });
+        check(!any, 'other stages never show an echo trail');
+      }
+
+      // --- Stage transitions: nothing stale on a fresh stage ---
+      {
+        q = await startStage(3);
+        check(q.view.trail.d !== q.view.trail.d || q.view.trail.latest === 0, 'a new stage has a fresh trail');
+        q.test.bot = true; q.startRun(); frames(q, 200);
+        check(q.view.ribbon.some((s) => s.visible), 'and draws its tail');
+      }
+
+      // --- Representative viewport ---
+      {
+        const H = q.SH, W = q.SW;
+        check(q.view.ribbon.every((s) => s.y >= q.orbY - 1 && s.y <= q.orbY + 700), `viewport ${W}x${H}: the tail stays below the orb inside the screen`);
+        check(q.view.ribbon.every((s) => s.x > -60 && s.x < W + 60), 'and inside the lane width');
+      }
+      check(errors.length === 0, `page errors: ${errors.join(' | ')}`);
+    }
+
+    (async () => {
+      try {
+        if (new URLSearchParams(location.search).get('manual')) { document.title = 'MANUAL'; return; } // for looking at it by eye
+        partA();
+        await partB();
+        document.title = (fails.length ? `FAIL ${fails.length}: ${fails.join(' | ')}` : `PASS trail tests ${checks} checks`) + ' | ' + notes.join(' | ');
+      } catch (e) { document.title = 'FAIL error ' + e.message + ' ' + (e.stack || '').split('\n')[1]; }
+    })();
+  </script>
+</body>
+</html>

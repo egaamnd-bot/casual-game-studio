@@ -125,21 +125,28 @@ Pulse.Render = (function () {
   // The echo orb: translucent violet disc with a bright outline, a faint tail and a thin link to the main
   // orb at the same height. Drawn with alpha well below 1 so the walls behind it stay readable; it is a
   // reflection, not a hazard, and never hides a boundary.
-  function echo(g, x, y, r, k, orbX, tailLen) {
+  function echo(g, x, y, r, k, orbX, tailLen, parts) {
     if (k <= 0.01) return;
+    const P = parts || {}; // the sprite view draws the tail (a curved ribbon) and the disc itself
+    const want = (n) => P[n] !== false;
     const col = C.mirror.color;
     const a = C.mirror.alpha * k;
-    if (orbX !== undefined) {
+    if (orbX !== undefined && want('link')) {
       g.fillStyle(col, 0.22 * k);
       const x0 = Math.min(x, orbX) + r;
       const x1 = Math.max(x, orbX) - r;
       if (x1 > x0) g.fillRect(x0, y - 1, x1 - x0, 2);
     }
     const tl = tailLen || 90;
-    g.fillStyle(col, 0.18 * k);
-    g.fillTriangle(x - r * 0.8, y, x + r * 0.8, y, x, y + tl * (0.5 + 0.5 * k));
-    g.fillStyle(col, 0.12 * k);
-    g.fillCircle(x, y, r * 1.35);
+    if (want('tail')) {
+      g.fillStyle(col, 0.18 * k);
+      g.fillTriangle(x - r * 0.8, y, x + r * 0.8, y, x, y + tl * (0.5 + 0.5 * k));
+    }
+    if (want('halo')) {
+      g.fillStyle(col, 0.12 * k);
+      g.fillCircle(x, y, r * 1.35);
+    }
+    if (!want('disc')) return;
     g.fillStyle(col, 0.32 * a);
     g.fillCircle(x, y, r);
     g.lineStyle(3, 0xffffff, 0.35 * a);

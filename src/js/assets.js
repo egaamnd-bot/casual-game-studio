@@ -10,6 +10,24 @@ Pulse.Assets = {
     pulse_ui: 'assets/atlases/pulse_ui_atlas',
   },
 
+  // Optional cosmetic atlases (Gemini batch 1 comet kit). A failed load never blocks the game: the
+  // trail falls back to procedural textures (see SpriteView.makeCometTextures).
+  OPTIONAL_ATLASES: {
+    pulse_comet_vfx: 'assets/atlases/pulse_comet_vfx_atlas',
+  },
+  VFX_FRAMES: [
+    'comet_core_disc', 'comet_halo_bloom', 'comet_overdrive_corona', 'comet_ribbon_seg', 'comet_spark_micro',
+    'comet_spark_star', 'comet_streak_fine', 'comet_taper_long', 'comet_taper_med', 'comet_taper_short',
+    'mirror_echo_fold_burst', 'mirror_echo_orb_disc', 'mirror_echo_ribbon_seg',
+  ],
+  // True when the comet atlas loaded and every frame the trail uses exists.
+  vfxReady(scene) {
+    const tex = scene.textures;
+    if (!tex.exists('pulse_comet_vfx')) return false;
+    const t = tex.get('pulse_comet_vfx');
+    return this.VFX_FRAMES.every((f) => t.has(f));
+  },
+
   // Landscape backgrounds: a 512² repeating base tile, a 1024×256 ridge strip (floor; flipped
   // for the ceiling) and a 512×128 tick rail (bottom edge; flipped for the top) per theme.
   // Plus a 512×160 intro banner per world.
@@ -87,6 +105,10 @@ Pulse.Assets = {
     if (window.PULSE_ASSET_BASE) scene.load.setBaseURL(window.PULSE_ASSET_BASE);
     for (const key of Object.keys(this.ATLASES)) {
       const base = this.ATLASES[key];
+      scene.load.atlas(key, `${base}.png`, `${base}.json`);
+    }
+    if (!(window.PULSE_TEST && window.PULSE_TEST.noVfx)) for (const key of Object.keys(this.OPTIONAL_ATLASES)) {
+      const base = this.OPTIONAL_ATLASES[key];
       scene.load.atlas(key, `${base}.png`, `${base}.json`);
     }
     for (const key of this.IMAGES) scene.load.image(key, `assets/backgrounds/${key}.png`);
