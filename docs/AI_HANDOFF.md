@@ -4,17 +4,15 @@
 
 - Updated: 2026-10-26 (UTC)
 - Project: PULSE
-- Status: MILESTONE 1 DONE (PR #17 merged); MILESTONE 2 (Mirror Pulse) SELF-REVIEWED, MERGING (result recorded in the next handoff)
-- Branch: `feature/pulse-mirror-break` (PR opened against `main`; not merged)
-- Code head SHA: `b2264746511bbcab6400bd8b12251055d1fe4883` (handoff commits after it are docs-only)
-- Base: `main` @ `ad9bd4c78ae4cf585455114537f44482ce5dbfc2` (PR #17 merge; integrated build run #57 success)
-- APK: `pulse-debug-apk-run60`, [run #60](https://github.com/egaamnd-bot/casual-game-studio/actions/runs/40305560055), source SHA `b226474...`; NOT DEVICE-TESTED
-- Tests: all suites PASS at 540x960, 360x640 and 412x915 (campaign 1874, mirror 961, routes 335, overdrive 1690, melody 809, rhythm 10101, logic, assets, portrait, scene); `gameplay.html` (manual `?bot=1`) NOT RUN
-- Evidence kept accurate: Producer phone-tested run #49 (routes, 36/36 stars, fun and fair); later APKs NOT device-tested
-- Workflow: Claude is reviewer and merge operator (permanent, 2026-10-26); no ChatGPT gate. Producer phone test requested for feel, not blocking.
+- Status: MILESTONES 1 AND 2 MERGED AND VERIFIED. Nothing open.
+- `main` @ `908e51a3c77ffd61bfe04e969b382f0b49a4f5f0` (PR #18 merge of head `c0dfc0c0bc20329e4f5c7d4b622ee9aa4fda030b`; PR #17 merged earlier as `ad9bd4c`)
+- Integrated build: [run #62](https://github.com/egaamnd-bot/casual-game-studio/actions/runs/40306086598) success on `908e51a`; artifact `pulse-debug-apk-run62` (latest APK for playtesting)
+- Tests (at code head `b226474`, identical code to merge head): all suites PASS at 540x960 and 360x640 (412x915 for assets, melody, rhythm, portrait, scene); campaign 1874, mirror 961, routes 335, overdrive 1690, melody 809, rhythm 10101. `gameplay.html` (manual `?bot=1`) NOT RUN. Suites were not re-run on the merge commit itself; the merge head's tree equals the tested tree plus docs.
+- Device testing: Producer phone-tested run #49 (routes: 36/36 stars, fun and fair). Mirror Pulse and every later APK: NOT DEVICE-TESTED.
+- Workflow: Claude is Lead Developer, reviewer and merge operator (permanent since 2026-10-26); ChatGPT is a report reviewer, not a merge gate; Producer decides product/gameplay and releases.
 
 ## Known limitations
-Echo readability, colour contrast, cue loudness, timing feel NOT DEVICE-TESTED; durations reasoned from 300 px/s, not phone-tuned; prototype in stage 7 only.
+Echo readability, colour contrast, cue loudness and timing feel NOT DEVICE-TESTED; durations reasoned from 300 px/s, not phone-tuned; Mirror Pulse is a stage 7 prototype only.
 
 ## Next recommended task
-Phone-test Mirror Pulse; tune from feedback.
+Producer phone-tests run #62 (Mirror Pulse); tune from feedback. Backlog (not built): Near-Miss Rewards, Collectible Chains, World Finale Sequences; combined safe-route vs. paired-risk-route sequence after validation.
