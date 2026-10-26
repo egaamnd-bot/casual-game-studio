@@ -178,6 +178,8 @@
     if (src.type === 'barrier' && src.charged) item.charged = true;
     if (isPickup(src.type)) item.x = clamp(C.orb.x + (src.x || 0), S.margin, width - S.margin);
     if (src.pattern) item.pattern = src.pattern;
+    if (src.zone) item.zone = src.zone; // Mirror Pulse zone id (docs/MIRROR.md)
+    if (src.mirror) item.mirror = true; // a mirrored pair of openings (a fork without routes)
     if (src.route) {
       item.route = src.route; // route id: the fork rows and the notes of one route choice share it
       if (src.routeEnd) item.routeEnd = true; // the last row of the fork
@@ -481,6 +483,8 @@
       seg.lane = it.lane || null;
       seg.role = it.role || null;
       seg.routeEnd = !!it.routeEnd;
+      seg.zone = it.zone || null;
+      seg.mirror = !!it.mirror;
       if (it.type === 'gate') {
         seg.kind = 'gate';
         seg.gapL = it.gapL;
@@ -584,6 +588,26 @@
       return null;
     }
   }
+
+  // Mirror Pulse (docs/MIRROR.md): the echo orb's collisions, evaluated independently of the main orb's.
+  // The echo shares the orb's radius and charge, sits at `ex`, and only meets segments of the mirror zone
+  // (everything else was never laid out for two orbs). Returns 'crash' or 'collect' (a mint note the echo
+  // touched; the segment is then resolved exactly once, so rewards are never doubled) or null. Passing a
+  // row is scored once by the main orb in `resolve`.
+  Level.prototype.resolveEcho = function (s, orbY, r, charge, ex) {
+    if (!s.zone) return null;
+    if (s.kind === 'pickup') {
+      if (s.resolved || !this.touchesPickup(s, ex, orbY)) return null;
+      s.taken = s.resolved = true;
+      s.quality = 'good';
+      return 'collect';
+    }
+    if (s.kind === 'barrier') {
+      if (s.broken || !this.touchesBarrier(s, orbY, r)) return null;
+      return this.canSmash(s, r, charge) ? null : 'crash'; // the main orb smashes it first when it can
+    }
+    return this.hitsWall(s, ex, orbY, r) ? 'crash' : null;
+  };
 
   // Test autopilot with perfect reading: acts on the nearest obstacle within ~`lookSeconds`.
   // Shrinks for a gate that needs it, stays full size for a barrier (looking further ahead for

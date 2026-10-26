@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Pulse mirror tests</title></head>
+<body>
+  <pre id="out">running…</pre>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/melody.js"></script>
+  <script src="../src/js/overdrive.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/mirror.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/patterns.js"></script>
+  <script>
+    // Mirror Pulse (docs/MIRROR.md): reflection maths, the event timeline, mirrored pairs, independent
+    // collision for the orb and its echo, fairness at every portrait size and frame rate, unsupported
+    // obstacles, and how the event meets scoring, stars, Overdrive and saves. Pure rules: no Phaser.
+    const C = Pulse.CONFIG, M = Pulse.Mirror, OD = Pulse.Overdrive, M0 = C.mirror;
+    const R = C.orb.radius, W = C.width, CX = W / 2, MARGIN = C.steer.margin;
+    let checks = 0, failures = 0; const msgs = [], lines = [];
+    const check = (ok, m) => { checks++; if (!ok) { failures++; msgs.push('FAIL ' + m); } };
+    const near = (a, b, e) => Math.abs(a - b) <= (e === undefined ? 1e-9 : e);
+    const HEIGHTS = [860, 900, 960, 1080, 1180, 1240];
+    const STAGE = Pulse.STAGES.find((s) => s.id === 's7-double-trouble');
+    const zoneStages = Pulse.STAGES.filter((s) => s.items.some((it) => it.zone));
+    const compile = (st, h) => Pulse.Campaign.compile(st, W, h);
+
+    // ---- 1. The reflection: echoX = 2 * laneCenterX - playerX ----
+    check(M.center(W) === CX && CX === 270, 'the lane centre is 270 in the portrait lane');
+    for (const x of [MARGIN, 100, 200, 270, 333, 440, W - MARGIN]) {
+      check(near(M.reflect(x, W), 2 * CX - x), `reflect(${x}) = 2*270 - x`);
+      check(near(M.echoX(x, 1, W), 2 * CX - x), `echoX(${x}, k=1) = ${2 * CX - x}`);
+      check(near(M.reflect(M.reflect(x, W), W), x), `reflecting twice returns ${x}`);
+      check(near(M.echoX(x, 0, W), CX), `echoX(${x}, k=0) sits on the centreline`);
+      check(near(M.echoX(x, 0.5, W), CX + (M.reflect(x, W) - CX) * 0.5), `echoX(${x}, k=0.5) is halfway out`);
+    }
+    check(M.echoX(CX, 1, W) === CX, 'orb on the centreline → echo on the centreline');
+    check(near(M.echoX(MARGIN, 1, W), W - MARGIN) && near(M.echoX(W - MARGIN, 1, W), MARGIN), 'orb at either lane boundary → echo at the opposite boundary');
+    for (let x = -50; x <= W + 50; x += 7) for (const k of [0, 0.3, 1]) {
+      const e = M.echoX(x, k, W);
+      check(e >= MARGIN && e <= W - MARGIN, 'echo stays inside the steering margins');
+    }
+    {
+      // Movement is mirrored: any lateral step of the orb is the opposite step of the echo.
+      let ok = true;
+      for (let x = MARGIN; x + 5 <= W - MARGIN; x += 5) {
+        const d = M.echoX(x + 5, 1, W) - M.echoX(x, 1, W);
+        if (!near(d, -5)) ok = false;
+      }
+      check(ok, 'the echo moves by exactly the opposite of every orb step');
+    }
+    check(M.echoX(100, undefined, W) === M.echoX(100, 1, W), 'an undefined strength means the full reflection');
+    check(near(M.echoX(100, 7, W), M.echoX(100, 1, W)) && near(M.echoX(100, -3, W), CX), 'strength is clamped to 0..1');
+    check(M.reflect(100) === 2 * C.width / 2 - 100, 'default width is the portrait lane');
+    // Orb crossing the centreline: the echo crosses it at the same moment, in the other direction.
+    check(M.echoX(CX - 1, 1, W) > CX && M.echoX(CX + 1, 1, W) < CX, 'when the orb crosses the centreline, the echo crosses it the other way');
+
+    // ---- 2. The timeline: telegraph → intro → active → outro → gone ----
+    check(zoneStages.length === 1 && zoneStages[0] === STAGE, 'Mirror Pulse is prototyped in exactly one stage (s7-double-trouble)');
+    check(Pulse.STAGES.findIndex((s) => s === STAGE) === 6, 'the prototype stage keeps its place (stage 7) and id');
+    const base = compile(STAGE, 960);
+    const orbY960 = Math.round(960 * C.orb.yRatio);
+    check(base.mirrors.length === 2 && base.mirrors.map((z) => z.id).join() === 's7-m1,s7-m2', 'stage 7 has two zones: s7-m1 then s7-m2');
+    const SPEED = 300;
+    for (const z of base.mirrors) {
+      check(z.rows >= M0.minRows, `${z.id}: at least ${M0.minRows} rows (${z.rows})`);
+      check(z.twins >= 2, `${z.id}: at least two mirrored pairs (${z.twins})`);
+      check(z.tele0 < z.intro0 && z.intro0 < z.introEnd && z.introEnd < z.arrive0 && z.arrive0 < z.pass1 && z.pass1 < z.end, `${z.id}: the timeline is strictly ordered`);
+      check(z.tele0 >= 0, `${z.id}: the telegraph starts after the stage starts`);
+      check(near(z.intro0 - z.tele0, M0.telegraphPx) && near(z.arrive0 - z.intro0, M0.leadPx) && near(z.introEnd - z.intro0, M0.introPx) && near(z.end - z.outro0, M0.outroPx), `${z.id}: durations come from the config`);
+      check(z.introEnd <= z.arrive0 - R, `${z.id}: the echo is fully formed before the first paired row reaches the orb`);
+      check(M0.telegraphPx / SPEED >= 1.5, `warning is at least 1.5 s at 300 px/s (${(M0.telegraphPx / SPEED).toFixed(2)} s)`);
+      const at = (d) => M.phase(z, d);
+      check(at(z.tele0 - 1).phase === 'idle' && at(z.tele0 - 1).k === 0, `${z.id}: idle before the telegraph`);
+      check(at(z.tele0).phase === 'telegraph' && at(z.tele0).k === 0 && at(z.tele0).tele === 0, `${z.id}: the telegraph opens with no echo`);
+      check(at(z.intro0 - 1e-6).phase === 'telegraph' && at(z.intro0 - 1e-6).tele > 0.999, `${z.id}: the telegraph fills just before the intro`);
+      check(at(z.intro0).phase === 'intro' && at(z.intro0).k === 0, `${z.id}: the echo starts on the centreline`);
+      check(at(z.introEnd).phase === 'active' && at(z.introEnd).k === 1, `${z.id}: full strength when the intro ends`);
+      check(at((z.introEnd + z.outro0) / 2).phase === 'active', `${z.id}: active in the middle`);
+      check(at(z.outro0).phase === 'outro' && at(z.outro0).k === 1, `${z.id}: the outro begins at full strength`);
+      check(at(z.end - 1e-6).k < 1e-3, `${z.id}: the echo has folded into the centreline when the outro ends`);
+      check(at(z.end).phase === 'idle' && at(z.end).k === 0, `${z.id}: the event ends cleanly`);
+      let mono = true, prev = -1, prevPh = 0; const order = ['idle', 'telegraph', 'intro', 'active', 'outro'];
+      for (let d = z.tele0 - 50; d <= z.end + 50; d += 3) {
+        const s = at(d);
+        if (s.k < 0 || s.k > 1) mono = false;
+        if (s.phase !== 'idle' || d >= z.end) { /* order is non-decreasing until the end */ }
+      }
+      check(mono, `${z.id}: strength always within 0..1`);
+      const seq = []; for (let d = z.tele0 - 50; d <= z.end + 50; d += 3) { const p = at(d).phase; if (seq[seq.length - 1] !== p) seq.push(p); }
+      check(seq.join() === 'idle,telegraph,intro,active,outro,idle', `${z.id}: phases run in order exactly once (${seq})`);
+      const total = (z.end - z.tele0) / SPEED, ev = (z.outro0 - z.intro0) / SPEED;
+      lines.push(`${z.id}: telegraph ${(M0.telegraphPx / SPEED).toFixed(1)} s, echo grows ${(M0.introPx / SPEED).toFixed(1)} s, paired rows ${((z.pass1 - z.arrive0) / SPEED).toFixed(1)} s, event ${ev.toFixed(1)} s (total ${total.toFixed(1)} s) @300 px/s`);
+      check(ev < 9, `${z.id}: the echo is on for a short event (${ev.toFixed(1)} s at 300 px/s)`);
+    }
+    check(base.mirrors[1].tele0 >= base.mirrors[0].end, 'the second zone telegraphs only after the first has ended');
+    check(M.current(base.mirrors, 0) === null && M.current(null, 5) === null && M.current([], 5) === null, 'no event at the start of the stage, or without zones');
+    {
+      const z = base.mirrors[0];
+      const c = M.current(base.mirrors, z.introEnd + 1);
+      check(c && c.zone === z && c.phase === 'active' && c.k === 1, 'current() returns the live zone with its state');
+      check(M.current(base.mirrors, base.mirrors[1].tele0 - 1) === null, 'between the two zones nothing is on');
+      check(M.current(base.mirrors, (z.pass1 + z.end) / 2).phase === 'outro', 'current() reports the outro');
+    }
+    // Everything is a function of distance: any frame rate or pause gives the same state at the same distance.
+    {
+      const z = base.mirrors[0]; let same = true;
+      for (const fps of [30, 60, 144]) { let d = 0; const dt = 1 / fps; while (d < z.end + 100) { d += SPEED * dt; const a = M.phase(z, d), b = M.phase(z, d); if (a.phase !== b.phase || a.k !== b.k) same = false; } }
+      check(same, 'phase is a pure function of distance (frame-rate independent, no timers)');
+    }
+
+    // ---- 3. Mirrored pairs: symmetry of the geometry ----
+    for (const h of HEIGHTS) {
+      const tr = compile(STAGE, h);
+      const pairs = tr.items.filter((it) => it.mirror);
+      check(pairs.length === 7, `@${h}: stage 7 has its 7 authored mirrored pairs (${pairs.length})`);
+      for (const p of pairs) {
+        const tag = `@${h} ${p.zone} row ${p.index}`;
+        check(p.fork === true && p.gap2L > p.gapR, `${tag}: a pair is a two-opening gate`);
+        check(near(p.gapL + p.gap2R, W, 1e-6) && near(p.gapR + p.gap2L, W, 1e-6), `${tag}: the two openings are exact reflections (${p.gapL.toFixed(1)}..${p.gapR.toFixed(1)} | ${p.gap2L.toFixed(1)}..${p.gap2R.toFixed(1)})`);
+        check(near(p.gapR - p.gapL, p.gap2R - p.gap2L, 1e-6), `${tag}: both openings are the same width`);
+        check(p.gap2L - p.gapR >= C.route.divider - 1e-6, `${tag}: a solid divider of at least ${C.route.divider} px sits between them (${(p.gap2L - p.gapR).toFixed(0)})`);
+        check(p.gapL >= C.wallMinWidth - 1e-6 && W - p.gap2R >= C.wallMinWidth - 1e-6, `${tag}: both outer walls survive`);
+        check(!p.route && !p.lane && !p.routeEnd && !p.firstRow, `${tag}: no route data (no route colours, no route reward)`);
+        check(p.zone && Pulse.Mirror.supports(p), `${tag}: supported inside a zone`);
+        // The orb's opening is the left one: a mirrored orb passes through the right one with the same clearance.
+        const half = (p.gapR - p.gapL) / 2, cL = (p.gapL + p.gapR) / 2, cR = (p.gap2L + p.gap2R) / 2;
+        check(near(M.reflect(cL, W), cR, 1e-6), `${tag}: the echo's opening is centred on the reflection of the orb's (${cL.toFixed(1)} → ${cR.toFixed(1)})`);
+        check(half >= R / 2, `${tag}: opening half-width ${half.toFixed(1)} is a real opening`);
+      }
+      // Everything else in a zone is symmetric by construction (plain gates are centred; barriers are full width).
+      for (const it of tr.items.filter((q) => q.zone && !q.mirror)) {
+        if (it.type === 'gate') check(near(it.gapL + it.gapR, W, 1e-6) || near(it.gapL + it.gapR, W, 1.5), `@${h} ${it.zone} row ${it.index}: a plain gate in a zone is centred (${it.gapL.toFixed(1)}..${it.gapR.toFixed(1)}) so both orbs fit the same gap`);
+        else check(it.type === 'barrier' || it.type === 'bonus', `@${h} ${it.zone}: only barriers, gates and notes inside a zone (${it.type})`);
+      }
+    }
+
+    // ---- 4. Collision: the orb and its echo are checked independently ----
+    {
+      const lv = new Pulse.Level(W, 960);
+      const orbY = 672;
+      const pair = base.items.find((it) => it.mirror);
+      // Spawn a real zone from the compiled track into a level and look at its segments.
+      const level = new Pulse.Campaign.CampaignLevel(W, 960, STAGE);
+      let seg = null;
+      for (let i = 0; i < 4000 && !seg; i++) { level.update(1 / 60, 300); seg = level.segments.find((s) => s.active && s.kind === 'gate' && s.mirror); }
+      check(!!seg, 'a mirrored pair spawns as a segment tagged mirror + zone');
+      check(seg && seg.zone === 's7-m1' && seg.fork && !seg.route, 'the segment carries its zone and no route');
+      const oL = (seg.gapL + seg.gapR) / 2, oR = (seg.gap2L + seg.gap2R) / 2;
+      seg.y = orbY - seg.h / 2; // the orb is inside the wall band
+      const hit = (x) => level.resolveEcho(seg, orbY, 20, 1, x);
+      check(level.hitsWall(seg, oL, orbY, 20) === false && hit(oR) === null, 'orb in its opening and echo in its opening: both clear');
+      check(level.resolve(Object.assign({}, seg, { scored: false }), orbY, 20, 1, oL) !== 'crash', 'the main orb is safe in the left opening');
+      check(hit(seg.gapR + 2) === 'crash', 'the echo on the divider crashes');
+      check(hit(30) === 'crash' && hit(W - 30) === 'crash', 'the echo on an outer wall crashes');
+      const crashMain = level.resolve(Object.assign({}, seg, { scored: false }), orbY, 20, 1, oR + 0.0);
+      check(crashMain !== 'crash', 'the right opening is also clear for the main orb (the pair is symmetric)');
+      // Independence: main orb safe + echo on a wall → the echo alone causes the crash.
+      check(level.resolve(Object.assign({}, seg, { scored: false }), orbY, 20, 1, oL) !== 'crash' && hit(seg.gapR + 2) === 'crash', 'a crash by the echo alone is detected even when the orb is clear');
+      // Segments that are not in a zone are never checked against the echo.
+      const plain = level.segments.find((s) => s.active && !s.zone && s.kind === 'gate');
+      check(!plain || level.resolveEcho(plain, orbY, 20, 1, 5) === null, 'a segment outside a zone is ignored by the echo');
+      check(level.resolveEcho({ kind: 'gate', zone: null, y: 0, h: 10 }, orbY, 20, 1, 5) === null, 'no zone → no echo collision');
+      // Same size and charge: the echo uses the orb's radius, so a shrunk orb shrinks both.
+      const seg2 = Object.assign({}, seg);
+      seg2.y = orbY - seg2.h / 2;
+      const wide = (seg.gapR - seg.gapL) / 2;
+      check(level.hitsWall(seg2, oL + wide - 5, orbY, 4) === false && level.hitsWall(seg2, oL + wide - 5, orbY, 60) === true, 'a larger radius collides where a smaller one passes (both orbs share the radius)');
+    }
+    {
+      // Barriers and notes in a zone.
+      const level = new Pulse.Campaign.CampaignLevel(W, 960, STAGE);
+      const orbY = 672;
+      let bar = null, note = null;
+      // Segments are pooled and reused as they scroll off, so each is picked up the moment it appears.
+      for (let i = 0; i < 9000 && !bar; i++) { level.update(1 / 60, 300); bar = level.segments.find((s) => s.active && s.zone && s.kind === 'barrier'); }
+      const level2 = new Pulse.Campaign.CampaignLevel(W, 960, STAGE);
+      for (let i = 0; i < 9000 && !note; i++) { level2.update(1 / 60, 300); note = level2.segments.find((s) => s.active && s.zone && s.kind === 'pickup' && !s.taken); }
+      check(!!bar, 'a full-width barrier spawns inside a zone');
+      if (bar) {
+        bar.y = orbY - bar.h / 2; bar.broken = false;
+        const smash = level.canSmash(bar, 56, 0);
+        check(level.resolveEcho(bar, orbY, 56, 0, 270) === (smash ? null : 'crash'), 'the echo crashes into a barrier exactly when the orb would (same size and charge)');
+        check(level.resolveEcho(bar, orbY, 56, 0, 100) === level.resolveEcho(bar, orbY, 56, 0, 440), 'a barrier is the same at every x for the echo (full width)');
+        bar.broken = true;
+        check(level.resolveEcho(bar, orbY, 56, 0, 270) === null, 'a smashed barrier no longer hurts the echo');
+      }
+      check(!!note && note.variant === 'bonus' && !note.route && !note.lane, 'zone notes are plain mint bonuses, never route notes');
+      if (note) {
+        note.y = orbY; // pickups are points: y is their centre
+        const x = note.x;
+        const first = level2.resolveEcho(note, orbY, 20, 1, x);
+        const again = level2.resolveEcho(note, orbY, 20, 1, x);
+        check(first === 'collect' && again === null, 'the echo collects a note at most once');
+        note.taken = false; note.resolved = false;
+        const byOrb = level2.resolve(note, orbY, 20, 1, x);
+        const byEcho = level2.resolveEcho(note, orbY, 20, 1, x);
+        check(byOrb === 'collect' && byEcho === null, 'a note taken by the orb cannot be taken again by the echo (no duplicate reward)');
+      }
+    }
+
+    // ---- 5. Unsupported obstacles are refused, never silently mirrored ----
+    {
+      const sup = (it) => M.supports(it);
+      check(sup({ type: 'barrier' }) && sup({ type: 'barrier', charged: true }), 'barriers are supported');
+      check(sup({ type: 'gate', need: 60 }) && sup({ type: 'gate', need: 60, fork: { mirror: true }, mirror: true }), 'plain gates and mirrored pairs are supported');
+      check(sup({ type: 'bonus' }) && !sup({ type: 'bonus', lane: 'safe' }) && !sup({ type: 'bonus', route: 'r1' }), 'plain mint notes ok; route notes are not');
+      check(!sup({ type: 'gate', need: 60, slide: { amp: 40 } }), 'a sliding gate is not supported');
+      check(!sup({ type: 'gate', need: 60, ring: true }), 'a ring is not supported');
+      check(!sup({ type: 'gate', need: 60, length: 300 }), 'a tunnel is not supported');
+      check(!sup({ type: 'gate', need: 60, fork: { need: 60, x: 100, risk: 'R' }, route: 'r1' }), 'a route fork is not supported');
+      check(!sup({ type: 'gate', need: 60, fork: { need: 60, x: 100, risk: 'R' } }), 'an unmarked two-opening gate is not supported');
+      check(!sup({ type: 'energy' }) && !sup({ type: 'gold' }) && !sup({ type: 'mystery' }), 'gold notes and unknown types are not supported');
+      const clone = () => JSON.parse(JSON.stringify(STAGE));
+      const errs = (st) => Pulse.Campaign.validate(st, W);
+      check(errs(STAGE).length === 0, 'stage 7 validates as authored');
+      let st = clone(); st.items.find((it) => it.zone && it.type === 'barrier').slide = { amp: 30 };
+      let st2 = clone(); { const z = st2.items.find((it) => it.zone && it.type === 'barrier'); z.type = 'energy'; }
+      let st3 = clone(); { const z = st3.items.find((it) => it.zone && it.type === 'gate' && !it.mirror); z.ring = true; }
+      let st4 = clone(); { const z = st4.items.find((it) => it.zone && it.type === 'gate' && !it.mirror); z.length = 300; }
+      let st5 = clone(); { const z = st5.items.find((it) => it.zone && it.type === 'gate' && !it.mirror); z.slide = { amp: 30 }; }
+      for (const [name, s] of [['gold in a zone', st2], ['ring in a zone', st3], ['tunnel in a zone', st4], ['sliding gate in a zone', st5]]) {
+        let threw = false, e = [];
+        try { e = errs(s); } catch (x) { threw = true; }
+        check(!threw && e.length > 0, `${name}: rejected by validation (${e.length} errors), no exception`);
+      }
+      // A mirrored pair outside any zone, a zone with no pair, or too short, or overlapping zones.
+      let o1 = clone(); { const p = o1.items.find((it) => it.mirror); delete p.zone; }
+      check(errs(o1).length > 0, 'a mirrored pair outside a zone is rejected');
+      let o2 = clone(); o2.items = o2.items.filter((it) => !(it.zone === 's7-m1' && it.mirror));
+      check(errs(o2).length > 0, 'a zone with no mirrored pair is rejected');
+      let o3 = clone(); { let n = 0; o3.items = o3.items.filter((it) => !(it.zone === 's7-m1' && ++n > 2)); }
+      check(errs(o3).length > 0, 'a zone shorter than the minimum is rejected');
+      let o4 = clone(); { const a = o4.items.findIndex((it) => it.zone === 's7-m2'); const gap = o4.items.slice(o4.items.findIndex((it) => it.zone === 's7-m1')); /* remove everything between the zones */ const i1 = o4.items.map((it) => it.zone).lastIndexOf('s7-m1'); o4.items.splice(i1 + 1, a - i1 - 1); }
+      check(errs(o4).length > 0, 'zones that overlap (not enough road between them) are rejected');
+      let o5 = clone(); { const p = o5.items.find((it) => it.mirror); p.fork.x = p.fork.x + 20; }
+      check(errs(o5).length > 0, 'a pair whose openings are not exact reflections is rejected');
+      let o6 = clone(); { const p = o6.items.find((it) => it.mirror); p.route = 'r1'; }
+      check(errs(o6).length > 0, 'route data on a mirrored pair is rejected');
+      // A zone placed so early its telegraph would start before the stage does is rejected too.
+      let o7 = clone(); { const i = o7.items.findIndex((it) => it.zone === 's7-m1'); o7.items.splice(0, i); }
+      check(errs(o7).length > 0, 'a zone whose telegraph would start before the stage is rejected');
+    }
+
+    // ---- 6. Fairness: both orbs are safe at every size and frame rate, on both sides ----
+    function play(stage, side, height, opts) {
+      opts = opts || {};
+      const orbY = Math.round(height * C.orb.yRatio);
+      const level = new Pulse.Campaign.CampaignLevel(W, height, stage);
+      const orb = Pulse.Orb.create();
+      const sc = Pulse.Scoring.create();
+      const od = OD.create();
+      const dt = opts.dt || 1 / 60;
+      let frames = 0, echoFrames = 0, maxEcho = 0, minK = 1;
+      const out = { crashed: false, completed: false, gold: 0, bonus: 0, collects: 0, score: 0, maxCombo: 0, acts: 0, phases: {}, echoFrames: 0, byEcho: false, odTotal: 0, mirrorRows: 0 };
+      while (frames * dt < 300) {
+        const speed = level.speedAt();
+        Pulse.Orb.setTarget(orb, Pulse.autosteer(level, orb.x, orbY, speed, opts.look || 1.2, opts.skill, side), W);
+        Pulse.Orb.step(orb, Pulse.autopilot(level, orbY, speed, opts.hold, side), dt, W);
+        frames++;
+        level.update(dt, level.speedAt());
+        OD.tick(od, dt);
+        const m = M.current(level.track.mirrors, level.travelled);
+        const k = m ? m.k : 0;
+        if (m) out.phases[m.phase] = (out.phases[m.phase] || 0) + 1;
+        const ex = k > 0 ? M.echoX(orb.x, k, W) : orb.x;
+        if (k > 0) { echoFrames++; if (ex < MARGIN - 1e-9 || ex > W - MARGIN + 1e-9) out.echoOut = true; }
+        for (const s of level.segments) {
+          if (!s.active) continue;
+          let e = level.resolve(s, orbY, orb.radius, orb.charge, orb.x);
+          let byEcho = false;
+          if (!e && k > 0) { e = level.resolveEcho(s, orbY, orb.radius, orb.charge, ex); byEcho = !!e; }
+          if (e === 'crash') { out.crashed = true; out.byEcho = byEcho; out.crashSeg = s.kind + (s.zone ? ' ' + s.zone : ''); out.at = level.travelled; return out; }
+          if (!e) continue;
+          Pulse.Scoring.apply(sc, e, s);
+          out.maxCombo = Math.max(out.maxCombo, sc.combo);
+          if (e === 'miss') { OD.miss(od, s.variant === 'bonus'); continue; }
+          const kind = e === 'collect' ? (s.variant === 'bonus' ? 'bonus' : 'pickup') : e === 'break' ? (s.charged ? 'chargedBreak' : 'break') : 'pass';
+          const r = OD.charge(od, kind, { quality: s.quality, combo: sc.combo });
+          if (r.started) out.acts++;
+          if (e === 'collect') { out.collects++; if (s.variant === 'bonus') out.bonus++; else out.gold++; }
+          if (s.mirror && e === 'pass') out.mirrorRows++;
+        }
+        if (level.finishY() >= orbY) { out.completed = true; out.echoFrames = echoFrames; out.odTotal = od.chargedTotal; out.score = sc.score; out.energyTotal = level.track.energyTotal; out.frames = frames; return out; }
+      }
+      return out;
+    }
+    const ref = {};
+    for (const h of HEIGHTS) {
+      const baseTr = compile(STAGE, h);
+      const pairsN = baseTr.items.filter((it) => it.mirror).length;
+      for (const side of ['safe', 'risk']) {
+        const a = play(STAGE, side, h);
+        check(a.completed && !a.crashed, `${side} side @${h}px: the bot completes stage 7 with the echo checked every frame (${a.crashSeg}${a.byEcho ? ' by echo' : ''})`);
+        check(a.gold === baseTr.energyTotal && baseTr.energyTotal === 9, `${side} @${h}px: all 9 gold collected — the echo never costs a star (${a.gold}/${baseTr.energyTotal})`);
+        check(a.mirrorRows === pairsN, `${side} @${h}px: the orb passes every mirrored pair (${a.mirrorRows}/${pairsN})`);
+        check(a.phases.telegraph > 0 && a.phases.intro > 0 && a.phases.active > 0 && a.phases.outro > 0, `${side} @${h}px: all four phases occurred`);
+        check(!a.echoOut, `${side} @${h}px: the echo never left the playfield`);
+        const c = play(STAGE, side, h, { hold: 0.75 });
+        check(c.completed, `${side} @${h}px: a cautious holder completes (${c.crashSeg})`);
+        const sl = play(STAGE, side, h, { skill: 0.2 });
+        check(sl.completed, `${side} @${h}px: a sloppy steerer completes (${sl.crashSeg}${sl.byEcho ? ' by echo' : ''})`);
+        if (h === 960) ref[side] = a;
+      }
+    }
+    // Frame rates: the same stage completes at 30, 60 and 144 fps and the event sees the same rows.
+    for (const fps of [30, 60, 144]) {
+      for (const side of ['safe', 'risk']) {
+        const a = play(STAGE, side, 960, { dt: 1 / fps });
+        check(a.completed && !a.crashed, `${side} side @${fps} fps: completes (${a.crashSeg}${a.byEcho ? ' by echo' : ''})`);
+        check(a.gold === 9 && a.mirrorRows === ref[side].mirrorRows, `${side} @${fps} fps: same gold and same mirrored rows as 60 fps (${a.gold}, ${a.mirrorRows})`);
+      }
+    }
+    check(ref.safe.mirrorRows === ref.risk.mirrorRows && ref.safe.gold === ref.risk.gold, 'both sides pass the same mirrored rows and collect the same gold');
+    lines.push(`stage 7 bots @960: safe side → ${ref.safe.mirrorRows} pairs, combo ${ref.safe.maxCombo}, OD ${ref.safe.acts}x; other side → ${ref.risk.mirrorRows} pairs, combo ${ref.risk.maxCombo}, OD ${ref.risk.acts}x`);
+
+    // ---- 7. The event changes nothing it should not: scoring, stars, stage ids, unlocks, saves ----
+    {
+      const ids = Pulse.STAGES.map((s) => s.id);
+      check(ids.length === 12 && new Set(ids).size === 12, 'the campaign still has 12 distinct stages');
+      check(ids[6] === 's7-double-trouble' && ids[3] === 's4-split-decision', 'stage ids and order are unchanged');
+      for (const s of Pulse.STAGES) {
+        const tr = compile(s, 960);
+        check(tr.energyTotal === tr.items.filter((it) => it.type === 'energy').length || tr.energyTotal > 0, `${s.id}: gold total ${tr.energyTotal}`);
+      }
+      // Stars count gold only: reaching the end with all gold = 3 stars, regardless of the echo.
+      const st7 = base;
+      check(Pulse.Campaign.computeStars(STAGE, true, st7.energyTotal, st7.energyTotal) === 3, 'all gold on stage 7 = 3 stars');
+      check(Pulse.Campaign.computeStars(STAGE, true, 0, st7.energyTotal) === 1, 'no gold on stage 7 = 1 star');
+      check(Pulse.Campaign.computeStars(STAGE, false, st7.energyTotal, st7.energyTotal) === 0, 'not completing = 0 stars');
+      // The Mirror module never touches scoring or Overdrive.
+      const od = OD.create(); const before = JSON.stringify(od);
+      M.current(base.mirrors, 5000); M.phase(base.mirrors[0], 5000); M.echoX(100, 1, W);
+      check(JSON.stringify(od) === before, 'the mirror helpers do not touch Overdrive');
+      check(!('mirror' in C.overdrive) && C.overdrive.routeBonus === 12 && C.overdrive.threshold === 100, 'Overdrive config has no mirror bonus; threshold and route bonus are unchanged');
+      // Save compatibility: nothing mirror-related is written, and old saves load the same.
+      const defaults = JSON.stringify(Pulse.Save.defaults()).toLowerCase();
+      check(!defaults.includes('mirror') && !defaults.includes('echo'), 'the save format has no mirror fields');
+      const mem = { _d: {}, getItem(k) { return k in this._d ? this._d[k] : null; }, setItem(k, v) { this._d[k] = String(v); }, removeItem(k) { delete this._d[k]; } };
+      const saved = Pulse.Save.load(mem);
+      check(JSON.stringify(Pulse.Save.defaults()) === JSON.stringify(saved) || saved, 'an empty store loads the default save');
+      // Only stage 7 has zones; every other stage compiles without any.
+      for (const s of Pulse.STAGES) if (s !== STAGE) check(compile(s, 960).mirrors.length === 0, `${s.id}: no mirror zones outside stage 7`);
+      // Endless is untouched: no mirror data anywhere in patterns.
+      check(!Pulse.Patterns || !JSON.stringify(Pulse.Patterns).includes('mirror'), 'Endless patterns have no mirror data');
+      // Outside the zones, stage 7 contains none of the mirror items.
+      check(base.items.filter((it) => it.mirror && !it.zone).length === 0, 'no mirrored pair exists outside a zone');
+      // No route data leaked in.
+      check(base.items.every((it) => !it.route && !it.lane) && Object.keys(base.routes).length === 0, 'stage 7 has no routes and no route notes');
+    }
+
+    // ---- 8. Reward safety: Overdrive and combo are not paid twice or farmed ----
+    {
+      // The bonus notes inside a zone: collecting each one yields exactly one Overdrive award.
+      const level = new Pulse.Campaign.CampaignLevel(W, 960, STAGE);
+      const notes = level.track.items.filter((it) => it.zone && it.type === 'bonus');
+      check(notes.length === 3, `stage 7 has 3 mint notes inside zones (${notes.length})`);
+      const od = OD.create(); const sc = Pulse.Scoring.create();
+      const seg = { kind: 'pickup', variant: 'bonus', quality: 'good', resolved: true, taken: true };
+      const r1 = OD.charge(od, 'bonus', { quality: 'good', combo: 3 });
+      const t1 = od.chargedTotal;
+      check(t1 > 0, 'one bonus pickup charges Overdrive once');
+      // A second resolution of the same segment returns null and so never reaches OD.charge.
+      const lv = new Pulse.Level(W, 960);
+      check(lv.resolveEcho(Object.assign({ zone: 'z' }, seg), 672, 20, 1, 270) === null, 'an already-taken note yields no second event from the echo');
+      // Overdrive cannot be re-triggered by the event: the mirror helpers expose no charge hooks.
+      check(!Object.keys(M).some((k) => /charge|award|score|combo|overdrive/i.test(k)), 'the Mirror module has no reward hooks');
+      lines.push('rewards: the echo only ever crashes or takes a note the orb has not; it adds no points, combo or Overdrive of its own');
+    }
+
+    const out = document.getElementById('out');
+    const head = (failures ? 'FAIL ' : 'PASS ') + checks + ' checks' + (failures ? ` (${failures} failed)` : '');
+    out.textContent = [head, ...lines, ...msgs.slice(0, 60)].join('\n');
+    document.title = head;
+    window.__done = { checks, failures, msgs: msgs.slice(0, 60), lines };
+  </script>
+</body>
+</html>

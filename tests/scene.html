@@ -26,6 +26,7 @@
   <script src="../src/js/melody.js"></script>
   <script src="../src/js/overdrive.js"></script>
   <script src="../src/js/level.js"></script>
+  <script src="../src/js/mirror.js"></script>
   <script src="../src/js/stages.js"></script>
   <script src="../src/js/campaign.js"></script>
   <script src="../src/js/patterns.js"></script>
@@ -264,6 +265,84 @@
         check(savedData().campaign.stages[Pulse.STAGES[3].id].bestStars === 3, 'route play leaves the save format and stars alone');
         const keys = Object.keys(savedData()).sort().join();
         check(!/route/i.test(JSON.stringify(savedData())), 'the save file has no route data');
+      }
+
+      // ---- Mirror Pulse in the real scene (stage 7: two zones) ----
+      {
+        scene().scene.start('game', { mode: 'campaign', stageIndex: 6 }); await wait(300);
+        let q = scene();
+        check(q.stage.id === 's7-double-trouble' && q.level.track.mirrors.length === 2, 'stage 7 carries its two mirror zones');
+        check(!q.echoOn && q.mirror === null, 'no echo before the run');
+        q.test.bot = true;
+        q.startRun();
+        let sawTele = false, sawHint = false, echoOnInTele = false, mirrored = true, sawActive = false, maxErr = 0, cueIntro = false, inSync = false, leftBounds = false;
+        const scan = () => {
+          const m = q.mirror;
+          if (m && m.phase === 'telegraph') { sawTele = true; if (q.echoOn) echoOnInTele = true; if (q.hintShown && Object.values(q.stage.mirrorHints).includes(q.hintShown)) sawHint = true; }
+          if (m && m.phase === 'active') { sawActive = true; const err = Math.abs(q.echoX - (2 * 270 - q.orbX)); maxErr = Math.max(maxErr, err); if (err > 1e-6) mirrored = false; }
+          if (q.echoOn && (q.echoX < C.steer.margin - 1e-6 || q.echoX > q.W - C.steer.margin + 1e-6)) leftBounds = true;
+          if (q.qualityText && q.qualityText.text === 'IN SYNC') inSync = true;
+          return false;
+        };
+        // Run to the middle of the first zone.
+        frames(q, 20000, () => { scan(); return q.mirror && q.mirror.phase === 'active' && q.state === 'playing'; });
+        check(q.state === 'playing' && q.echoOn && q.mirror.zone.id === 's7-m1', 'the echo exists during the first zone');
+        check(sawTele && !echoOnInTele, 'the telegraph precedes the echo and has no echo');
+        check(sawHint, 'the Mirror Pulse hint card shows during the telegraph');
+        check(Math.abs(q.echoX - (2 * 270 - q.orbX)) < 1e-6, `echoX = 2 * centre - orbX (orb ${q.orbX.toFixed(1)}, echo ${q.echoX.toFixed(1)})`);
+        // Pause / focus loss / resume freeze the event exactly where it is.
+        const trav = q.level.travelled, ek = q.echoK, ex = q.echoX, mph = q.mirror.phase;
+        q.pause(); frames(q, 30); await wait(200); frames(q, 30);
+        check(q.state === 'paused' && q.level.travelled === trav && q.echoK === ek && q.mirror.phase === mph, 'pause freezes the mirror event');
+        q.game.events.emit('blur'); frames(q, 10);
+        check(q.state === 'paused' && q.level.travelled === trav, 'focus loss keeps it paused and frozen');
+        down(270, 600); up(270, 600); await wait(100);
+        check(q.state === 'playing', 'tap resumes');
+        frames(q, 5);
+        check(q.level.travelled > trav && q.echoOn && q.mirror.phase === mph, 'resume continues the event from the same place');
+        // Finish the zone: the outro folds the echo away and the cue plays once.
+        frames(q, 20000, () => { scan(); return q.state !== 'playing' || (q.mirror === null && q.mirrorClears === 1); });
+        check(q.state === 'playing' && q.mirrorClears === 1 && !q.echoOn && q.mirror === null, `the first zone ends cleanly (clears ${q.mirrorClears}, echo ${q.echoOn})`);
+        check(inSync, 'the ending cue (IN SYNC) was shown');
+        check(mirrored && sawActive, `the echo mirrored the orb on every active frame (max error ${maxErr.toExponential(1)})`);
+        check(!leftBounds, 'the echo stayed inside the playfield');
+        check(Object.keys(q.mirrorSeen).length === 1 && q.mirrorSeen['s7-m1'] && q.mirrorSeen['s7-m1'].outro, 'each cue plays once per zone');
+        // Play on to completion: both zones cleared, same stars as ever.
+        frames(q, 30000, () => q.state !== 'playing');
+        check(q.state === 'complete' && q.mirrorClears === 2, `stage 7 completes with the echo checked (state ${q.state}, clears ${q.mirrorClears})`);
+        check(!q.echoOn && q.mirror === null, 'completion leaves no echo behind');
+        const st7 = savedData().campaign.stages['s7-double-trouble'];
+        check(st7 && st7.bestStars === 3, `the mirrored stage still earns 3 stars with all gold (${st7 && st7.bestStars})`);
+        check(!/mirror|echo/i.test(JSON.stringify(savedData())), 'the save file has no mirror data');
+        // Retry resets everything.
+        q.startRun();
+        check(!q.echoOn && q.mirror === null && q.mirrorClears === 0 && Object.keys(q.mirrorSeen).length === 0, 'retry clears the mirror state');
+        // Crash in the middle of an event: cleared, and the reason names the echo when the echo did it.
+        frames(q, 20000, () => q.mirror && q.mirror.phase === 'active');
+        check(q.echoOn, 'the second run reaches the echo again');
+        q.test.bot = false;
+        const gate = q.level.segments.find((g) => g.active && g.zone && g.kind === 'gate');
+        q.crash(gate, true);
+        check(q.state === 'over' && !q.echoOn && q.mirror === null && q.crashedByEcho === true, 'a crash ends the event and records that the echo did it');
+        check(/echo/i.test(q.crashReason), `the crash reason names the echo ("${q.crashReason}")`);
+        check(Pulse.GameScene && Pulse.GameScene.crashReason ? !/echo/i.test(Pulse.GameScene.crashReason(gate, 56, 0, false)) : true, 'a crash by the orb itself does not blame the echo');
+        await wait(600);
+        q.startRun();
+        check(q.state === 'playing' && !q.echoOn && q.mirror === null && !q.crashedByEcho, 'retrying after a crash starts clean');
+        frames(q, 20);
+        check(!q.echoOn, 'no echo at the start of the retry');
+        // Changing stage mid-event leaves nothing behind; other stages never show an echo.
+        q.test.bot = true;
+        frames(q, 20000, () => q.mirror && q.mirror.phase === 'active');
+        check(q.echoOn, 'the third run reaches the echo');
+        scene().scene.start('game', { mode: 'campaign', stageIndex: 2 }); await wait(300);
+        q = scene();
+        check(q.stage.id !== 's7-double-trouble' && !q.echoOn && q.mirror === null && q.mirrorClears === 0, 'a new stage starts with no mirror state');
+        q.test.bot = true; q.startRun();
+        let echoElsewhere = false;
+        frames(q, 20000, () => { if (q.echoOn) echoElsewhere = true; return q.state !== 'playing'; });
+        check(!echoElsewhere, 'no other stage ever shows an echo');
+        q.test.bot = false;
       }
 
       // Menus render, with the menu theme.

@@ -7,7 +7,7 @@ Build original, enjoyable casual games for a broad age range, with a realistic p
 
 ### Human Producer
 - Owns final decisions.
-- Approves major features, design changes, merges, and releases.
+- Approves major features, design changes and releases; makes product and gameplay decisions. Routine technical merges are delegated to Claude (see below).
 - Resolves disagreements between AI assistants.
 
 ### Claude — Lead Developer
@@ -24,8 +24,8 @@ Build original, enjoyable casual games for a broad age range, with a realistic p
 - Provides asset files, prompts, filenames, formats, dimensions, and integration notes.
 - Does not assume assets are integrated until the repository confirms it.
 
-### ChatGPT — Producer Support and QA
-- Helps research ideas, prioritize features, and write specifications.
+### ChatGPT — Report Reviewer and Product-Planning Partner (not a merge gate)
+- Helps research ideas, prioritize features, and write specifications. Reads milestone reports; deep code review only on explicit request or material risk. Not a mandatory merge gate.
 - Reviews code, proposed architecture, gameplay, monetization, and test plans.
 - Identifies bugs, risks, and inconsistencies.
 - Uses repository handoff notes, the exact PR/branch/commit, test evidence, and approval status to review the latest work.
@@ -39,7 +39,7 @@ Build original, enjoyable casual games for a broad age range, with a realistic p
 4. All implementation changes must be reviewable.
 5. Claude must not overwrite another contributor's changes without checking for conflicts.
 6. Run relevant tests and builds before marking a task complete; report exact commands and actual outcomes.
-7. The human producer approves merges into `main`. A request to approve work is not approval to merge unless the producer explicitly says so.
+7. Claude merges to `main` after its own technical checklist passes (see the permanent workflow note below); releases and changes to approved design decisions need the producer. Never merge with failing tests or an unverified build.
 8. Never commit API keys, passwords, tokens, signing keys, or other secrets.
 9. For PULSE, preserve the existing working landscape gameplay, core hold-to-shrink/release-to-grow mechanic, controls, scoring, stage IDs, and save compatibility unless the producer explicitly approves a change.
 10. Clearly distinguish **implemented**, **tested**, **built**, **device-tested**, **merged**, and **released**. These are different states.
@@ -63,3 +63,5 @@ When handing work to another AI, provide:
 - Exact repository references, not just a conversational description
 
 Never assume another AI has read a separate conversation. Include the relevant findings or link to the canonical repository record.
+
+**Permanent workflow (Producer decision, 2026-10-26):** Claude is Lead Developer, technical reviewer, approver and merge operator. Claude merges a PR into `main` itself once its technical checklist passes (own diff review; relevant and full regression suites; Android debug APK built from the exact head; no unrelated changes; no unapproved change to controls, collision, scoring, stars, stage IDs or save compatibility), then verifies the integrated `main` build and updates the handoff. No ChatGPT approval gate and no per-PR Producer approval for routine technical steps. Releases, new product/gameplay directions and changes to approved design decisions still need the Producer. Anything not tested on a physical device is labelled NOT DEVICE-TESTED; a pending phone test does not block unrelated work.

@@ -42,7 +42,8 @@ Pulse.Render = (function () {
     const mid = width / 2;
     const D = C.route.divider / 2;
     const wm = C.wallMinWidth;
-    const colorOf = (side) => (seg.risk === side ? RISK_COLOR : SAFE_COLOR);
+    // A mirrored pair is not a route: one violet colour for both openings, no safe/risk colours or glyphs.
+    const colorOf = (side) => (seg.mirror ? C.mirror.color : seg.risk === side ? RISK_COLOR : SAFE_COLOR);
     // Corridor tint under each opening's lane (below the row, toward the orb).
     const top = y + h; // the corridor runs from this row's near edge back toward the previous row
     const bottom = top + (seg.firstRow ? C.route.preview : (seg.laneSpan || 0));
@@ -89,7 +90,7 @@ Pulse.Render = (function () {
     }
     // Preview glyphs ahead of the first row: chevrons over each opening (3 = risky, 1 = safe) and one
     // dot per optional note of that route, so "more notes, tighter gap" is visible before committing.
-    if (seg.firstRow) {
+    if (seg.firstRow && !seg.mirror) {
       for (const [cx, side] of [[seg.cx, 'L'], [seg.cx2, 'R']]) {
         const risk = seg.risk === side;
         g.lineStyle(3, colorOf(side), 0.85);
@@ -107,6 +108,46 @@ Pulse.Render = (function () {
         for (let k = 0; k < dots; k++) g.fillCircle(cx + (k - (dots - 1) / 2) * 18, y + h + 44 + n * 22 + 14, 5);
       }
     }
+  }
+
+  // Mirror Pulse (docs/MIRROR.md). The reflection axis: a dashed vertical line down the lane centre,
+  // drawn BEHIND the hazards. While the event is telegraphed it fades up steadily (no flashing).
+  function mirrorAxis(g, width, height, strength, scroll) {
+    if (strength <= 0.01) return;
+    const x = width / 2;
+    g.fillStyle(C.mirror.color, 0.05 * strength);
+    g.fillRect(x - 1, 0, 2, height);
+    g.fillStyle(C.mirror.color, 0.55 * strength);
+    const off = (scroll || 0) % 36;
+    for (let y = off - 36; y < height; y += 36) g.fillRect(x - 1, y, 2, 16);
+  }
+
+  // The echo orb: translucent violet disc with a bright outline, a faint tail and a thin link to the main
+  // orb at the same height. Drawn with alpha well below 1 so the walls behind it stay readable; it is a
+  // reflection, not a hazard, and never hides a boundary.
+  function echo(g, x, y, r, k, orbX, tailLen) {
+    if (k <= 0.01) return;
+    const col = C.mirror.color;
+    const a = C.mirror.alpha * k;
+    if (orbX !== undefined) {
+      g.fillStyle(col, 0.22 * k);
+      const x0 = Math.min(x, orbX) + r;
+      const x1 = Math.max(x, orbX) - r;
+      if (x1 > x0) g.fillRect(x0, y - 1, x1 - x0, 2);
+    }
+    const tl = tailLen || 90;
+    g.fillStyle(col, 0.18 * k);
+    g.fillTriangle(x - r * 0.8, y, x + r * 0.8, y, x, y + tl * (0.5 + 0.5 * k));
+    g.fillStyle(col, 0.12 * k);
+    g.fillCircle(x, y, r * 1.35);
+    g.fillStyle(col, 0.32 * a);
+    g.fillCircle(x, y, r);
+    g.lineStyle(3, 0xffffff, 0.35 * a);
+    g.strokeCircle(x, y, r - 1);
+    g.lineStyle(2, col, 0.95 * k);
+    g.strokeCircle(x, y, r);
+    g.fillStyle(0xffffff, 0.5 * a);
+    g.fillCircle(x, y, Math.max(3, r * 0.18));
   }
 
   // Trailer-style gap wall (comet look): dark hull, crimson rim and chevrons pointing at the gap,
@@ -391,5 +432,5 @@ Pulse.Render = (function () {
     for (let i = 0; i < max; i++) star(g, x0 + i * step, y, r, i < count);
   }
 
-  return { background, walls, forkGate, cometGate, ring, tunnelBody, barrier, chargeRing, pickup, finishLine, orb, collectRing, progressBar, star, stars };
+  return { background, walls, forkGate, mirrorAxis, echo, cometGate, ring, tunnelBody, barrier, chargeRing, pickup, finishLine, orb, collectRing, progressBar, star, stars };
 })();

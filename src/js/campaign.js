@@ -64,7 +64,8 @@
         : Pulse.Track.spaceFor(prevType, src.type, src.t * (stage.pace || 1), stage.speed.end);
       const sp = stage.spread === undefined ? 1 : stage.spread;
       const placed = Object.assign({}, src, { space, x: (src.x || 0) * sp });
-      if (src.fork) placed.fork = Object.assign({}, src.fork, { x: (src.fork.x || 0) * sp });
+      if (src.fork) placed.fork = Object.assign({}, src.fork, { x: (src.fork.x || 0) * (src.mirror ? 1 : sp) });
+      if (src.mirror) placed.x = src.x || 0; // a mirrored pair is authored exactly: never scaled by `spread`
       if (src.slide && sp !== 1) placed.slide = Object.assign({}, src.slide, { amp: src.slide.amp * sp });
       const item = Pulse.Track.placeItem(placed, prevTop, width);
       // Fairness floor: the authored `t` is a request, never less than a fair spacing (level.js).
@@ -111,7 +112,7 @@
     const lastRow = {};
     const firstRow = {};
     for (const it of items) {
-      if (!it.fork) continue;
+      if (!it.fork || it.mirror) continue;
       const prev = lastRow[it.route];
       if (prev) it.laneSpan = Math.max(0, it.at - (prev.at + prev.h));
       else firstRow[it.route] = it;
@@ -135,7 +136,8 @@
       const r = routes[it.route] || (routes[it.route] = { id: it.route, rows: 0, riskNotes: 0, safeNotes: 0, risk: null });
       if (it.fork) { r.rows++; r.risk = it.risk; } else if (it.role === 'risk') r.riskNotes++; else if (it.role === 'safe') r.safeNotes++;
     }
-    return { stage, items, finishAt, speedLength: speedLength || finishAt, bpm, orbY, energyTotal, bonusTotal, routes };
+    const mirrors = Pulse.Mirror.plan(items, orbY);
+    return { stage, items, finishAt, speedLength: speedLength || finishAt, bpm, orbY, energyTotal, bonusTotal, routes, mirrors };
   }
 
   function speedAtDistance(stage, finishAt, travelled) {
@@ -166,7 +168,14 @@
       if (!(it.space > 0) && !(it.t >= 0)) err(`item ${stage.items.indexOf(it)} needs space > 0 or t >= 0`);
       if (it.x !== undefined && !(Math.abs(it.x) <= C.orb.x - C.steer.margin)) err(`item ${stage.items.indexOf(it)} x is outside the lane`);
       if (it.type === 'gate' && !(typeof it.need === 'number')) err(`gate ${stage.items.indexOf(it)} needs a numeric need`);
-      if (it.fork || it.lane || it.route) {
+      if (it.zone || it.mirror) {
+        const n = stage.items.indexOf(it);
+        if (it.mirror && !it.zone) err(`item ${n}: a mirrored pair only makes sense inside a mirror zone`);
+        if (it.zone && !Pulse.Mirror.supports(it)) err(`item ${n}: a ${it.type} cannot be mirrored (gold notes, moving gaps, rings, tunnels and route forks are not allowed inside a mirror zone)`);
+        if (it.mirror && (!it.fork || it.fork.mirror !== true || it.fork.need !== it.need || Math.abs((it.fork.x || 0) + (it.x || 0)) > 1e-9 || !(it.x < 0))) err(`item ${n}: a mirrored pair must be symmetric (same need, opposite x, left opening first)`);
+        if (it.mirror && (it.route || it.lane)) err(`item ${n}: a mirrored pair carries no route data`);
+      }
+      if ((it.fork && !it.mirror) || it.lane || it.route) {
         const n = stage.items.indexOf(it);
         if (!it.route) err(`item ${n}: a fork row or lane note needs a route id`);
         if (it.fork) {
@@ -203,9 +212,33 @@
         if (s && s.kind !== undefined && s.kind !== 'slide' && s.kind !== 'breathe') err(`item ${n}: unknown motion kind`);
       }
     }
+    // Mirror zones: contiguous, long enough, with at least one mirrored pair, and clear of each other.
+    {
+      const seen = {};
+      let open = null;
+      stage.items.forEach((it, n) => {
+        if (it.zone !== open) {
+          if (it.zone && seen[it.zone]) err(`item ${n}: mirror zone "${it.zone}" is not contiguous`);
+          open = it.zone || null;
+        }
+        if (it.zone) seen[it.zone] = (seen[it.zone] || 0) + 1;
+      });
+      for (const id in seen) {
+        const rows = stage.items.filter((it) => it.zone === id);
+        if (seen[id] < C.mirror.minRows) err(`mirror zone "${id}" needs at least ${C.mirror.minRows} items`);
+        if (!rows.some((it) => it.mirror)) err(`mirror zone "${id}" has no mirrored pair`);
+      }
+    }
     if (errors.length) return errors;
 
     const track = compile(stage, width);
+    {
+      const z = track.mirrors;
+      for (let i = 0; i < z.length; i++) {
+        if (z[i].tele0 < 0) err(`mirror zone "${z[i].id}" starts too early: its telegraph would begin before the run does`);
+        if (i > 0 && z[i].tele0 < z[i - 1].end) err(`mirror zones "${z[i - 1].id}" and "${z[i].id}" overlap (telegraph starts before the previous echo has dissolved)`);
+      }
+    }
     for (const it of track.items) {
       if (!it.ring) continue;
       const r = it.ring;

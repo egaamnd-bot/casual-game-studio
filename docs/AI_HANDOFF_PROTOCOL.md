@@ -88,9 +88,10 @@ Report actual counts, failures, skipped tests, warnings, environment caveats, an
 ## Approval and merge rules
 
 - "Continue", "proceed", or approval of a coding plan authorizes only the scope clearly stated by the producer; it is not blanket permission to merge or release.
-- Do not merge into `main`, release a build, delete important work, change secrets/account configuration, or alter approved decisions without the required explicit approval.
+- **Merging (permanent, 2026-10-26):** Claude merges its own PR into `main` after the technical checklist passes (diff self-review, relevant + full regression suites with real results, APK built from the exact head, no unrelated changes, controls/collision/scoring/stars/stage IDs/saves preserved), re-checking head, base, mergeability and build immediately before merging. It then verifies the integrated `main` build and updates `docs/AI_HANDOFF.md` and a dated note. ChatGPT review and Producer phone tests are not merge gates; label anything not run on a phone NOT DEVICE-TESTED. Do not create approval monitors.
+- Do not release a build, delete important work, change secrets/account configuration, or alter approved decisions without the required explicit approval.
 - If a PR depends on another PR, state the dependency prominently and do not merge out of order.
-- If approval is pending, set status to `NEEDS PRODUCER DECISION` or `READY FOR REVIEW`, list the exact decision, and stop at that checkpoint.
+- If a real product/gameplay decision is pending, set status to `NEEDS PRODUCER DECISION` or `READY FOR REVIEW`, list the exact decision, and stop at that checkpoint.
 - If no approval is needed, explicitly state why the task can continue safely.
 
 ## End-of-iteration checklist

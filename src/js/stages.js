@@ -57,6 +57,13 @@
   });
   // An optional mint note that belongs to one lane of a fork ('risk' = on the demanding route).
   const routeNote = (route, role, t, x) => ({ type: 'bonus', t, x, route, role, lane: x < 0 ? 'L' : 'R' });
+  // Mirror Pulse (docs/MIRROR.md). `mgate` is a MIRRORED PAIR of openings: the left opening sits `x` px
+  // left of the lane centre and the right one the same distance right, both `need` half-width, so when
+  // the main orb is in one the echo (its reflection) is in the other. A centred gap is its own mirror
+  // image: use gap(need, t, 0) or wide() for a pinch where both orbs meet in the middle. `mirrorZone`
+  // tags a run of items as one telegraphed mirror event: gates, mirrored pairs, barriers and mint notes only.
+  const mgate = (need, t, x) => ({ type: 'gate', need, t, x: -Math.abs(x), mirror: true, fork: { need, x: Math.abs(x), risk: 'R', mirror: true } });
+  const mirrorZone = (id, items) => items.map((it) => Object.assign(it, { zone: id }));
   // Beat-aligns an item to a coarser grid than the stage's (`sub` beats). Only ever delays an item.
   const on = (item, sub) => Object.assign(item, { beat: sub || 1 });
   // n gates alternating left and right of the lane centre by `amp` (first one on side `s`).
@@ -222,18 +229,28 @@
     },
     {
       id: 's7-double-trouble', name: 'Double Trouble', world: W2,
-      intro: 'Gaps back to back and bending the other way. Hold through the S-bends.',
-      teaches: 'Double and triple squeezes (hold through) bending across the lane, mixed with barriers.',
+      intro: 'Gaps back to back and bending the other way. Twice, an echo copies you in reverse: find a gap for both.',
+      teaches: 'Double and triple squeezes (hold through) bending across the lane, mixed with barriers; the first Mirror Pulse (an echo orb reflects your position, obstacles come in mirrored pairs).',
       profile: 'Tight S-bends: gaps stacked close with opposite offsets, barriers as the only rests.',
       speed: { start: 295, end: 335 }, exit: RUNOUT,
       pace: 0.45, grid: 0.25, spread: 0.5,
+      mirrorHints: { 's7-m1': { title: 'MIRROR PULSE', sub: 'YOUR ECHO MIRRORS YOU · FIND A GAP FOR BOTH' }, 's7-m2': { title: 'MIRROR PULSE', sub: 'TWO ORBS · ONE FINGER' } },
       items: [
         gap(46, 0.9, -50), gap(46, 0.5, 60), gold(0.45, 60), gold(0.4, 0),
         bar(0.45), gap(44, 0.5, 100), gap(44, 0.5, -20), gap(44, 0.5, -100), gold(0.4, -90), bar(0.45),
         ...snake(4, 44, 0.5, -90, 90), gold(0.4, 90), charged(0.8),
         on(slide(44, 0.55, 0, 45, 6, 0.75), 0.5), gap(42, 0.5, 90), gap(42, 0.5, -90), gold(0.4, -80), bar(0.45),
         ...zig(4, 42, 0.5, 90, -1), gold(0.4, 80), gold(0.35, 0), charged(0.75),
-        gap(42, 0.5, -90), gap(42, 0.5, 20), gap(42, 0.5, 100), gold(0.4, 90), bar(0.4), gold(0.4, 0),
+        // MIRROR PULSE 1: the first echo. Wide mirrored pairs, a centre pinch, one pair that needs a shrink.
+        ...mirrorZone('s7-m1', [
+          mgate(72, 0.9, 140), mint(0.35, 140), mgate(68, 0.5, 105), wide(0.5, 0), mgate(56, 0.5, 150), mint(0.35, -150),
+        ]),
+        bar(0.5), gap(42, 0.5, -90), gap(42, 0.5, 20), gap(42, 0.5, 100), gold(0.4, 90), bar(0.4), gap(44, 0.5, -60),
+        // MIRROR PULSE 2: tighter, with a barrier in the middle of the pairs.
+        ...mirrorZone('s7-m2', [
+          mgate(54, 0.9, 150), mgate(52, 0.5, 95), bar(0.55), mgate(48, 0.6, 130), mint(0.35, 130), mgate(46, 0.5, 165), gap(56, 0.5, 0),
+        ]),
+        bar(0.4), gold(0.4, 0),
       ],
     },
     {
