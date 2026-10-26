@@ -54,6 +54,8 @@
       this.crashedByEcho = false;
       this.resetMirror(); // a new scene never inherits an echo
       this.forkCued = {};
+      this.smashReady = false;
+      this.cuedBarrier = null;
     }
 
     create() {
@@ -389,6 +391,8 @@
       Pulse.Sfx.stemStop(0);
       Pulse.Sfx.stemPrepare(this.worldIndex()); // decode this world's Overdrive stem now, not when it is needed
       this.forkCued = {};
+      this.smashReady = false;
+      this.cuedBarrier = null;
       this.routeClears = 0;
       this.resetMirror();
       this.mirrorClears = 0;
@@ -674,6 +678,7 @@
       this.scroll += speed * dt * 0.5;
       this.level.update(dt, speed, this.elapsed);
       this.updateMirror();
+      this.updateBarrierCue();
 
       // Pulse.Level.resolve applies the rules; this only turns its events into score and feedback.
       // Contact feedback (sound, burst, flash) happens in this same frame: nothing waits for a beat.
@@ -906,6 +911,31 @@
       else if (want && !on) {
         if (!Sfx.stemFits(world, this.trackBpm())) Sfx.stemPrepare(world);
         else Sfx.stemStart(world, this.trackBpm(), Pulse.Rhythm.trackTime(this.clock));
+      }
+    }
+
+    // Barrier-ready cue (docs/BARRIER_CUE.md). The nearest barrier ahead within C.barrierCue.lookAhead px, and
+    // whether the orb could smash it RIGHT NOW: the very predicate the collision uses (Level.canSmash:
+    // Pulse.isCharged(radius), plus a full ring for charged barriers). Feedback only: it sets a flag for
+    // the orb's look and plays one short sound per plain barrier (charged ones already have the ring sounds).
+    updateBarrierCue() {
+      let near = null;
+      let nearD = Infinity;
+      if (C.barrierCue.enabled && this.state === 'playing') {
+        const segs = this.level.segments;
+        for (let i = 0; i < segs.length; i++) {
+          const s = segs[i];
+          if (!s.active || s.kind !== 'barrier' || s.broken) continue;
+          const d = this.orbY - (s.y + s.h); // px between the barrier's near edge and the orb's centre
+          if (d >= -this.radius && d <= C.barrierCue.lookAhead && d < nearD) { near = s; nearD = d; }
+        }
+      }
+      const ready = !!near && this.level.canSmash(near, this.radius, this.orbState.charge);
+      this.smashReady = ready;
+      if (!near) this.cuedBarrier = null;
+      else if (ready && this.cuedBarrier !== near) {
+        this.cuedBarrier = near;
+        if (!near.charged) Pulse.Sfx.play('barrierReady');
       }
     }
 
@@ -1178,6 +1208,7 @@
       }
 
       if (this.view) {
+        if (this.view.setSmashReady) this.view.setSmashReady(!!this.smashReady && active);
         this.view.renderOrb(this.radius, this.state === 'over', this.orbFx);
       } else {
         Pulse.Render.orb(g, this.orbX, this.orbY, this.radius, this.state === 'over', this.skin, this.orbFx);

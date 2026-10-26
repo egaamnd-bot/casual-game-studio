@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse barrier-ready cue tests</title>
+  <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
+</head>
+<body>
+  <script>
+    // Barrier-ready cue: the orb's look and one short sound must agree exactly with the collision rule (docs/BARRIER_CUE.md).
+    try { localStorage.clear(); } catch (e) {}
+    window.PULSE_ASSET_BASE = '../src/';
+    window.PULSE_TEST = { autoStart: true, holdReady: true, bot: false, mode: 'campaign', stageIndex: 0 };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/melody.js"></script>
+  <script src="../src/js/overdrive.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/mirror.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/patterns.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script src="../src/js/render.js"></script>
+  <script src="../src/js/ui.js"></script>
+  <script src="../src/js/assets.js"></script>
+  <script src="../src/js/trail.js"></script>
+  <script src="../src/js/sprite-view.js"></script>
+  <script src="../src/js/game-scene.js"></script>
+  <script src="../src/js/menu-scenes.js"></script>
+  <script src="../src/js/main.js"></script>
+  <script>
+    const C = Pulse.CONFIG;
+    const fails = [];
+    let checks = 0;
+    const check = (ok, msg) => { checks++; if (!ok) fails.push(msg); };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const scene = () => window.__pulseScene;
+    const fake = new WeakMap();
+    const clockOf = (sc) => { let c = fake.get(sc); if (!c) { c = { now: sc.time.now }; fake.set(sc, c); Object.defineProperty(sc.time, 'now', { get: () => c.now, set: () => {}, configurable: true }); } return c; };
+    const frames = (sc, n, until, ms) => { const c = clockOf(sc); const dt = ms || 16.667; for (let i = 0; i < n; i++) { c.now += dt; sc.update(c.now, dt); sc.draw && sc.draw(); if (until && until()) return true; } return !until; };
+    const errors = [];
+    window.addEventListener('error', (e) => errors.push(e.message));
+    const played = [];
+    const realPlay = Pulse.Sfx.play.bind(Pulse.Sfx);
+    Pulse.Sfx.play = (name, o) => { const r = realPlay(name, o); played.push({ name, ok: r }); return r; };
+    const count = (n) => played.filter((p) => p.name === n).length;
+    const startStage = async (idx, opts) => { scene().scene.start('game', { mode: 'campaign', stageIndex: idx }); await wait(400); const q = scene(); q.test = Object.assign({ holdReady: true }, opts || {}); return q; };
+    // A barrier `d` px ahead of the orb's centre (its near edge), exactly as the level would place it.
+    const placeBarrier = (q, d, charged) => {
+      for (const s of q.level.segments) if (s.kind === 'barrier') s.active = false;
+      const h = charged ? C.barrier.chargedThickness : C.barrier.thickness;
+      const seg = Object.assign(q.level.obtain(), { kind: 'barrier', charged: !!charged, h, y: q.orbY - d - h, active: true, broken: false, scored: false, resolved: false });
+      return seg;
+    };
+    // Test doubles (always restored): pin the orb radius, and freeze the world so a placed barrier stays where it is.
+    const pin = (q, r) => { Object.defineProperty(q, 'radius', { get: () => r, set: () => {}, configurable: true }); };
+    const unpin = (q) => { delete q.radius; };
+    const freeze = (q) => { const o = q.level.update; q.level.update = () => {}; return () => { q.level.update = o; }; };
+    const R = C.orb.radius, TOL = C.pickup.sizeTolerance, THRESH = R - TOL;
+
+    async function run() {
+      for (let i = 0; i < 200 && !(scene() && scene().state); i++) await wait(100);
+      await Pulse.Audio.loading; await wait(300); Pulse.Audio.unlock();
+
+      // ---- The rule itself is untouched ----
+      check(R === 56 && TOL === 8 && THRESH === 48, `orb radius ${R}, tolerance ${TOL}: charged above radius ${THRESH} (diameter ${2 * THRESH})`);
+      check(C.barrier.chargeTime === 0.6 || C.barrier.chargeTime > 0, `charge time ${C.barrier.chargeTime} s`);
+      check(!Pulse.isCharged(THRESH) && Pulse.isCharged(THRESH + 0.001) && !Pulse.isCharged(THRESH - 0.001) && Pulse.isCharged(R), 'isCharged(r) is r > R - tolerance: false below and AT the threshold, true just above');
+
+      // ---- Agreement with the collision across a radius sweep ----
+      let q = await startStage(0);
+      q.startRun(); frames(q, 5);
+      const radii = [C.orb.minRadius, 20, 30, 40, THRESH - 1, THRESH - 0.01, THRESH - 0.0001, THRESH, THRESH + 0.0001, THRESH + 0.01, THRESH + 1, 52, R];
+      for (const r of radii) {
+        for (const charged of [false, true]) {
+          q.radius = r; q.orbState.charge = 1;
+          const seg = placeBarrier(q, 200, charged);
+          q.updateBarrierCue();
+          const ready = q.smashReady;
+          const outcome = q.level.resolve(Object.assign({}, seg, { y: q.orbY - R - 5 }), q.orbY, r, 1, q.orbX);
+          check(ready === (r > THRESH), `${charged ? 'charged' : 'plain'} barrier, radius ${r}: cue ${ready} equals r > ${THRESH}`);
+          check(ready === (outcome === 'break'), `${charged ? 'charged' : 'plain'} barrier, radius ${r}: cue ${ready} equals the collision outcome (${outcome})`);
+          seg.active = false;
+        }
+      }
+      // A charged barrier also needs the full ring.
+      q.radius = R;
+      for (const [charge, want] of [[0, false], [0.5, false], [0.999, false], [1, true]]) {
+        q.orbState.charge = charge; const seg = placeBarrier(q, 200, true); q.updateBarrierCue();
+        const outcome = q.level.resolve(Object.assign({}, seg, { y: q.orbY - R - 5 }), q.orbY, R, charge, q.orbX);
+        check(q.smashReady === want && (outcome === 'break') === want, `charged barrier, ring ${charge}: cue ${q.smashReady}, outcome ${outcome}`);
+        seg.active = false;
+      }
+      q.orbState.charge = 1;
+
+      // ---- Which barrier counts ----
+      q.radius = R;
+      let seg = placeBarrier(q, C.barrierCue.lookAhead + 5, false); q.updateBarrierCue();
+      check(!q.smashReady, 'a barrier beyond the look-ahead gives no cue');
+      seg.y += 10; q.updateBarrierCue(); check(q.smashReady, 'inside the look-ahead it does');
+      seg.active = false; q.updateBarrierCue(); check(!q.smashReady, 'no barrier, no cue');
+      seg = placeBarrier(q, -R - 5, false); q.updateBarrierCue(); check(!q.smashReady, 'a barrier already behind the orb gives no cue');
+      seg.active = false;
+      const a = placeBarrier(q, 300, false); a.active = true; const b = Object.assign(q.level.obtain(), { kind: 'barrier', charged: true, h: C.barrier.chargedThickness, y: q.orbY - 100 - C.barrier.chargedThickness, active: true, broken: false });
+      q.orbState.charge = 0; q.updateBarrierCue(); check(!q.smashReady, 'the NEAREST barrier decides (a not-yet-chargeable charged one, 100 px ahead)');
+      q.orbState.charge = 1; b.active = false; a.active = false;
+      seg = placeBarrier(q, 200, false); seg.broken = true; q.updateBarrierCue(); check(!q.smashReady, 'a broken barrier gives no cue'); seg.active = false;
+
+      // ---- The orb's look follows the flag, eased, and frozen while paused ----
+      const v = q.view;
+      check(v.comet && v.readyRing, 'comet look has the corona ring');
+      const thaw = freeze(q);
+      pin(q, R); q.orbState.charge = 1; seg = placeBarrier(q, 300, false); frames(q, 1);
+      const core0 = v.cometCore.scaleX, glow0 = v.cometGlow.alpha;
+      frames(q, 40);
+      check(q.smashReady && v.readyK > 0.99 && v.readyRing.visible && v.readyRing.alpha > 0.35, `ready: corona on (k ${v.readyK.toFixed(3)}, alpha ${v.readyRing.alpha.toFixed(2)})`);
+      check(v.cometCore.scaleX > core0 * 1.2 && v.cometGlow.alpha > glow0, 'the core and glow are brighter/larger when ready');
+      check(v.readyRing.displayWidth / 2 >= v.drawnRadius && v.readyRing.displayWidth / 2 <= v.drawnRadius * 1.4, 'the ring sits just outside the orb (a restrained corona)');
+      pin(q, THRESH); frames(q, 40);
+      check(!q.smashReady && v.readyK === 0 && !v.readyRing.visible, 'at exactly the threshold the corona is off (no cue where the barrier would not break)');
+      pin(q, THRESH + 0.5); frames(q, 40); check(q.smashReady && v.readyK > 0.99, 'half a pixel above it, on');
+      // Frame-rate independence of the easing.
+      const settle = (ms) => { pin(q, THRESH); frames(q, 60, null, ms); pin(q, R); const n = Math.round(200 / ms); frames(q, n, null, ms); return v.readyK; };
+      const k30 = settle(33.333), k60 = settle(16.667), k144 = settle(6.944);
+      check(Math.abs(k30 - k60) < 0.025 && Math.abs(k144 - k60) < 0.025, `0.2 s after becoming ready the level is the same at 30 / 60 / 144 fps (${k30.toFixed(3)} / ${k60.toFixed(3)} / ${k144.toFixed(3)})`);
+      // Pause freezes it; resume continues.
+      pin(q, R); frames(q, 40); const kp = v.readyK; q.pause();
+      pin(q, THRESH); frames(q, 20);
+      check(q.state === 'paused' && v.readyK === kp, `paused: the cue is frozen (k ${kp.toFixed(2)})`);
+      q.setState('playing'); frames(q, 40); check(!q.smashReady && v.readyK === 0, 'after resume it follows the rule again');
+      seg.active = false;
+
+      // ---- The sound: once per plain barrier, only when ready, never for charged ones ----
+      pin(q, R); q.orbState.charge = 1; played.length = 0;
+      seg = placeBarrier(q, C.barrierCue.lookAhead + 40, false); frames(q, 3);
+      check(count('barrierReady') === 0, 'a barrier still outside the window: no sound');
+      seg.y += 60; frames(q, 1);
+      check(count('barrierReady') === 1, `a ready plain barrier enters the window: one cue sound (${count('barrierReady')})`);
+      frames(q, 30); check(count('barrierReady') === 1, 'and it does not repeat while that barrier stays ahead');
+      pin(q, THRESH); frames(q, 5); pin(q, R); frames(q, 5);
+      check(count('barrierReady') === 1, 'releasing and growing again for the same barrier does not repeat it');
+      seg.active = false; frames(q, 2); played.length = 0;
+      seg = placeBarrier(q, 300, false); pin(q, 30); frames(q, 5);
+      check(count('barrierReady') === 0, 'a barrier you are too small for: no cue sound');
+      pin(q, R); frames(q, 2);
+      check(count('barrierReady') === 1, 'growing big while it approaches: the cue sounds then');
+      seg.active = false; frames(q, 2); played.length = 0;
+      seg = placeBarrier(q, 300, true); pin(q, R); q.orbState.charge = 1; frames(q, 5);
+      check(count('barrierReady') === 0 && q.smashReady, 'charged barriers keep their ring sounds: no extra cue sound (the corona still shows)');
+      seg.active = false;
+      // Mute respected by the audio layer.
+      Pulse.Audio.setVolume('sfx', 0); played.length = 0; seg = placeBarrier(q, 300, false); frames(q, 3);
+      check(played.filter((p) => p.name === 'barrierReady').every((p) => !p.ok), 'sfx volume 0 silences it'); Pulse.Audio.setVolume('sfx', 1); seg.active = false;
+      // Not while paused.
+      seg = placeBarrier(q, 300, false); q.cuedBarrier = null; q.pause(); played.length = 0; q.updateBarrierCue(); check(count('barrierReady') === 0 && !q.smashReady, 'no cue sound or flag while paused'); q.setState('playing'); seg.active = false;
+      unpin(q); thaw();
+
+      // ---- Retries: no growth, clean state ----
+      const kids = () => scene().children.list.length;
+      q = await startStage(0, { bot: true, route: 'safe' }); q.startRun(); frames(q, 200);
+      const n0 = kids();
+      for (let i = 0; i < 25; i++) { q.startRun(); frames(q, 60); }
+      check(kids() <= n0 + 2, `25 retries add no display objects (${n0} -> ${kids()})`);
+      check(q.view.readyK <= 1 && q.cuedBarrier !== undefined, 'cue state is reset on retry');
+
+      // ---- Gameplay is identical with and without the cue; the sprite look cannot crash ----
+      const runStage = async (idx) => { const x = await startStage(idx, { bot: true, route: 'safe' }); x.startRun(); frames(x, 40000, () => x.state !== 'playing'); return JSON.stringify({ s: x.state, sc: x.score, e: x.energy, t: +x.elapsed.toFixed(3), st: x.result && x.result.stars }); };
+      for (const idx of [0, 1, 4, 16]) {
+        C.barrierCue.enabled = true; const a1 = await runStage(idx);
+        C.barrierCue.enabled = false; const b1 = await runStage(idx);
+        C.barrierCue.enabled = true;
+        check(a1 === b1 && JSON.parse(a1).s === 'complete', `stage ${idx + 1}: same result with the cue on and off (${JSON.parse(a1).s})`);
+      }
+      C.comet.enabled = false;
+      q = await startStage(1, { bot: true, route: 'safe' }); q.startRun(); frames(q, 600);
+      check(q.state === 'playing' || q.state === 'complete', 'sprite look (comet off) runs with the cue enabled');
+      C.comet.enabled = true;
+      q = await startStage(1); q.test = { endless: true };
+      scene().scene.start('game', { mode: 'endless' }); await wait(400); q = scene(); q.test = { holdReady: true, bot: true }; q.startRun(); frames(q, 400);
+      check(q.mode === 'endless', 'Endless runs');
+      check(errors.length === 0, `page errors: ${errors.join(' | ')}`);
+    }
+    run().then(() => { document.title = fails.length ? `FAIL ${fails.length}: ${fails.join(' | ')}` : `PASS barrier cue tests ${checks} checks`; })
+      .catch((e) => { document.title = 'FAIL error ' + e.message + ' ' + (e.stack || '').split('\n')[1]; });
+  </script>
+</body>
+</html>
