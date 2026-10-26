@@ -197,6 +197,10 @@
       this.cometEcho = this.add(sc.add.image(x, y, 'comet_ring').setBlendMode('ADD').setVisible(false), 4.8);
       this.cometRipple = this.add(sc.add.image(x, y, 'comet_ring').setBlendMode('ADD').setVisible(false), 4.9);
       this.cometRing = this.add(sc.add.graphics(), 5.2);
+      // Barrier-ready corona: a thin ring just outside the orb while it could smash the barrier ahead (feedback only).
+      this.readyRing = this.add(sc.add.image(x, y, 'comet_ring').setBlendMode('ADD').setVisible(false), 4.75);
+      this.readyTarget = 0;
+      this.readyK = 0;
       this.milestoneRings = [0, 1, 2].map(() => this.add(sc.add.image(x, y, 'comet_ring').setBlendMode('ADD').setVisible(false), 4.85));
       // Mirror Pulse echo: its own violet ribbon (history of the echo's actual positions) and orb sprite.
       // The shared Render.echo keeps the link line and halo; the tail and disc are drawn here.
@@ -328,6 +332,11 @@
     // model `f` (Pulse.Rhythm.OrbFx): the disc is f.radius, which is never below the collision
     // radius; the tail and glow follow it through springs so they trail and recover smoothly.
     // The tail is a ribbon along the orb's recent path (see trail.js), not a rotated bar.
+    // Whether the orb could smash the barrier ahead right now (set by the scene from Level.canSmash).
+    setSmashReady(on) {
+      this.readyTarget = on ? 1 : 0;
+    }
+
     renderComet(radius, dead, f) {
       const sc = this.scene;
       const Rh = Pulse.Rhythm;
@@ -346,6 +355,10 @@
       const col = this.mixColor(this.cometColor(t, dead), 0xfff1b8, 0.55 * od);
       const speed = sc.speedNow || 200;
       const k = C.comet;
+      // Barrier-ready level 0..1, eased with an exponential so it looks the same at any frame rate (frozen while paused).
+      this.readyK += ((dead ? 0 : this.readyTarget) - this.readyK) * (1 - Math.exp(-dt * 14));
+      if (Math.abs(this.readyK - (dead ? 0 : this.readyTarget)) < 0.003) this.readyK = dead ? 0 : this.readyTarget;
+      const rk = this.readyK;
       // Tail: longer the faster you go, shorter while shrunk, stretched a little while shrinking
       // (streamlined) and eased in and out by a spring so it trails the orb instead of snapping.
       const target = (k.tailBase * vr + k.tailPerSpeed * speed * (0.4 + 0.6 * (vr / C.orb.radius))) * (1 + 0.22 * (f.shrink || 0));
@@ -414,8 +427,10 @@
       this.cometStreak.setVisible(show).setPosition(x, y).setTint(this.skin.colors.core).setAlpha(0.7 + 0.3 * od).setRotation(lean)
         .setScale((2 * vr * (0.2 + 0.1 * od)) / (this.vfx ? 26 : 64), (headLen * 1.1) / (this.vfx ? 192 : 256));
 
-      this.cometGlow.setVisible(true).setPosition(x, y).setTint(col).setAlpha(dead ? 0.5 : Math.min(1, 0.55 + 0.25 * (f.pop || 0) + 0.25 * od))
-        .setScale((vr * 2.7 * f.glow * (1 + 0.3 * od)) / 256);
+      this.cometGlow.setVisible(true).setPosition(x, y).setTint(rk > 0 ? this.mixColor(col, 0xffffff, 0.35 * rk) : col).setAlpha(dead ? 0.5 : Math.min(1, 0.55 + 0.25 * (f.pop || 0) + 0.25 * od + 0.15 * rk))
+        .setScale((vr * 2.7 * f.glow * (1 + 0.3 * od + 0.1 * rk)) / 256);
+      this.readyRing.setVisible(rk > 0.01 && !dead).setPosition(x, y).setTint(this.mixColor(col, 0xffffff, 0.6))
+        .setAlpha(0.55 * rk * (0.85 + 0.15 * Math.sin(now / 1000 * 9))).setScale((vr / 64) * 1.28);
       if (this.odCorona) {
         this.odCorona.setVisible(od > 0.02 && !dead).setPosition(x, y).setAlpha(0.8 * od).setRotation(now / 1000 * 0.9)
           .setScale((vr * 3.1) / 175);
@@ -423,7 +438,7 @@
       // The disc is at least the collision radius across the lane; stretch only adds.
       const d = (2 * vr) / 128;
       this.cometBody.setPosition(x, y).setTint(col).setScale(d * f.across, d * f.along);
-      this.cometCore.setPosition(x, y).setTint(0xffffff).setAlpha(dead ? 0 : 0.9).setScale(d * 0.46);
+      this.cometCore.setPosition(x, y).setTint(0xffffff).setAlpha(dead ? 0 : 0.9 + 0.1 * rk).setScale(d * (0.46 + 0.14 * rk));
 
       // Sparks: shed off the curve more often the faster you go or turn, drifting back with the world,
       // spreading a little sideways and easing out as they fade.
@@ -528,6 +543,9 @@
       if (!this.comet || !this.trail) return;
       Pulse.Trail.reset(this.trail, this.scene.orbX, this.scene.level ? this.scene.level.travelled : 0);
       this.hideEcho();
+      this.readyK = 0;
+      this.readyTarget = 0;
+      this.readyRing.setVisible(false);
       for (const n of this.nodes) { n.age = 1e9; n.setVisible(false); }
     }
 
