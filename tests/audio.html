@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse audio pack tests</title>
+  <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
+</head>
+<body>
+  <script>
+    // Gemini audio pack: 10 event samples + 3 Overdrive stems (docs/ASSET_MANIFEST.md).
+    try { localStorage.clear(); } catch (e) {}
+    window.PULSE_ASSET_BASE = '../src/';
+    window.PULSE_TEST = { autoStart: true, holdReady: true, bot: false, mode: 'campaign', stageIndex: 0 };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/melody.js"></script>
+  <script src="../src/js/overdrive.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/mirror.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/patterns.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script src="../src/js/render.js"></script>
+  <script src="../src/js/ui.js"></script>
+  <script src="../src/js/assets.js"></script>
+  <script src="../src/js/trail.js"></script>
+  <script src="../src/js/sprite-view.js"></script>
+  <script src="../src/js/game-scene.js"></script>
+  <script src="../src/js/menu-scenes.js"></script>
+  <script src="../src/js/main.js"></script>
+  <script>
+    const C = Pulse.CONFIG;
+    const fails = [];
+    const notes = [];
+    let checks = 0;
+    const check = (ok, msg) => { checks++; if (!ok) fails.push(msg); };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const scene = () => window.__pulseScene;
+    const fake = new WeakMap();
+    const clockOf = (sc) => { let c = fake.get(sc); if (!c) { c = { now: sc.time.now }; fake.set(sc, c); Object.defineProperty(sc.time, 'now', { get: () => c.now, set: () => {}, configurable: true }); } return c; };
+    const frames = (sc, n, until) => { const c = clockOf(sc); for (let i = 0; i < n; i++) { c.now += 16.667; sc.update(c.now, 16.667); sc.draw && sc.draw(); if (until && until()) return true; } return !until; };
+    const errors = [];
+    window.addEventListener('error', (e) => errors.push(e.message));
+
+    // Spies: every Sfx.play call, every decode, every buffer-source start.
+    const played = [];
+    const realPlay = Pulse.Sfx.play.bind(Pulse.Sfx);
+    Pulse.Sfx.play = (name, o) => { const r = realPlay(name, o); played.push({ name, ok: r }); return r; };
+    let decodes = 0;
+    const realDecode = AudioContext.prototype.decodeAudioData;
+    AudioContext.prototype.decodeAudioData = function (...a) { decodes++; return realDecode.apply(this, a); };
+    const starts = [];
+    const realStart = AudioBufferSourceNode.prototype.start;
+    AudioBufferSourceNode.prototype.start = function (...a) { starts.push({ loop: this.loop, dur: this.buffer && this.buffer.duration, args: a }); return realStart.apply(this, a); };
+    const mlog = []; const rp = Pulse.Music.play.bind(Pulse.Music); Pulse.Music.play = (t) => { mlog.push('play ' + t + ' paused=' + (Pulse.Music.el && Pulse.Music.el.paused) + ' track=' + Pulse.Music.track); rp(t); mlog.push(' ->started=' + Pulse.Music.started); };
+    const rs = Pulse.Music.stop.bind(Pulse.Music); Pulse.Music.stop = (m) => { mlog.push('stop'); rs(m); };
+    const odOn = (x) => { x.od.active = true; x.od.remaining = C.overdrive.duration; x.od.meter = C.overdrive.threshold; };
+    const count = (n) => played.filter((p) => p.name === n).length;
+    const packCount = () => played.filter((p) => /^pack/.test(p.name) && p.ok).length;
+
+    const PACK = {
+      packCombo4: ['sfx_combo_milestone_04', 0.26], packCombo8: ['sfx_combo_milestone_08', 0.36], packCombo16: ['sfx_combo_milestone_16', 0.52],
+      packRouteClear: ['sfx_route_risk_clear', 0.48], packForkDiscover: ['sfx_route_fork_discover', 0.24],
+      packMirrorWarn: ['sfx_mirror_pulse_warning', 0.34], packMirrorAppear: ['sfx_mirror_echo_appear', 0.42], packMirrorExit: ['sfx_mirror_echo_exit', 0.34],
+      packOdOn: ['sfx_overdrive_activate', 0.55], packOdOff: ['sfx_overdrive_deactivate', 0.42],
+    };
+    const BPM = { 1: 125, 2: 133, 3: 140 };
+    const startStage = async (idx, opts) => { scene().scene.start('game', { mode: 'campaign', stageIndex: idx }); await wait(400); const q = scene(); q.test = Object.assign({ holdReady: true }, opts || {}); return q; };
+
+    async function run() {
+      for (let i = 0; i < 200 && !(scene() && scene().state); i++) await wait(100);
+      await Pulse.Audio.loading; await wait(300);
+      Pulse.Audio.unlock();
+      const bootRes = performance.getEntriesByType('resource').map((r) => r.name);
+      const st0 = Pulse.Audio.status();
+      check(st0.context === 'running', `audio context running (${st0.context})`);
+      check(st0.buffers === st0.expected && st0.failed.length === 0, `all ${st0.expected} effects decoded (${st0.buffers}; failed: ${st0.failed.join(',')})`);
+      const sfxDecodes = decodes;
+
+      // ---- Files: decode, length, peak, loudness ----
+      const files = Object.values(PACK).map((v) => ['sfx', v[0], v[1]]).concat([1, 2, 3].map((w) => ['music', `WORLD_${w}_OVERDRIVE_STEM`, w]));
+      const ctx = new AudioContext();
+      for (const [dir, name, ref] of files) {
+        const r = await fetch(`../src/assets/audio/${dir}/${name}.ogg`);
+        check(r.ok, `${name}.ogg is shipped`);
+        const buf = await ctx.decodeAudioData(await r.arrayBuffer());
+        const d = buf.getChannelData(0);
+        let pk = 0, sum = 0; for (let i = 0; i < d.length; i++) { pk = Math.max(pk, Math.abs(d[i])); sum += d[i] * d[i]; }
+        const rms = Math.sqrt(sum / d.length);
+        check(pk > 0.05 && pk < 1, `${name}: peak ${pk.toFixed(2)} is audible and does not clip`);
+        check(rms > 0.01 && rms < 0.3, `${name}: rms ${rms.toFixed(3)} is a sane level`);
+        if (dir === 'sfx') check(Math.abs(buf.duration - ref) < 0.03 && buf.duration < 0.6, `${name}: ${buf.duration.toFixed(2)} s is a short one-shot`);
+        else check(Math.abs(buf.duration * BPM[ref] / 60 - 16) < 0.06, `${name}: ${buf.duration.toFixed(3)} s is 16 beats at ${BPM[ref]} bpm`);
+        // No click at the edges: the loop/one-shot starts and ends near silence for the SFX.
+        if (dir === 'sfx') check(Math.abs(d[d.length - 1]) < 0.08, `${name}: ends quietly (${Math.abs(d[d.length - 1]).toFixed(3)})`);
+      }
+      // WAV masters are not shipped to the runtime; the two unwired samples are not shipped at all.
+      const res = performance.getEntriesByType('resource').map((r) => r.name);
+      check(!res.some((u) => /\.wav(\?|$)/.test(u)), 'no WAV is fetched at runtime');
+
+      // ---- Stems are decoded lazily: none at boot ----
+      check(!bootRes.some((u) => /sync_pulse|chain_sparkle/.test(u)) && !(await fetch('../src/assets/audio/sfx/sfx_mirror_sync_pulse.ogg')).ok, 'the two unwired samples are neither shipped nor requested');
+      const stemFetches0 = bootRes.filter((u) => /OVERDRIVE_STEM/.test(u)).length;
+
+      // ---- Event wiring (stage 1: world 1, no fork or mirror) ----
+      let q = await startStage(0);
+      q.startRun(); frames(q, 30);
+      played.length = 0;
+      q.comboMilestone(4); q.comboMilestone(8); q.comboMilestone(16);
+      check(count('packCombo4') === 1 && count('packCombo8') === 1 && count('packCombo16') === 1, 'combo 4 / 8 / 16 each play their own sample once');
+      played.length = 0;
+      q.overdriveStarted(); q.overdriveEnded();
+      check(count('packOdOn') === 1 && count('packOdOff') === 1, 'Overdrive start / end play their samples once');
+      played.length = 0;
+      q.routeClear({});
+      check(count('packRouteClear') === 1, 'route clear plays its sample');
+      // Every gameplay cue still plays the synthesized melody next to it (the melody system is untouched).
+      const noteCalls = []; const realNotes = Pulse.Sfx.notes; Pulse.Sfx.notes = (a, b) => { noteCalls.push(a.length); return realNotes.call(Pulse.Sfx, a, b); };
+      q.comboMilestone(4); q.overdriveStarted(); q.overdriveEnded(); q.routeClear({});
+      Pulse.Sfx.notes = realNotes;
+      check(noteCalls.length === 4 && noteCalls.every((n) => n > 0), `the melody phrases still play (${noteCalls.join(',')} notes)`);
+      // Samples off: nothing from the pack plays, the rest is as before.
+      C.audioPack.samples = false; played.length = 0;
+      q.comboMilestone(8); q.overdriveStarted(); q.overdriveEnded();
+      check(packCount() === 0, 'with samples off no pack sample plays');
+      C.audioPack.samples = true;
+
+      // ---- Mirror cues (stage 7) ----
+      q = await startStage(6, { bot: true, route: 'safe' });
+      played.length = 0; q.startRun();
+      frames(q, 40000, () => q.state !== 'playing' || (q.mirrorSeen && Object.values(q.mirrorSeen).some((z) => z.outro)));
+      check(count('packMirrorWarn') === 1 && count('packMirrorAppear') === 1 && count('packMirrorExit') === 1, `Mirror warning / appear / exit once each (${count('packMirrorWarn')}/${count('packMirrorAppear')}/${count('packMirrorExit')})`);
+      // ---- Fork discover (stage 4) ----
+      q = await startStage(3, { bot: true, route: 'safe' });
+      played.length = 0; q.startRun();
+      frames(q, 40000, () => q.state !== 'playing' || Object.keys(q.forkCued).length >= 2);
+      check(count('packForkDiscover') === Object.keys(q.forkCued).length && count('packForkDiscover') >= 1, `fork discover plays once per fork (${count('packForkDiscover')} for ${Object.keys(q.forkCued).length})`);
+      frames(q, 600);
+      check(count('packForkDiscover') === Object.keys(q.forkCued).length, 'and never again while the same fork card is on screen');
+
+      // ---- Stems (a non-opener stage, so the music is simply playing; openers stop it for the world intro) ----
+      q = await startStage(1, { bot: true, route: 'safe' });
+      q.startRun(); frames(q, 20);
+      await Pulse.Sfx.stemPrepare(1); await wait(1500); frames(q, 5);
+      check(Pulse.Sfx.stemFits(1, 125) && !Pulse.Sfx.stemFits(1, 140) && !Pulse.Sfx.stemFits(1, 100), 'a stem fits only its own tempo (16 beats)');
+      check(stemFetches0 === 0, 'stems are fetched on demand: none at boot');
+      check(!Pulse.Sfx.stemActive(), 'no stem before Overdrive');
+      starts.length = 0;
+      odOn(q); frames(q, 3);
+      check(Pulse.Sfx.stemActive() === 1, 'the world 1 stem starts with Overdrive');
+      const ss = starts.filter((s) => s.loop && s.dur > 5);
+      check(ss.length === 1 && Math.abs(ss[0].dur - 7.68) < 0.02, 'one looping stem source of 7.68 s');
+      const clockT = Pulse.Rhythm.trackTime(q.clock);
+      check(ss.length === 1 && Math.abs(ss[0].args[1] - (clockT % ss[0].dur)) < 0.25, `it starts in phase with the run clock (offset ${ss[0] ? ss[0].args[1].toFixed(2) : 'none'} at ${clockT.toFixed(2)}; aligned ${q.aligned()}, music ${JSON.stringify([Pulse.Audio.status().musicTrack, Pulse.Audio.status().musicPaused])}, state ${q.state}, log ${mlog.slice(-8).join(';')}, el ${Pulse.Music.el && [Pulse.Music.el.readyState, Pulse.Music.el.paused, Pulse.Music.started, Pulse.Music.track, q.playingTrack, Pulse.Music.el.error && Pulse.Music.el.error.code].join('/')})`);
+      frames(q, 300); check(starts.filter((s) => s.loop && s.dur > 5).length === 1, `it is not restarted while Overdrive lasts (${starts.filter((s) => s.loop && s.dur > 5).length} starts, od ${q.od.active}/${q.od.remaining.toFixed(1)}, state ${q.state}, stem ${Pulse.Sfx.stemActive()})`);
+      // Pause stops it, resume restarts it in phase.
+      q.pause(); check(q.state === 'paused' && !Pulse.Sfx.stemActive(), `pause stops the stem (state ${q.state}, stem ${Pulse.Sfx.stemActive()})`);
+      q.setState('playing'); await wait(400); frames(q, 5);
+      check(Pulse.Sfx.stemActive() === 1 && starts.filter((s) => s.loop && s.dur > 5).length === 2, 'resume brings it back');
+      // End of Overdrive.
+      q.od.active = false; frames(q, 2);
+      check(!Pulse.Sfx.stemActive(), 'the stem stops when Overdrive ends');
+      // Crash and clear.
+      await wait(600); frames(q, 3); odOn(q); frames(q, 3); check(!!Pulse.Sfx.stemActive(), `on again (aligned ${q.aligned()})`); q.crash && q.crash({ kind: 'gate' });
+      check(q.state === 'over' && !Pulse.Sfx.stemActive(), 'a crash stops the stem');
+      // Retry cycles: no growth, nothing decoded again.
+      const dec = decodes;
+      for (let i = 0; i < 15; i++) { q.startRun(); frames(q, 4); odOn(q); frames(q, 3); q.od.active = false; frames(q, 2); }
+      check(decodes === dec, `15 retries decode nothing more (${decodes - dec})`);
+      check(!Pulse.Sfx.stemActive(), 'and leave no stem running');
+      // Mute: music volume 0 prevents and stops the stem; sfx 0 mutes the samples.
+      await wait(1500); frames(q, 3); odOn(q); frames(q, 3); check(!!Pulse.Sfx.stemActive(), `on before mute (aligned ${q.aligned()}, started ${Pulse.Music.started}, track ${Pulse.Music.track})`);
+      Pulse.Audio.setVolume('music', 0); check(!Pulse.Sfx.stemActive(), 'music mute stops the stem');
+      frames(q, 5); check(!Pulse.Sfx.stemActive(), 'and it does not come back while muted');
+      Pulse.Audio.setVolume('music', 0.8); frames(q, 3); check(!!Pulse.Sfx.stemActive(), 'unmuting during Overdrive brings it back');
+      played.length = 0; Pulse.Audio.setVolume('sfx', 0); q.comboMilestone(16); check(played.filter((p) => /^pack/.test(p.name)).every((p) => !p.ok), 'sfx volume 0 silences the samples');
+      Pulse.Audio.setVolume('sfx', 1);
+      q.od.active = false; frames(q, 2);
+      // Stems off.
+      C.audioPack.stems = false; odOn(q); frames(q, 3); check(!Pulse.Sfx.stemActive(), 'stems off: no stem'); q.od.active = false; C.audioPack.stems = true;
+      // Tempo override: a stage whose bpm does not fit gets no stem.
+      const realBpm = q.trackBpm; q.trackBpm = () => 100; odOn(q); frames(q, 3); check(!Pulse.Sfx.stemActive(), 'a tempo that does not fit gets no stem'); q.trackBpm = realBpm; q.od.active = false; frames(q, 2);
+      // Worlds 2 and 3.
+      for (const [idx, w] of [[6, 2], [9, 3]]) {
+        q = await startStage(idx, { bot: true, route: 'safe' }); q.startRun(); frames(q, 20); await Pulse.Sfx.stemPrepare(w); await wait(1500); frames(q, 5);
+        odOn(q); frames(q, 3);
+        check(Pulse.Sfx.stemActive() === w || (q.trackBpm() !== BPM[w]), `world ${w} stem plays in stage ${idx + 1} (bpm ${q.trackBpm()}, aligned ${q.aligned()}, started ${Pulse.Music.started}, music ${Pulse.Music.track}/${q.playingTrack}, fits ${Pulse.Sfx.stemFits(w, q.trackBpm())})`);
+        q.od.active = false; frames(q, 2);
+      }
+
+      // ---- Voices ----
+      q = await startStage(0); q.startRun();
+      const v0 = Pulse.Audio.status().voices;
+      for (let i = 0; i < 60; i++) { Pulse.Sfx.play('packCombo16'); Pulse.Sfx.play('packOdOn'); Pulse.Sfx.play('packMirrorAppear'); }
+      check(Pulse.Audio.status().voices - v0 <= 3, `an event sample cannot retrigger inside 35 ms (${Pulse.Audio.status().voices - v0} voices from 180 calls)`);
+      check(Pulse.Audio.status().voices <= 6, 'never more than 6 effect voices');
+
+      // ---- Gameplay is identical with and without the pack ----
+      const runStage = async (idx) => { const x = await startStage(idx, { bot: true, route: 'safe' }); x.startRun(); frames(x, 40000, () => x.state !== 'playing'); return JSON.stringify({ s: x.state, sc: x.score, e: x.energy, t: +x.elapsed.toFixed(3), st: x.result && x.result.stars }); };
+      for (const idx of [0, 3, 6, 8]) {
+        C.audioPack.samples = true; C.audioPack.stems = true; const a = await runStage(idx);
+        C.audioPack.samples = false; C.audioPack.stems = false; const b = await runStage(idx);
+        C.audioPack.samples = true; C.audioPack.stems = true;
+        check(a === b, `stage ${idx + 1} plays identically with the pack on and off`);
+      }
+      check(errors.length === 0, `page errors: ${errors.join(' | ')}`);
+      notes.push(`${sfxDecodes} effects decoded at boot`);
+    }
+    run().then(() => { document.title = fails.length ? `FAIL ${fails.length}: ${fails.join(' | ')}` : `PASS audio tests ${checks} checks | ${notes.join(' | ')}`; })
+      .catch((e) => { document.title = 'FAIL error ' + e.message + ' ' + (e.stack || '').split('\n')[1]; });
+  </script>
+</body>
+</html>

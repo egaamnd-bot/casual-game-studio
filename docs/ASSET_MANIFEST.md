@@ -45,9 +45,26 @@ Runtime: `src/assets/atlases/pulse_expansion_30stage_atlas.png` + `.json` (21 fr
 
 No tension-arc frames exist for these, so `arcPrefix` is null and no arcs animation is made. Device appearance NOT DEVICE-TESTED.
 
+## Audio pack: INTEGRATED (10 of 12 SFX, 3 stems)
+Source: master library ZIP, `batch4_audio_library`. Runtime uses the OGG versions only (`src/assets/audio/sfx/`, stems in `src/assets/audio/music/`); the WAV masters are not in the repo and never fetched. All mono 44.1 kHz Vorbis, peaks -0.1 to -5.5 dB, mean about -15 dB (about 3 dB quieter than the v4 effects, so they play at gain 0.6-0.65). Switches: `CONFIG.audioPack.samples` / `.stems`.
+
+| File | Length | Event (game name) |
+|---|---|---|
+| sfx_combo_milestone_04 / 08 / 16 | 0.26 / 0.36 / 0.52 s | combo 4 / 8 / 16 (`packCombo*`) |
+| sfx_route_risk_clear | 0.48 s | full risk route (`packRouteClear`) |
+| sfx_route_fork_discover | 0.24 s | first show of a fork's hint card, once per fork (`packForkDiscover`) |
+| sfx_mirror_pulse_warning | 0.34 s | Mirror telegraph (`packMirrorWarn`) |
+| sfx_mirror_echo_appear | 0.42 s | echo appears (`packMirrorAppear`) |
+| sfx_mirror_echo_exit | 0.34 s | echo dissolves, with IN SYNC (`packMirrorExit`) |
+| sfx_overdrive_activate / deactivate | 0.55 / 0.42 s | Overdrive start / end (`packOdOn/Off`) |
+| WORLD_1/2/3_OVERDRIVE_STEM | 7.68 / 7.22 / 6.86 s | looping stem over the world's music while Overdrive is on; each is exactly 16 beats at 125 / 133 / 140 bpm |
+
+Rules: the synthesized melody phrases still play for every one of these moments (the samples are a short layer, not a replacement, and they have no synth stand-in if undecoded). Stems decode lazily per world when a run starts, start in phase with the run clock (offset = clock time mod loop), fade 0.12 s in / 0.3 s out, stop on pause, crash, clear, retry, mute and end of Overdrive, and only play when the stage tempo fits the stem (16 beats), so a stage with its own bpm gets none.
+NOT wired, deliberately: `sfx_mirror_sync_pulse` (no separate event from the echo exit) and `sfx_pickup_chain_sparkle` (pickups already have pitched scale notes, accent chords and cadence hits; adding it would be the stacking to avoid). Both are left out of the repo.
+NOT DEVICE-TESTED: loudness balance, how the layers sound against the melody, stem blend.
+
 ## VALIDATED in the ZIP, NOT integrated (reason)
 - `wall_w1_chevron_cap`, `wall_w2_prism_cap`, `wall_w3_reactor_cap`, `mirror_gate_cap_left/right`, `route_chevron_risk/safe`, `route_divider_pillar`, `mirror_axis_tile` (expansion atlas): the shipping comet look draws walls, forks and the mirror axis procedurally from the collision numbers (`Render.cometGate`, `forkGate`, `mirrorAxis`); the sprite caps are only used by the non-comet path. The prism and reactor caps also have notched edges that sit up to 6 px inside the collision edge on some rows, which would misstate where a wall collides. Revisit only as a deliberate wall-style change.
-- 12 SFX, 3 Overdrive stems: next batch.
 - The 9 non-skin frames of the expansion atlas stay in the atlas (loaded, unused), see above.
 
 ## MISSING from Gemini's proposal

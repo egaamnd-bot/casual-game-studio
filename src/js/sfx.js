@@ -21,6 +21,7 @@
   const RETRIGGER_MS = 35;
   const HOLD_LEVEL = 0.25;
   const ACCENT_MIN_MS = 380;
+  const STEM_LEVEL = 0.5; // the Overdrive stem sits well under the music it layers on
 
   // Gameplay name → file (assets/audio/sfx/ unless `music`) and relative volume.
   const SFX = {
@@ -70,6 +71,19 @@
     accentW2: { file: 'sfx_accent_chord_w2', gain: 0.42 },
     accentW3: { file: 'sfx_accent_chord_w3', gain: 0.42 },
     comboCadence: { file: 'sfx_combo_cadence_hit', gain: 0.55 },
+    // Gemini audio pack (docs/ASSET_MANIFEST.md). Short one-shots for rare, big moments only; the
+    // sources are ~3 dB quieter than the v4 effects, hence the gains. Skipped when
+    // CONFIG.audioPack.samples is false.
+    packCombo4: { file: 'sfx_combo_milestone_04', gain: 0.6, pack: true },
+    packCombo8: { file: 'sfx_combo_milestone_08', gain: 0.6, pack: true },
+    packCombo16: { file: 'sfx_combo_milestone_16', gain: 0.6, pack: true },
+    packRouteClear: { file: 'sfx_route_risk_clear', gain: 0.6, pack: true },
+    packForkDiscover: { file: 'sfx_route_fork_discover', gain: 0.6, pack: true },
+    packMirrorWarn: { file: 'sfx_mirror_pulse_warning', gain: 0.6, pack: true },
+    packMirrorAppear: { file: 'sfx_mirror_echo_appear', gain: 0.6, pack: true },
+    packMirrorExit: { file: 'sfx_mirror_echo_exit', gain: 0.6, pack: true },
+    packOdOn: { file: 'sfx_overdrive_activate', gain: 0.65, pack: true },
+    packOdOff: { file: 'sfx_overdrive_deactivate', gain: 0.6, pack: true },
   };
 
   // Fallback tones (the prototype's placeholder sounds), used when a file isn't loaded.
@@ -90,6 +104,9 @@
   };
 
   const state = {
+    stemBuf: {},
+    stemLoading: {},
+    stem: null,
     ctx: null,
     sfxGain: null,
     buffers: {},
@@ -123,12 +140,22 @@
     return state.ctx;
   }
 
+  // The Overdrive stems share a bus after the effects limiter's input, scaled by the music volume.
+  function stemBus() {
+    if (!state.stemGain) {
+      state.stemGain = state.ctx.createGain();
+      state.stemGain.connect(state.limiter);
+    }
+    state.stemGain.gain.value = state.volumes.music * MUSIC_LEVEL * STEM_LEVEL;
+    return state.stemGain;
+  }
+
   // Fetch and decode every effect and sting once. Decoding works before the first tap.
   function loadBuffers() {
     const ctx = ensureContext();
     if (!ctx || (window.PULSE_TEST && window.PULSE_TEST.noAudioFiles)) return Promise.resolve();
     const files = {};
-    for (const name of Object.keys(SFX)) files[SFX[name].file] = SFX[name].music;
+    for (const name of Object.keys(SFX)) if (!SFX[name].pack || Pulse.CONFIG.audioPack.samples) files[SFX[name].file] = SFX[name].music;
     return Promise.all(Object.keys(files).map((file) => {
       const url = `${base()}assets/audio/${files[file] ? 'music' : 'sfx'}/${file}.ogg`;
       return fetch(url)
@@ -258,8 +285,10 @@
       state.lastPlayed[name] = now;
       const o = opts || {};
       const def = SFX[name];
+      if (def && def.pack && (!Pulse.CONFIG.audioPack.samples)) return false;
       const buf = def && state.buffers[def.file];
       if (!buf) {
+        if (def && def.pack) return false; // no synthesized stand-in for the pack: the melody cue already covers the moment
         playTone(name);
         return true;
       }
@@ -297,6 +326,70 @@
 
     unlock() {
       Audio.unlock();
+    },
+
+    // ---- Overdrive stems (docs/ASSET_MANIFEST.md) ----
+    // A 16-beat loop per world, played over the music while Overdrive is on. Decoded only when a
+    // run in that world asks for it (stemPrepare), started at the same phase as the run clock
+    // (offset = clock time mod loop length), faded in and out, and stopped on pause, crash, clear
+    // and retry. `bpm` must match the stem (16 beats long), otherwise it is not played.
+    stemPrepare(world) {
+      const ctx = state.ctx;
+      const file = `WORLD_${world}_OVERDRIVE_STEM`;
+      if (!Pulse.CONFIG.audioPack.stems || !ctx || (window.PULSE_TEST && window.PULSE_TEST.noAudioFiles)) return null;
+      if (state.stemBuf[file]) return Promise.resolve(state.stemBuf[file]);
+      if (state.stemLoading[file]) return state.stemLoading[file];
+      state.stemLoading[file] = fetch(`${base()}assets/audio/music/${file}.ogg`)
+        .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status))))
+        .then((data) => new Promise((resolve, reject) => ctx.decodeAudioData(data, resolve, reject)))
+        .then((buf) => { state.stemBuf[file] = buf; return buf; })
+        .catch(() => { state.failed.push(file); return null; });
+      return state.stemLoading[file];
+    },
+
+    stemFits(world, bpm) {
+      const buf = state.stemBuf[`WORLD_${world}_OVERDRIVE_STEM`];
+      return !!buf && Math.abs((buf.duration * bpm) / 60 - 16) < 0.06;
+    },
+
+    // Starts the stem at `clockTime` seconds into the run. False (and nothing plays) when stems are
+    // off, the stem is not decoded yet, the tempo does not fit, music is muted or audio is not running.
+    stemStart(world, bpm, clockTime) {
+      const ctx = state.ctx;
+      if (state.stem || !ctx || ctx.state !== 'running' || state.hidden) return false;
+      if (!Pulse.CONFIG.audioPack.stems || state.volumes.music <= 0 || !this.stemFits(world, bpm)) return false;
+      const buf = state.stemBuf[`WORLD_${world}_OVERDRIVE_STEM`];
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      const g = ctx.createGain();
+      const now = ctx.currentTime;
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(1, now + 0.12);
+      src.connect(g).connect(stemBus());
+      const off = ((clockTime % buf.duration) + buf.duration) % buf.duration;
+      src.start(0, off);
+      state.stem = { src, g, world };
+      return true;
+    },
+
+    stemStop(ms) {
+      const st = state.stem;
+      if (!st) return;
+      state.stem = null;
+      const ctx = state.ctx;
+      const t = (ms === undefined ? 250 : ms) / 1000;
+      try {
+        const now = ctx.currentTime;
+        st.g.gain.cancelScheduledValues(now);
+        st.g.gain.setValueAtTime(st.g.gain.value, now);
+        st.g.gain.linearRampToValueAtTime(0, now + t);
+        st.src.stop(now + t + 0.02);
+      } catch (e) { /* already stopped */ }
+    },
+
+    stemActive() {
+      return state.stem ? state.stem.world : 0;
     },
   };
 
@@ -363,6 +456,9 @@
       const el = this.element();
       if (!el || (window.PULSE_TEST && window.PULSE_TEST.noAudioFiles)) return;
       if (this.track === track && !el.paused) {
+        // Already playing this track. (A second play() during the fade-out of a restart cancels that
+        // restart; the music is on the right track, so it counts as started and the run clock re-aligns it.)
+        this.started = true;
         this.fadeTo(this.targetVolume(), 200);
         return;
       }
@@ -406,6 +502,8 @@
     duck(on) {
       this.level = on ? 0.4 : 1;
       this.holding = !!on;
+      // A track change that is fading out must not be cancelled by a volume fade (it would leave the old track playing).
+      if (this.el && !this.el.paused && this.wanted && this.track !== this.wanted) return;
       if (this.el && !this.el.paused) {
         this.fadeTo(this.targetVolume(), 200, () => {
           if (this.holding && this.el) this.el.pause();
@@ -459,6 +557,7 @@
     suspend() {
       state.hidden = true;
       Sfx.stopHold();
+      Sfx.stemStop(0);
       if (Music.el && !Music.el.paused) Music.el.pause();
       if (state.ctx && state.ctx.state === 'running') state.ctx.suspend();
     },
@@ -474,6 +573,8 @@
       if (kind === 'sfx' && state.sfxGain) state.sfxGain.gain.value = state.volumes.sfx * SFX_LEVEL;
       if (kind === 'sfx' && state.volumes.sfx <= 0) Sfx.stopHold();
       if (kind === 'music') {
+        if (state.volumes.music <= 0) Sfx.stemStop(60);
+        else if (state.stemGain) state.stemGain.gain.value = state.volumes.music * MUSIC_LEVEL * STEM_LEVEL;
         if (state.volumes.music <= 0 && Music.el) Music.el.pause();
         else Music.sync();
       }
@@ -488,7 +589,7 @@
       return {
         context: state.ctx ? state.ctx.state : 'none',
         buffers: Object.keys(state.buffers).length,
-        expected: new Set(Object.values(SFX).map((d) => d.file)).size,
+        expected: new Set(Object.values(SFX).filter((d) => !d.pack || Pulse.CONFIG.audioPack.samples).map((d) => d.file)).size,
         failed: state.failed.slice(),
         musicTrack: Music.track,
         musicWanted: Music.wanted,
