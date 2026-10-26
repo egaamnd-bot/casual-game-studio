@@ -146,6 +146,19 @@
     return budget(out);
   }
 
+  // A risk route taken in full: five rising notes of the world's scale, one per 16th, ending on a held
+  // fifth-above chime. Accompaniment only (layer: true); the notes the player collected on the way
+  // were already the lead.
+  function routeClear(w, info) {
+    const step = info && info.step > 0 ? info.step : 0.12;
+    const base = LEAD_OCTAVE + 1;
+    const out = [];
+    for (let i = 0; i < 5; i++) out.push(spec(hz(w, base + i), 0.18, 'triangle', 0.07, { layer: true, at: step * i * 0.75, cutoff: 3200 }));
+    out.push(spec(hz(w, base + 7), 0.55, 'sine', 0.08, { layer: true, at: step * 3.5 }));
+    out.push(spec(hz(w, base + 9), 0.55, 'sine', 0.05, { layer: true, at: step * 3.5 }));
+    return budget(out);
+  }
+
   // Overdrive starts: a rising sweep and a bright chord of the world's scale. Ends: a falling release.
   function overdriveStart(w) {
     const f = hz(w, LEAD_OCTAVE - 5);
@@ -185,5 +198,5 @@
     ];
   }
 
-  Pulse.Melody = { WORLDS, semitone, hz, degree, hit, lost, fail, milestone, overdriveStart, overdriveEnd, budget, GAIN_CEILING };
+  Pulse.Melody = { WORLDS, semitone, hz, degree, hit, lost, fail, milestone, routeClear, overdriveStart, overdriveEnd, budget, GAIN_CEILING };
 })();

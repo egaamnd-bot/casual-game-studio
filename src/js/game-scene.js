@@ -376,6 +376,8 @@
       this.crashReason = null;
       this.combo = 0;
       Pulse.Overdrive.reset(this.od);
+      this.routeClears = 0;
+      this.routes = {}; // per route id: { notes: risk notes taken, side: lane chosen }
       this.odShown = 0;
       this.showCombo(0);
       this.lastCharge = this.orbState.charge;
@@ -411,7 +413,7 @@
       const o = this.orbState;
       const st = this.steer;
       if (this.test && this.test.bot) {
-        const target = Pulse.autosteer(this.level, o.x, this.orbY, this.level.speedAt(this.elapsed), this.test.slook, this.test.skill);
+        const target = Pulse.autosteer(this.level, o.x, this.orbY, this.level.speedAt(this.elapsed), this.test.slook, this.test.skill, this.test.route);
         Pulse.Orb.setTarget(o, target, this.W);
         return;
       }
@@ -543,7 +545,22 @@
     updateHintCard() {
       const hints = this.mode === 'campaign' && this.stage.hints;
       const playing = this.state === 'playing' || this.state === 'paused';
-      const h = hints && playing && hints.find((x) => this.elapsed >= x.from && this.elapsed <= x.to);
+      let h = hints && playing && hints.find((x) => this.elapsed >= x.from && this.elapsed <= x.to);
+      // Route hint: while the first row of a fork is on its way down, name the two routes. The card
+      // fades with the row's position, so it is gone well before the player has to commit.
+      let routeFade = null;
+      const rh = this.mode === 'campaign' && this.stage.routeHints;
+      if (!h && rh && playing) {
+        const segs = this.level.segments;
+        for (let i = 0; i < segs.length; i++) {
+          const q = segs[i];
+          if (q.active && q.fork && q.firstRow && rh[q.route] && q.y + q.h > 0 && q.y < this.orbY - 150) {
+            h = rh[q.route];
+            routeFade = Math.min(1, (q.y + q.h) / 60, (this.orbY - 150 - q.y) / 60);
+            break;
+          }
+        }
+      }
       if (!h) {
         if (this.hintShown) {
           this.hintShown = null;
@@ -553,7 +570,7 @@
         }
         return;
       }
-      const a = Math.min(1, (this.elapsed - h.from) / 0.3, (h.to - this.elapsed) / 0.3);
+      const a = routeFade !== null ? routeFade : Math.min(1, (this.elapsed - h.from) / 0.3, (h.to - this.elapsed) / 0.3);
       if (this.hintShown !== h) {
         this.hintShown = h;
         this.hintTitle.setText(h.title);
@@ -664,6 +681,7 @@
           this.ringT = 0;
           const bonus = s.variant === 'bonus';
           this.contact(bonus ? 'bonus' : 'pickup', s, prevCombo);
+          if (s.route && s.role === 'risk') this.routeState(s.route).notes++;
           if (this.view) this.view.collect(s);
           const color = bonus ? T.textBonus : T.textAccent;
           if (campaign) {
@@ -713,6 +731,7 @@
           } else {
             this.contact('pass', s, prevCombo);
             this.checkNearMiss(s, r);
+            if (s.fork) this.routePassed(s);
           }
         }
       }
@@ -760,6 +779,42 @@
       const K = C.combo;
       const label = m === K.flourish ? 'FLOURISH!' : m === K.layerB ? 'ENERGY!' : 'LAYER';
       this.quality(label, m === K.flourish ? T.textBonus : T.textAccent);
+    }
+
+    routeState(id) {
+      return this.routes[id] || (this.routes[id] = { notes: 0, side: null, done: false });
+    }
+
+    // A fork row was cleared. The first row commits the player to a side (a small cue when that is the
+    // risky one); the last row decides the route: every risk note taken = ROUTE CLEAR. Feedback and one
+    // bounded Overdrive award only; rules, score and stars were resolved before this runs.
+    routePassed(seg) {
+      const st = this.routeState(seg.route);
+      const risky = seg.side === seg.risk;
+      if (seg.firstRow) {
+        st.side = seg.side;
+        if (risky) this.quality('RISK ROUTE', '#FF5AC8');
+        else this.quality('SAFE ROUTE', '#35C8FF');
+      }
+      if (seg.routeEnd && !st.done) {
+        st.done = true;
+        const info = this.level.track && this.level.track.routes && this.level.track.routes[seg.route];
+        const total = info ? info.riskNotes : 0;
+        if (risky && total > 0 && st.notes >= total) this.routeClear(seg);
+      }
+    }
+
+    // A risk route taken in full: a short rising phrase of the world's scale (accompaniment, never
+    // delaying a lead note), a ring round the orb, and a one-off Overdrive award.
+    routeClear(seg) {
+      const wait = this.aligned() ? Pulse.Rhythm.Groove.delay(this.clock, true, 0.08) : 0;
+      Pulse.Sfx.notes(Pulse.Melody.routeClear(this.worldIndex(), { step: this.stepSeconds() }), wait);
+      if (this.view && this.view.comboMilestone) this.view.comboMilestone(C.combo.layerB);
+      this.quality('ROUTE CLEAR!', '#FF5AC8');
+      this.popup('ROUTE CLEAR', T.textBonus);
+      const r = Pulse.Overdrive.award(this.od, C.overdrive.routeBonus);
+      if (r.started) this.overdriveStarted();
+      this.routeClears = (this.routeClears || 0) + 1;
     }
 
     overdriveStarted() {
@@ -940,8 +995,9 @@
     // Cosmetic only: flashes a graze arc when the orb squeezed past a wall edge with little room.
     // It reads state after scoring is done and never touches score, stars or the multiplier.
     checkNearMiss(s, r) {
-      const left = this.orbX - r - s.gapL;
-      const right = s.gapR - this.orbX - r;
+      const o = Pulse.Track.openingAt(s, this.orbX, this.W);
+      const left = this.orbX - r - o.gapL;
+      const right = o.gapR - this.orbX - r;
       if (Math.min(left, right) > C.nearMissMargin) return;
       this.nearMisses++;
       Pulse.Sfx.play('nearMiss');
@@ -985,6 +1041,7 @@
           if (!s.active || s.y > this.H || s.y + s.h < -40) continue;
           if (s.kind === 'pickup') Pulse.Render.pickup(g, s);
           else if (s.kind === 'barrier') Pulse.Render.barrier(g, s, this.W, canSmash(s));
+          else if (s.fork) Pulse.Render.forkGate(g, s, this.W);
           else if (s.ring) Pulse.Render.ring(g, s, this.level.time);
           else Pulse.Render.walls(g, s, this.W);
         }
@@ -1023,7 +1080,7 @@
     // Test-only autopilot (Pulse.autopilot in level.js, shared with the logic tests).
     botWantsHold() {
       if (this.state !== 'playing') return false;
-      return Pulse.autopilot(this.level, this.orbY, this.level.speedAt(this.elapsed), this.test.look);
+      return Pulse.autopilot(this.level, this.orbY, this.level.speedAt(this.elapsed), this.test.look, this.test.route);
     }
   }
 

@@ -78,6 +78,64 @@
     seg.need = half;
   }
 
+  // Route fork (docs/ROUTES.md): ONE wall with TWO openings, left (`gapL..gapR`, the item's own `need`
+  // and `x`) and right (`gap2L..gap2R`, from `fork.need`/`fork.x`), kept apart by a divider pillar
+  // at least `route.divider` px wide on the lane centre. `fork.risk` ('L' or 'R') says which opening
+  // is the demanding route. The openings are clamped so each stays on its own side of the divider.
+  function setFork(seg, src, width) {
+    const D = C.route.divider / 2;
+    const mid = width / 2;
+    const h1 = src.need;
+    const h2 = src.fork.need;
+    const cx1 = clamp(C.orb.x + (src.x || 0), C.wallMinWidth + h1, mid - D - h1);
+    const cx2 = clamp(C.orb.x + (src.fork.x || 0), mid + D + h2, width - C.wallMinWidth - h2);
+    seg.cx = seg.cx0 = cx1;
+    seg.half = seg.need = h1;
+    seg.gapL = cx1 - h1;
+    seg.gapR = cx1 + h1;
+    seg.cx2 = cx2;
+    seg.need2 = h2;
+    seg.gap2L = cx2 - h2;
+    seg.gap2R = cx2 + h2;
+    seg.risk = src.fork.risk === 'L' ? 'L' : 'R';
+    seg.fork = true;
+  }
+
+  // One opening of a gate as a plain gate-shaped object: side 'L'/'R' of a fork, or the gate itself.
+  function openingOf(g, side) {
+    if (!g.fork) return { gapL: g.gapL, gapR: g.gapR, half: g.half !== undefined ? g.half : g.need, cx: g.cx, side: null };
+    return side === 'R'
+      ? { gapL: g.gap2L, gapR: g.gap2R, half: g.need2, cx: g.cx2, side: 'R' }
+      : { gapL: g.gapL, gapR: g.gapR, half: g.need, cx: g.cx, side: 'L' };
+  }
+
+  // Which side a route name means at this fork: 'risk' / 'safe' (relative to the fork) or 'L' / 'R'.
+  function sideOf(g, route) {
+    if (route === 'L' || route === 'R') return route;
+    const other = g.risk === 'L' ? 'R' : 'L';
+    return route === 'risk' ? g.risk : other;
+  }
+
+  // The opening the orb is in (or nearest to) at lane position x.
+  function openingAt(g, x, width) {
+    return openingOf(g, x < (width || C.width) / 2 ? 'L' : 'R');
+  }
+
+  // A fork's lane as an ordinary item list: shared items as they are, the other lane's items left out,
+  // each fork row replaced by the gate for that lane's opening. Fairness is checked on each lane alone.
+  function laneView(items, side) {
+    const out = [];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      if (it.lane && it.lane !== side) continue;
+      if (it.fork) {
+        const o = openingOf(it, side);
+        out.push(Object.assign({}, it, { fork: false, gapL: o.gapL, gapR: o.gapR, need: o.half, half: o.half, cx: o.cx, cx0: o.cx, _i: i }));
+      } else out.push(it._i === undefined ? Object.assign({}, it, { _i: i }) : it);
+    }
+    return out;
+  }
+
   const isPickup = (type) => type === 'energy' || type === 'bonus';
   const itemHeight = (src) => (src.type === 'gate' ? (src.length || C.gate.thickness)
     : src.type === 'barrier' ? (src.charged ? C.barrier.chargedThickness : C.barrier.thickness) : 0);
@@ -101,7 +159,9 @@
   function placeItem(src, prevTop, width) {
     const h = itemHeight(src);
     const item = { type: src.type, at: prevTop + src.space, h, space: src.space };
-    if (src.type === 'gate' && src.ring) {
+    if (src.type === 'gate' && src.fork) {
+      setFork(item, src, width);
+    } else if (src.type === 'gate' && src.ring) {
       // Rotating ring (unused by the portrait campaign): geometry is filled in by
       // Pulse.Campaign.compile. Until then it is an ordinary centred gap of half-width `need`.
       Pulse.setGap(item, src.need, 0, width);
@@ -118,6 +178,11 @@
     if (src.type === 'barrier' && src.charged) item.charged = true;
     if (isPickup(src.type)) item.x = clamp(C.orb.x + (src.x || 0), S.margin, width - S.margin);
     if (src.pattern) item.pattern = src.pattern;
+    if (src.route) {
+      item.route = src.route; // route id: the fork rows and the notes of one route choice share it
+      if (src.routeEnd) item.routeEnd = true; // the last row of the fork
+      if (src.lane) { item.lane = src.lane; item.role = src.role; } // a note that belongs to one lane
+    }
     return item;
   }
 
@@ -195,6 +260,12 @@
     return at + FLOOR_EPS - st.prevTop;
   }
 
+  // A lane-only item the other lane never meets still moves that lane's "previous item" forward.
+  function advanceFair(st, it) {
+    st.prevTop = it.at + it.h;
+    st.prevType = it.type;
+  }
+
   function commitFair(st, it, speed, bpm, exact) {
     const want = wantRange(it, speed, bpm, exact);
     if (want) {
@@ -221,10 +292,29 @@
   //     do), must never become empty, and every gate must leave `lateral.minWindow` of aiming room.
   // `speedOf(item)` gives the speed when the item reaches the orb. `opts.bpm` is needed for moving gaps.
   function validateItems(items, speedOf, label, opts) {
+    if (!items.some((it) => it.fork || it.lane)) return validateLane(items, speedOf, label, opts, null);
+    // A route fork is two tracks that share their start and finish: each lane must be fair on its own,
+    // and the wall between the openings must be a real divider.
+    const errors = [];
+    const width = (opts && opts.width) || C.width;
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      if (!it.fork) continue;
+      if (it.gap2L - it.gapR < C.route.divider - 1e-9) errors.push(`${label}: item ${i} (gate): divider ${(it.gap2L - it.gapR).toFixed(0)} px is thinner than ${C.route.divider}`);
+      if (it.gapL < C.wallMinWidth - 1e-9 || it.gap2R > width - C.wallMinWidth + 1e-9) errors.push(`${label}: item ${i} (gate): fork leaves less than the minimum wall at the lane edge`);
+    }
+    for (const side of ['L', 'R']) {
+      const view = laneView(items, side);
+      errors.push(...validateLane(view, speedOf, `${label} [lane ${side}]`, opts, view.map((v) => v._i)));
+    }
+    return errors;
+  }
+
+  function validateLane(items, speedOf, label, opts, ids) {
     const errors = [];
     const bpm = opts && opts.bpm;
     const width = (opts && opts.width) || C.width;
-    const err = (i, msg) => errors.push(`${label}: item ${i} (${items[i].type}): ${msg}`);
+    const err = (i, msg) => errors.push(`${label}: item ${ids ? ids[i] : i} (${items[i].type}): ${msg}`);
     const minNeed = C.orb.minRadius + C.lateral.minWindow;
     const lo0 = S.margin;
     const hi0 = width - S.margin;
@@ -385,12 +475,30 @@
       // Segments are pooled: reset flags a previous use may have left (a recycled charged
       // barrier must not make a gate look charged).
       seg.charged = it.type === 'barrier' && !!it.charged;
+      seg.fork = false;
+      seg.side = null;
+      seg.route = it.route || null;
+      seg.lane = it.lane || null;
+      seg.role = it.role || null;
+      seg.routeEnd = !!it.routeEnd;
       if (it.type === 'gate') {
         seg.kind = 'gate';
         seg.gapL = it.gapL;
         seg.gapR = it.gapR;
         seg.need = seg.half = it.need;
         seg.cx = seg.cx0 = it.cx0;
+        if (it.fork) {
+          seg.fork = true;
+          seg.gap2L = it.gap2L;
+          seg.gap2R = it.gap2R;
+          seg.need2 = it.need2;
+          seg.cx2 = it.cx2;
+          seg.risk = it.risk;
+          seg.laneSpan = it.laneSpan || 0;
+          seg.firstRow = !!it.firstRow;
+          seg.riskNotes = it.riskNotes || 0;
+          seg.safeNotes = it.safeNotes || 0;
+        }
       } else if (it.type === 'barrier') {
         seg.kind = 'barrier';
       } else {
@@ -411,6 +519,11 @@
       if (seg.kind !== 'gate') return false;
       if (y + r < seg.y || y - r > seg.y + seg.h) return false;
       if (seg.ring) return this.ringHit(seg, x, y, r);
+      if (seg.fork) {
+        return circleRect(x, y, r, 0, seg.y, seg.gapL, seg.h) ||
+          circleRect(x, y, r, seg.gapR, seg.y, seg.gap2L - seg.gapR, seg.h) ||
+          circleRect(x, y, r, seg.gap2R, seg.y, this.width - seg.gap2R, seg.h);
+      }
       return circleRect(x, y, r, 0, seg.y, seg.gapL, seg.h) ||
         circleRect(x, y, r, seg.gapR, seg.y, this.width - seg.gapR, seg.h);
     }
@@ -463,7 +576,9 @@
       if (this.hitsWall(s, x, orbY, r)) return 'crash';
       if (!s.scored && s.y > orbY + r) {
         s.scored = true;
-        s.quality = Math.abs(x - s.cx) <= Math.max(C.pickup.perfect, 0.3 * s.half) ? 'perfect' : 'good';
+        const o = openingAt(s, x, this.width);
+        s.side = o.side; // which opening of a fork the orb used (null for an ordinary gate)
+        s.quality = Math.abs(x - o.cx) <= Math.max(C.pickup.perfect, 0.3 * o.half) ? 'perfect' : 'good';
         return 'pass';
       }
       return null;
@@ -474,7 +589,7 @@
   // Shrinks for a gate that needs it, stays full size for a barrier (looking further ahead for
   // charged barriers, to fill the ring), otherwise grows. A larger `lookSeconds` gives the cautious
   // player: it holds through every close dare. Returns whether to hold (shrink).
-  function autopilot(level, orbY, speed, lookSeconds) {
+  function autopilot(level, orbY, speed, lookSeconds, route) {
     const look = speed * (lookSeconds || 0.3);
     const chargeLook = speed * C.barrier.chargeTime;
     let nearest = null;
@@ -483,7 +598,7 @@
     for (let i = 0; i < segs.length; i++) {
       const s = segs[i];
       if (!s.active || s.kind === 'pickup' || s.broken) continue;
-      if (s.kind === 'gate' && (s.half >= R + C.lateral.minWindow || s.y >= orbY + R)) continue;
+      if (s.kind === 'gate' && (openingOf(s, s.fork ? sideOf(s, route) : null).half >= R + C.lateral.minWindow || s.y >= orbY + R)) continue;
       const bottom = s.y + s.h;
       if (bottom < orbY - R - look - (s.charged ? chargeLook : 0)) continue;
       if (bottom > nearestBottom) {
@@ -499,7 +614,7 @@
   // toward the next gate or note so it is already on its way; a gold note ahead of a gate is taken
   // only when it is on the way. `lookSeconds` is how far ahead it looks. `skill` 0..1 scales how
   // precisely it aims (1 = dead centre of the free range, less = sloppier).
-  function autosteer(level, orbX, orbY, speed, lookSeconds, skill) {
+  function autosteer(level, orbX, orbY, speed, lookSeconds, skill, route) {
     const sk = skill === undefined ? 1 : skill;
     const look = speed * (lookSeconds || 1.2);
     const list = [];
@@ -508,6 +623,7 @@
       const s = segs[i];
       if (!s.active || s.kind === 'barrier') continue;
       if (s.kind === 'gate' ? s.y > orbY + R : s.resolved) continue;
+      if (s.lane && (route === 'L' || route === 'R' ? s.lane !== route : s.role !== (route || 'safe'))) continue; // the other lane's note
       if (s.y + s.h < orbY - look) continue;
       list.push(s);
     }
@@ -515,6 +631,11 @@
     list.sort((a, b) => b.y - a.y); // nearest the orb first
     const span = (s) => {
       if (s.kind === 'pickup') return [s.x, s.x];
+      if (s.fork) {
+        const o = openingOf(s, sideOf(s, route));
+        const r = o.half < R + C.lateral.minWindow ? C.orb.minRadius : R;
+        return [o.gapL + r, o.gapR - r];
+      }
       const small = s.half < R + C.lateral.minWindow;
       const r = small ? C.orb.minRadius : R;
       const dist = Math.max(0, orbY - (s.y + s.h / 2));
@@ -577,7 +698,7 @@
     Pulse.isCharged = isCharged;
   Pulse.Orb = Orb;
   Pulse.Scoring = Scoring;
-  Pulse.Track = { placeItem, validateItems, clearTime, spaceFor, demand, itemHeight, gateSpan, fairState, floorSpace, commitFair };
+  Pulse.Track = { openingOf, openingAt, sideOf, laneView, placeItem, validateItems, clearTime, spaceFor, demand, itemHeight, gateSpan, fairState, floorSpace, commitFair, advanceFair };
   Pulse.autopilot = autopilot;
   Pulse.autosteer = autosteer;
 })();

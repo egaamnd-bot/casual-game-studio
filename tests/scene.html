@@ -228,6 +228,44 @@
       check(Pulse.Music.wanted === 'WORLD_3_GAMEPLAY', 'stage 10: World 3 track from the ready screen');
       check(scene().od && !scene().od.active && scene().od.meter === 0 && scene().od.fx === 0, 'a new stage starts with a fresh Overdrive state');
 
+      // ---- Routes in the real scene (stage 4: two forks) ----
+      {
+        const play = async (route) => {
+          scene().scene.start('game', { mode: 'campaign', stageIndex: 3 }); await wait(300);
+          const q = scene();
+          q.test.bot = true; q.test.route = route;
+          q.startRun();
+          let hint = false, riskCue = false, safeCue = false;
+          frames(q, 20000, () => {
+            if (q.hintShown && Object.values(q.stage.routeHints).includes(q.hintShown)) hint = true;
+            if (q.qualityText.text === 'RISK ROUTE') riskCue = true;
+            if (q.qualityText.text === 'SAFE ROUTE') safeCue = true;
+            return q.state !== 'playing';
+          });
+          const out = { q, hint, riskCue, safeCue, state: q.state, clears: q.routeClears, routes: JSON.parse(JSON.stringify(q.routes)), od: q.od.chargedTotal, stars: null };
+          q.test.bot = false; q.test.route = undefined;
+          return out;
+        };
+        const risk = await play('risk');
+        check(risk.state === 'complete', `stage 4 completes on the risk route (state ${risk.state})`);
+        check(risk.clears === 2 && risk.routes['s4-a'].done && risk.routes['s4-b'].done, `risk route: both forks cleared (${risk.clears})`);
+        check(risk.routes['s4-a'].notes === risk.q.level.track.routes['s4-a'].riskNotes, 'risk route: every risk note of fork A counted');
+        check(risk.hint, 'the route hint card names the two routes before the first fork');
+        check(risk.riskCue, 'taking the risk lane gets its cue');
+        const riskStars = savedData().campaign.stages[Pulse.STAGES[3].id];
+        check(riskStars && riskStars.bestStars === 3, 'the risk route earns the same 3 stars (route notes never count)');
+        const safe = await play('safe');
+        check(safe.state === 'complete' && safe.clears === 0, `stage 4 completes on the safe route with no route clear (${safe.state}, ${safe.clears})`);
+        check(safe.safeCue && !safe.riskCue, 'the safe lane has its own quiet cue');
+        check(safe.od < risk.od, `the risk route charges more Overdrive (${risk.od.toFixed(0)} vs ${safe.od.toFixed(0)})`);
+        // Retry resets the route state.
+        safe.q.startRun();
+        check(Object.keys(safe.q.routes).length === 0 && safe.q.routeClears === 0, 'retry clears the route state');
+        check(savedData().campaign.stages[Pulse.STAGES[3].id].bestStars === 3, 'route play leaves the save format and stars alone');
+        const keys = Object.keys(savedData()).sort().join();
+        check(!/route/i.test(JSON.stringify(savedData())), 'the save file has no route data');
+      }
+
       // Menus render, with the menu theme.
       scene().scene.start('menu'); await wait(300);
       check(Pulse.Music.wanted === 'MENU_THEME', 'menu plays the menu theme');

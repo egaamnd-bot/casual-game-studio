@@ -120,6 +120,12 @@ Pulse.CONFIG = {
   // raise it only to experiment with quantising reward sounds to the 16th note.
   groove: { enabled: true, inputDelay: 0, eventDelay: 0, maxSeeks: 4 },
 
+  // Risk-and-reward routes (docs/ROUTES.md): a fork is one wall with two openings split by a divider.
+  // `divider`: the pillar between the openings (px). `preview`: how far (px) before the first row the
+  // lane tint starts, so both routes are readable before the player has to commit. `clearBonus`:
+  // Overdrive charge for taking the risk lane and collecting every note of it (once per fork).
+  route: { divider: 64, preview: 180, minRisk: 3 },
+
   // Overdrive meter and combo milestones (src/js/overdrive.js, docs/OVERDRIVE.md). Feedback only:
   // nothing here touches collision, orb size, obstacle layout, score or stars.
   overdrive: {
@@ -127,6 +133,7 @@ Pulse.CONFIG = {
     duration: 6, // seconds of run time (frozen while paused)
     // Charge per successful contact (before the multipliers below).
     charge: { pickup: 4.5, bonus: 8, pass: 2.5, break: 6, chargedBreak: 10 },
+    routeBonus: 12, // one-off charge for a fully collected risk route (see `route` below)
     perfectMult: 1.4, // a Perfect contact charges 40% more
     comboStep: 4, // every 4 in a row adds comboBonus ...
     comboBonus: 0.1, // ... +10% charge, up to comboMaxBonus

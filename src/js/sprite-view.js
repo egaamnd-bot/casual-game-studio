@@ -411,6 +411,9 @@
         const onScreen = s.y < H && s.y + s.h > -60;
         if (s.kind === 'barrier') {
           this.placeBarrier(this.acquire(s, 'barrier'), s, onScreen && !s.broken, canSmash ? canSmash(s) : !dimmed);
+        } else if (s.kind === 'gate' && s.fork) {
+          this.release(s); // route fork: two openings, drawn from the same numbers the collision uses
+          if (s.y + s.h < H && s.y + s.h + (s.firstRow ? C.route.preview : (s.laneSpan || 0)) > -60) Pulse.Render.forkGate(wallGraphics, s, this.scene.W);
         } else if (s.kind === 'gate' && s.ring) {
           this.release(s); // rotating ring: drawn from the same numbers the collision test uses
           if (onScreen) Pulse.Render.ring(wallGraphics, s, level.time);
