@@ -15,22 +15,42 @@ Git LFS is **not** used. Keep binary assets small; ask the producer before addin
 1. In GitHub Desktop: **File → Clone repository** → `egaamnd-bot/casual-game-studio`.
 2. Create a branch from `main` for each task (see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 
-TODO: Project-specific steps once the stack is validated.
+No local install is needed. Game code lives in `src/` as plain JavaScript (no bundler); GitHub Actions installs Phaser and Capacitor during the build.
 
 ## Running the Game
 
-TODO: How to run it in the editor, on an emulator, or on a device.
+- **On a phone:** install the debug APK from GitHub Actions (see Building).
+- **In a desktop browser:** open `tests/gameplay.html?start=0` (Phaser loads from a CDN, so you need internet). Mouse button or touch = hold.
 
 ## Building
 
 | Platform | Steps | Output |
 |----------|-------|--------|
-| Android | TODO | `.apk` (testing) / `.aab` (Play Store) |
+| Android (testing) | Push any branch → **Actions → Android debug APK** → download the artifact `pulse-debug-apk-run<N>`. Install steps: [ANDROID_PIPELINE_TEST.md](ANDROID_PIPELINE_TEST.md) | Debug-signed `.apk` |
+| Android (Play Store) | TODO: release workflow and signing key (not set up) | `.aab` |
+
+### Installing a Test Build on an Android Phone
+
+1. In GitHub Desktop, select the branch and click **Push origin**. The push starts the build.
+2. On GitHub, open **Actions → Android debug APK** and click the run for your commit. Wait for the green check (a few minutes). The log should show no "Landscape lock not applied" warning.
+3. Under **Artifacts**, download `pulse-debug-apk-run<N>` (a `.zip`).
+4. Move it to the phone (download it there while signed in to GitHub, or copy it over USB), extract it with the Files app, and tap `app-debug.apk`.
+5. Allow installs from that app when asked. A test build replaces the previous one, and your saved progress is kept.
 | iOS | Deferred (needs a Mac and a paid Apple developer account) | n/a |
 
 ## Testing
 
-- **Automated tests:** TODO (framework, plus the command to run them)
+- **Automated tests:** plain HTML test pages in `tests/`. Open each in a desktop browser; the tab title shows PASS/FAIL or the result. Details: [PULSE_PROTOTYPE.md](PULSE_PROTOTYPE.md#testing)
+  - `tests/landscape.html`: landscape sizing at different aspect ratios, track-to-screen mapping, HUD and button bounds (resize the window to test other phones)
+  - `tests/assets.html`: Gemini's asset pack loads, every used frame exists, art lines up with collision sizes, barrier and charge-ring states match the rules
+  - `tests/campaign.html`: all 12 stages (fairness, completion, difficulty curve, introduction order), stars, unlocks, skins, save migration, audio settings
+  - `tests/rhythm.html`: beat clock, beat-aligned stages, moving gaps, music-sync decisions, orb effects (no Phaser needed)
+  - `tests/scene.html`: the real game with simulated input, plus audio lifecycle (music per mode and world, pause, background)
+  - Pages that load the game's images need Chrome/Edge started with `--allow-file-access-from-files` when opened as local files. `scene.html?noassets=1` and `gameplay.html?noassets=1` test the shape fallback
+  - `tests/scene.html`: the real game driven by simulated input (touch release, pause, retry, saving)
+  - `tests/logic.html`: collision and fairness of the Endless obstacle generator
+  - `tests/gameplay.html?bot=1&seconds=60`: the real game played by an autopilot
+  - `tests/gameplay.html?seconds=10`: the real game with no input (should crash at the first wall)
 - **Manual checklist** before a release:
   - [ ] Fresh install launches and the tutorial completes
   - [ ] Progress saves and loads after the app restarts

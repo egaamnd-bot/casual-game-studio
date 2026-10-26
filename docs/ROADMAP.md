@@ -6,8 +6,8 @@
 
 | Milestone | Goal | Target date | Status |
 |-----------|------|-------------|--------|
-| 0. Concept | Concept, design pillars, engine, and art direction approved | TODO | 🟡 In progress |
-| 1. Prototype | Core loop playable with placeholder art | TODO | ⚪ Not started |
+| 0. Concept | Concept, design pillars, engine, and art direction approved | TODO | 🟡 Concept and stack done; art direction pending |
+| 1. Prototype | Core loop playable with placeholder art | TODO | ✅ Producer phone QA passed; campaign v1 built |
 | 2. Vertical slice | One polished level with final art and audio | TODO | ⚪ Not started |
 | 3. Alpha | All core features in, content incomplete | TODO | ⚪ Not started |
 | 4. Beta | Content complete; testing, balancing, monetization tuning | TODO | ⚪ Not started |
@@ -15,11 +15,27 @@
 
 ## Current Focus
 
-- [ ] Agree on the game concept and fill in [GAME_DESIGN.md](GAME_DESIGN.md)
-- [ ] Choose the engine and target platforms; update [DEVELOPMENT.md](DEVELOPMENT.md)
-- [ ] Draft and approve the [ART_BIBLE.md](ART_BIBLE.md)
-- [ ] Record each approval in [DECISIONS.md](DECISIONS.md)
-- [ ] Set up the project skeleton and get a first build running
+- [x] Agree on the game concept (Pulse) and fill in [GAME_DESIGN.md](GAME_DESIGN.md)
+- [x] Choose the stack and validate the Android build pipeline on a phone
+- [x] Build the first playable prototype ([PULSE_PROTOTYPE.md](PULSE_PROTOTYPE.md))
+- [x] Producer phone QA of the prototype (8/8 checks passed)
+- [x] Approve the art direction (Kinetic Vector / Precision Cyber-Grid)
+- [x] Campaign system v1: data-driven stages, 3 stages, stars, skins, save data ([CAMPAIGN.md](CAMPAIGN.md))
+- [x] Phone playtest of the campaign (producer: works well)
+- [x] Integrate Gemini's v2.0 asset pack (`feature/pulse-art-v2`)
+- [x] Phone check of the new art (producer: looks good)
+- [x] Gameplay variety v1: barriers, Endless patterns, stage redesign ([GAMEPLAY_VARIETY.md](GAMEPLAY_VARIETY.md))
+- [x] Phone playtest of gameplay variety (producer: genuinely fun)
+- [x] Gameplay evolution v2: charged barriers, combo sequences, multiplier feedback ([GAMEPLAY_EVOLUTION.md](GAMEPLAY_EVOLUTION.md))
+- [x] Barrier and charge-ring art from Gemini (v3.0 pack)
+- [x] Landscape conversion with v3 art ([LANDSCAPE.md](LANDSCAPE.md))
+- [x] Phone playtest of the landscape build (producer: fun)
+- [x] 12-stage campaign, Gemini v4 worlds, skins, music and sound ([CAMPAIGN.md](CAMPAIGN.md), [AUDIO.md](AUDIO.md))
+- [x] Rhythm clock, beat-aligned stages and moving gaps, vertical slice (`feature/pulse-rhythm-motion`, [RHYTHM.md](RHYTHM.md))
+- [x] Game-feel pass (springy orb, eased tail, settled moving gaps) and the rotating ring obstacle ([RHYTHM.md](RHYTHM.md))
+- [ ] Phone playtest of the 12-stage campaign, audio, game feel and rings
+- [ ] Family-friendly monetization plan for approval ([MONETIZATION_FUTURE.md](MONETIZATION_FUTURE.md))
+- [ ] Playtest with 3–5 people against the targets in [PULSE_PROTOTYPE.md](PULSE_PROTOTYPE.md)
 
 ## Later / Ideas
 

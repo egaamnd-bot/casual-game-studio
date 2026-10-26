@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse campaign tests</title>
+</head>
+<body>
+  <pre id="out">running…</pre>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script>
+    // Campaign, stars, skins and save-data tests. No Phaser needed.
+    // Open in a browser; the page title becomes "PASS ..." or "FAIL ...".
+    const C = Pulse.CONFIG;
+    const R = C.orb.radius;
+    const W = C.width;
+    const lines = [];
+    let failures = 0, checks = 0;
+    function check(ok, message) {
+      checks++;
+      if (!ok) { failures++; if (failures <= 40) lines.push('FAIL ' + message); }
+    }
+    const fresh = () => Pulse.Save.defaults();
+
+    // In-memory stand-in for localStorage.
+    function memoryStorage(initial) {
+      const data = Object.assign({}, initial);
+      return {
+        data,
+        getItem: (k) => (k in data ? data[k] : null),
+        setItem: (k, v) => { data[k] = String(v); },
+      };
+    }
+
+    // Plays a stage with the game's own rules (Level.resolve). policy(level, orbY, speed) → hold?
+    function play(stage, policy, height) {
+      height = height || 1100;
+      const orbY = Math.round(height * C.orb.yRatio);
+      const level = new Pulse.Campaign.CampaignLevel(W, height, stage);
+      const orb = Pulse.Orb.create();
+      let frames = 0, energy = 0, bonus = 0, smashed = 0, crashedOn = null;
+      const dt = 1 / 60;
+      const done = (crashed, completed) => ({ crashed, crashedOn, completed, frames, energy, bonus, smashed, travelled: level.travelled });
+      while (frames < 60 * 300) {
+        Pulse.Orb.step(orb, policy(level, orbY, level.speedAt()), dt);
+        frames++;
+        level.update(dt, level.speedAt());
+        for (const s of level.segments) {
+          if (!s.active) continue;
+          const e = level.resolve(s, orbY, orb.radius, orb.charge);
+          if (e === 'crash') {
+            crashedOn = s.kind === 'barrier' ? (s.charged ? 'charged barrier' : 'barrier') : 'gap';
+            return done(true, false);
+          }
+          if (e === 'collect') { if (s.variant === 'bonus') bonus++; else energy++; }
+          if (e === 'break') smashed++;
+        }
+        if (level.finishY() >= orbY) return done(false, true);
+      }
+      return done(false, false);
+    }
+
+    // The game's own test autopilot (level.js).
+    const bot = Pulse.autopilot;
+
+    // A cautious player: reacts to gaps 0.75 s ahead, so never lets go inside a dare.
+    const cautious = (level, orbY, speed) => Pulse.autopilot(level, orbY, speed, 0.75);
+    // A habit holder: stays shrunk and only lets go when a barrier is 0.3 s away. That's enough
+    // to regrow for a plain barrier but not to fill the charge ring for a charged one.
+    const habitHolder = (level, orbY, speed) => !level.segments.some((s) =>
+      s.active && s.kind === 'barrier' && !s.broken && s.y + s.h > orbY - R - speed * 0.3);
+
+    // How often the required action flips (shrink ↔ stay big) from one obstacle to the next.
+    function decisionFlips(stage) {
+      let prev = null, flips = 0, n = 0;
+      for (const it of Pulse.Campaign.compile(stage, W).items) {
+        const need = Pulse.Track.demand(it);
+        if (!need || it.type === 'energy' || it.type === 'bonus') continue;
+        if (prev && need !== prev) flips++;
+        prev = need;
+        n++;
+      }
+      return { flips, n };
+    }
+
+    // ---- Stage definitions ----
+    const ids = new Set();
+    const STAGES = Pulse.STAGES;
+    check(STAGES.length === 12, `expected 12 stages, found ${STAGES.length}`);
+    check(['s1-first-pulse', 's2-find-the-rhythm', 's3-controlled-overload'].every((id, i) => STAGES[i].id === id),
+      'the original three stage ids keep their places (save compatibility)');
+    STAGES.forEach((stage, i) => {
+      const errors = Pulse.Campaign.validate(stage, W);
+      check(errors.length === 0, `stage ${i + 1} invalid: ${errors.join('; ')}`);
+      check(!ids.has(stage.id), `duplicate stage id ${stage.id}`);
+      ids.add(stage.id);
+      check(stage.world.index === Math.floor(i / 4) + 1, `stage ${i + 1} is in world ${Math.floor(i / 4) + 1}`);
+      check(typeof stage.teaches === 'string' && stage.teaches.length > 10, `stage ${i + 1} documents what it teaches`);
+      const track = Pulse.Campaign.compile(stage, W);
+      check(track.finishAt > 0 && Number.isFinite(track.finishAt), `stage ${stage.id}: finite finish`);
+      check(track.energyTotal >= 5, `stage ${stage.id}: at least 5 gold for meaningful stars (${track.energyTotal})`);
+      for (let k = 1; k < track.items.length; k++) check(track.items[k].at > track.items[k - 1].at, `stage ${stage.id}: items ordered`);
+    });
+
+    // Which mechanics each stage uses (from its source data).
+    const small = (it) => it && it.type === 'gate' && it.need < R;
+    function mechanics(stage) {
+      const m = new Set();
+      stage.items.forEach((it, i) => {
+        const prev = stage.items[i - 1];
+        if (it.type === 'barrier') m.add(it.charged ? 'charged' : 'barrier');
+        if (small(it) && it.length) m.add('tunnel');
+        if (it.type === 'bonus') m.add('mint');
+        if (small(it) && small(prev) && !it.length && !prev.length && it.t !== undefined && it.t < 0.35) m.add('double');
+      });
+      return m;
+    }
+    const INTRO = { barrier: 2, charged: 5, tunnel: 6, double: 7, mint: 8 };
+    for (const [mech, stageNo] of Object.entries(INTRO)) {
+      const first = STAGES.findIndex((s) => mechanics(s).has(mech)) + 1;
+      check(first === stageNo, `${mech} is introduced in stage ${stageNo} (first used in stage ${first})`);
+      // Teaching stages don't also raise the speed.
+      const s = STAGES[stageNo - 1], prev = STAGES[stageNo - 2];
+      check(s.speed.start <= prev.speed.end, `stage ${stageNo} (introduces ${mech}) starts no faster than stage ${stageNo - 1} ended`);
+    }
+    // First encounters are gentle.
+    const firstItem = (stage, pred) => {
+      const i = stage.items.findIndex(pred);
+      return { it: stage.items[i], prev: stage.items[i - 1], next: stage.items[i + 1] };
+    };
+    let f = firstItem(STAGES[1], (it) => it.type === 'barrier');
+    check(f.prev.type !== 'gate' && f.it.t >= 0.8, 'first barrier: not right after a gap, long lead');
+    f = firstItem(STAGES[4], (it) => it.charged);
+    check(f.prev.type !== 'gate' && f.it.t >= 0.9, 'first charged barrier: not right after a gap (ring already full), long lead');
+    f = firstItem(STAGES[5], (it) => it.length);
+    check(f.it.need >= 44 && f.it.t >= 0.8, 'first tunnel: roomy and well announced');
+    f = firstItem(STAGES[6], (it, i, arr) => small(it) && small(arr[i - 1]) && it.t < 0.35);
+    check(f.it.t >= 0.3, 'first double squeeze: the roomiest one');
+    f = firstItem(STAGES[7], (it) => it.type === 'bonus');
+    check(f.it.t >= 0.3 && f.next.t >= 0.3, 'first mint: a roomy dare');
+
+    // Difficulty curve. "Pressure" = how close each required size switch is to its fair minimum
+    // (1.0 = exactly the minimum); "density" = obstacles per second.
+    const MIN = { small: C.track.toSmall, barrier: C.track.toBarrier, charged: C.track.toChargedBarrier, energy: C.track.toEnergy, bonus: C.track.bonusTime };
+    function curve(stage) {
+      const track = Pulse.Campaign.compile(stage, W);
+      const speedAt = (it) => Pulse.Campaign.speedAtDistance(stage, track.finishAt, it.at);
+      let lastBig = { type: 'start', top: 0 }, lastSmall = null, sum = 0, n = 0, walls = 0;
+      for (const it of track.items) {
+        const need = Pulse.Track.demand(it);
+        if (it.type === 'gate' || it.type === 'barrier') walls++;
+        const from = need === 'small' ? lastBig : need === 'big' ? lastSmall : null;
+        if (from && it.type !== 'energy' && it.type !== 'bonus') {
+          const t = Pulse.Track.clearTime(from.type === 'start' ? 'gate' : from.type, it.type, it.at - from.top, speedAt(it));
+          const min = need === 'small' ? MIN.small : it.charged ? MIN.charged : MIN.barrier;
+          sum += min / t;
+          n++;
+        }
+        const rec = { type: it.type, top: it.at + it.h };
+        if (need === 'small') lastSmall = rec;
+        if (need === 'big') lastBig = rec;
+      }
+      const seconds = track.finishAt / ((stage.speed.start + stage.speed.end) / 2);
+      return { pressure: n ? sum / n : 0, density: walls / seconds, speed: stage.speed.end };
+    }
+    const curves = STAGES.map(curve);
+    for (let i = 1; i < 12; i++) {
+      check(curves[i].speed > curves[i - 1].speed, `top speed rises every stage (${i}→${i + 1})`);
+      check(curves[i].pressure - curves[i - 1].pressure <= 0.25, `no pressure jump from stage ${i} to ${i + 1} (${curves[i - 1].pressure.toFixed(2)}→${curves[i].pressure.toFixed(2)})`);
+    }
+    const avg = (a, b) => curves.slice(a, b).reduce((s, c) => s + c.pressure, 0) / (b - a);
+    check(avg(0, 4) < avg(4, 8) && avg(4, 8) < avg(8, 12), `pressure rises world by world (${avg(0, 4).toFixed(2)} < ${avg(4, 8).toFixed(2)} < ${avg(8, 12).toFixed(2)})`);
+    check(curves[9].pressure === Math.max(...curves.map((c) => c.pressure)), 'Precision (stage 10) has the tightest timing');
+    lines.push('curve: ' + curves.map((c, i) => `${i + 1}:v${c.speed} p${c.pressure.toFixed(2)} d${c.density.toFixed(2)}`).join(' '));
+    // Decision variety: from stage 2 on, the required action switches at least every other obstacle.
+    for (const st of STAGES.slice(1)) {
+      const v = decisionFlips(st);
+      check(v.flips / (v.n - 1) >= 0.5, `${st.id}: required action changes at least every other obstacle (${v.flips}/${v.n - 1})`);
+    }
+    const [s1, s2, s3] = STAGES;
+    const s5 = STAGES[4], s7 = STAGES[6], s8 = STAGES[7];
+
+    // validate() rejects bad data.
+    const bad = (base, mutate) => { const s = JSON.parse(JSON.stringify(base)); s.world = base.world; s.sector = base.sector; mutate(s); return Pulse.Campaign.validate(s, W); };
+    check(bad(s1, (s) => delete s.id).length > 0, 'missing id is rejected');
+    check(bad(s1, (s) => { s.exit = null; }).length > 0, 'missing exit is rejected');
+    check(bad(s1, (s) => { s.world = null; }).length > 0, 'missing world is rejected');
+    check(bad(s1, (s) => { s.items = []; }).length > 0, 'empty items are rejected');
+    check(bad(s1, (s) => { s.items[2].need = 20; }).length > 0, 'unfair narrow gap is rejected');
+    check(bad(s1, (s) => { s.items[3].space = 60; }).length > 0, 'gold too soon after a gap is rejected');
+    check(bad(s7, (s) => { s.items[1].space = 30; }).length > 0, 'walls overlapping is rejected');
+    check(bad(s7, (s) => { s.items[1].space = 60; }).length === 0, 'hold-through gaps may sit close together');
+    check(bad(s2, (s) => { s.items[5].space = 150; }).length > 0, 'barrier too soon after a gap is rejected');
+    check(bad(s3, (s) => { s.items[2].space = 140; }).length > 0, 'gap too soon after a barrier is rejected');
+    check(bad(s5, (s) => { s.items[5].space = 260; }).length > 0, 'charged barrier without time to fill the ring is rejected');
+    check(bad(s5, (s) => { s.items[5].charged = false; s.items[5].space = 260; }).length === 0, '…the same spacing is fair for a plain barrier');
+    check(bad(s8, (s) => { s.items[1].space = 120; }).length > 0, 'mint too soon after a gap is rejected');
+    check(bad(s1, (s) => { s.items[0].type = 'laser'; }).length > 0, 'unknown item type is rejected');
+    check(bad(s1, (s) => { s.stars = { two: 0.9, three: 0.6 }; }).length > 0, 'inverted star thresholds are rejected');
+    check(Pulse.Campaign.validate(null, W).length > 0, 'null stage is rejected');
+
+    // ---- Playback: completable, reachable, deterministic ----
+    STAGES.forEach((stage) => {
+      const track = Pulse.Campaign.compile(stage, W);
+      for (const h of [860, 1100, 1240]) {
+        const run = play(stage, bot, h);
+        check(run.completed, `${stage.id} @${h}px: autopilot should finish (crashed=${run.crashed})`);
+        check(run.energy === track.energyTotal, `${stage.id} @${h}px: all gold reachable (${run.energy}/${track.energyTotal})`);
+      }
+      const a = play(stage, bot), b = play(stage, bot);
+      check(JSON.stringify(a) === JSON.stringify(b), `${stage.id}: playback is deterministic`);
+      check(JSON.stringify(Pulse.Campaign.compile(stage, W).items) === JSON.stringify(track.items), `${stage.id}: compile is deterministic`);
+      const idle = play(stage, () => false);
+      check(idle.crashed && !idle.completed, `${stage.id}: no input must crash`);
+      const hold = play(stage, () => true);
+      check(hold.energy === 0 && hold.bonus === 0, `${stage.id}: always shrunk collects nothing`);
+      if (track.items.some((it) => it.type === 'barrier')) {
+        check(hold.crashed, `${stage.id}: holding the whole time must crash on a barrier`);
+      }
+      const safe = play(stage, cautious);
+      check(safe.completed, `${stage.id}: a cautious player who skips every dare can finish`);
+      const habit = play(stage, habitHolder);
+      const hasCharged = track.items.some((it) => it.charged);
+      check(hasCharged ? habit.crashedOn === 'charged barrier' : habit.completed,
+        `${stage.id}: releasing only 0.3 s before barriers ${hasCharged ? 'fails on a charged barrier' : 'is enough'} (got ${habit.completed ? 'finished' : habit.crashedOn})`);
+      const v = decisionFlips(stage);
+      lines.push(`${stage.id}: ${(a.frames / 60).toFixed(1)}s, gold ${a.energy}/${track.energyTotal}, mint ${a.bonus}/${track.bonusTotal}, barriers ${a.smashed}, flips ${v.flips}/${v.n - 1}, hold-always ${hold.crashed ? 'crashes' : 'finishes'}, cautious gold ${safe.energy}, habit-holder ${habit.completed ? 'finishes' : 'crashes on ' + habit.crashedOn}`);
+    });
+
+    // ---- Stars ----
+    const cs = Pulse.Campaign.computeStars;
+    const st = { stars: { two: 0.6, three: 0.9 } };
+    check(cs(st, false, 10, 10) === 0, 'crash awards 0 stars');
+    check(cs(st, true, 0, 10) === 1, 'completion alone = 1 star');
+    check(cs(st, true, 5, 10) === 1, '50% = 1 star');
+    check(cs(st, true, 6, 10) === 2, 'exactly 60% = 2 stars');
+    check(cs(st, true, 8, 10) === 2, '80% = 2 stars');
+    check(cs(st, true, 9, 10) === 3, 'exactly 90% = 3 stars');
+    check(cs(st, true, 10, 10) === 3, '100% = 3 stars');
+    check(cs(st, true, 0, 0) === 3, 'no energy in stage: completion = 3 stars');
+    check(cs(st, true, 1, 1) === 3 && cs(st, true, 0, 1) === 1, 'single energy: all or nothing');
+    // 7 energy: 60% → ceil(4.2) = 5 needed, 90% → ceil(6.3) = 7 needed.
+    check(cs(st, true, 4, 7) === 1 && cs(st, true, 5, 7) === 2, '7 energy: 2 stars needs 5');
+    check(cs(st, true, 6, 7) === 2 && cs(st, true, 7, 7) === 3, '7 energy: 3 stars needs 7');
+    check(cs({}, true, 6, 10) === 2, 'defaults apply when stage has no stars field');
+    check(cs({ stars: { three: 1 } }, true, 9, 10) === 2, 'per-stage threshold overrides default');
+
+    // ---- Progress, unlocks, replay ----
+    let save = fresh();
+    check(Pulse.Campaign.isUnlocked(save, 0) && !Pulse.Campaign.isUnlocked(save, 1), 'only stage 1 unlocked at start');
+    let r = Pulse.Campaign.recordCompletion(save, s1.id, 2);
+    check(r.unlockedNext === s2, 'first completion unlocks stage 2');
+    check(Pulse.Campaign.isUnlocked(save, 1) && !Pulse.Campaign.isUnlocked(save, 2), 'stage 3 still locked');
+    r = Pulse.Campaign.recordCompletion(save, s1.id, 1);
+    check(save.campaign.stages[s1.id].bestStars === 2 && r.bestStars === 2, 'replay with fewer stars keeps best');
+    check(r.unlockedNext === null, 'replay does not re-announce unlock');
+    r = Pulse.Campaign.recordCompletion(save, s1.id, 3);
+    check(save.campaign.stages[s1.id].bestStars === 3, 'replay with more stars raises best');
+    check(Pulse.Campaign.totalStars(save) === 3, 'total stars derived from records');
+    save.campaign.stages['unknown-stage'] = { completed: true, bestStars: 3 };
+    check(Pulse.Campaign.totalStars(save) === 3, 'records for unknown stages do not count');
+
+    // ---- Skins ----
+    save = fresh();
+    const solar = Pulse.Skins.byId('solar-flare'), prism = Pulse.Skins.byId('void-prism'), retro = Pulse.Skins.byId('retro-green');
+    check(solar.unlockStars === 3 && prism.unlockStars === 6 && retro.unlockStars === 9, 'skin thresholds 3/6/9');
+    check(!Pulse.Skins.select(save, 'solar-flare'), 'locked skin cannot be selected');
+    r = Pulse.Campaign.recordCompletion(save, s1.id, 2);
+    check(r.newSkins.length === 0 && !Pulse.Skins.isUnlocked(save, solar), '2 stars: Solar Flare still locked');
+    r = Pulse.Campaign.recordCompletion(save, s2.id, 1);
+    check(r.newSkins.length === 1 && r.newSkins[0] === solar, '3 stars unlocks Solar Flare exactly once');
+    r = Pulse.Campaign.recordCompletion(save, s2.id, 1);
+    check(r.newSkins.length === 0, 'unlock is not repeated');
+    check(Pulse.Skins.select(save, 'solar-flare') && Pulse.Skins.selected(save) === solar, 'unlocked skin can be selected');
+    Pulse.Campaign.recordCompletion(save, s1.id, 3);
+    Pulse.Campaign.recordCompletion(save, s2.id, 3);
+    check(Pulse.Skins.isUnlocked(save, prism) && !Pulse.Skins.isUnlocked(save, retro), '6 stars unlocks Void Prism only');
+    r = Pulse.Campaign.recordCompletion(save, s3.id, 3);
+    check(r.newSkins[0] === retro, '9 stars unlocks Retro Green');
+    for (const skin of Pulse.SKINS) {
+      check(Object.keys(skin).sort().join() === 'colors,id,name,sprite,unlockStars', `${skin.id}: skin has looks only (no gameplay fields)`);
+      check(Object.keys(skin.sprite).sort().join() === 'arcPrefix,atlas,prefix', `${skin.id}: sprite entry names frames only`);
+    }
+
+    // ---- Save data ----
+    const S = Pulse.Save;
+    let mem = memoryStorage();
+    check(JSON.stringify(S.load(mem)) === JSON.stringify(fresh()), 'empty storage loads defaults');
+    mem = memoryStorage({ 'pulse.best': '42' });
+    let loaded = S.load(mem);
+    check(loaded.endless.best === 42, 'prototype best score (pulse.best) is migrated');
+    S.write(loaded, mem);
+    check(JSON.parse(mem.data['pulse.save.v1']).endless.best === 42 && mem.data['pulse.best'] === '42', 'write keeps both keys');
+    mem = memoryStorage({ 'pulse.save.v1': '{not json', 'pulse.best': '17' });
+    loaded = S.load(mem);
+    check(loaded.endless.best === 17, 'malformed save falls back without losing legacy best');
+    check(mem.data['pulse.save.corrupt'] === '{not json', 'malformed save is kept as a backup');
+    mem = memoryStorage({ 'pulse.save.v1': JSON.stringify({ endless: { best: 5 } }), 'pulse.best': '30' });
+    check(S.load(mem).endless.best === 30, 'higher legacy best wins');
+    mem = memoryStorage({ 'pulse.save.v1': JSON.stringify({ endless: { best: 50 } }), 'pulse.best': '30' });
+    check(S.load(mem).endless.best === 50, 'higher saved best wins');
+    loaded = S.sanitize({ endless: { best: 'x' }, campaign: { stages: { a: { bestStars: 7 }, b: null, c: { bestStars: -2 } } }, skins: { selected: 5, unlocked: ['void-prism', 3] } });
+    check(loaded.endless.best === 0, 'non-numeric best becomes 0');
+    check(loaded.campaign.stages.a.bestStars === 3 && loaded.campaign.stages.a.completed, 'stars clamped to 3 and imply completion');
+    check(!('b' in loaded.campaign.stages) && loaded.campaign.stages.c.bestStars === 0, 'bad stage records dropped or clamped');
+    check(loaded.skins.selected === 'classic' && loaded.skins.unlocked.join() === 'classic,void-prism', 'bad skin fields cleaned');
+    check(S.sanitize('garbage').version === 1 && S.sanitize(null).endless.best === 0, 'non-object saves become defaults');
+    check(Pulse.Skins.selected(S.sanitize({ skins: { selected: 'retro-green' } })).id === 'classic', 'selected locked skin falls back to Classic');
+    check(Pulse.Skins.selected(S.sanitize({ skins: { selected: 'nope' } })).id === 'classic', 'unknown skin falls back to Classic');
+    const throwing = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
+    check(S.load(throwing).version === 1, 'blocked storage loads defaults');
+    S.write(fresh(), throwing);
+    check(true, 'blocked storage write does not throw');
+    mem = memoryStorage();
+    save = S.load(mem);
+    Pulse.Campaign.recordCompletion(save, s1.id, 3);
+    Pulse.Skins.select(save, 'solar-flare');
+    S.write(save, mem);
+    loaded = S.load(mem);
+    check(loaded.campaign.stages[s1.id].bestStars === 3 && Pulse.Skins.selected(loaded).id === 'solar-flare', 'progress and skin survive a save/load round trip');
+
+    // ---- 12-stage progression ----
+    save = fresh();
+    for (let i = 0; i < STAGES.length; i++) {
+      check(Pulse.Campaign.isUnlocked(save, i), `stage ${i + 1} unlocked after clearing the stages before it`);
+      if (i + 1 < STAGES.length) check(!Pulse.Campaign.isUnlocked(save, i + 1), `stage ${i + 2} locked until stage ${i + 1} is cleared`);
+      check(Pulse.Campaign.nextStageIndex(save) === i, `next stage to play is ${i + 1}`);
+      r = Pulse.Campaign.recordCompletion(save, STAGES[i].id, 3);
+      if (i + 1 < STAGES.length) check(r.unlockedNext === STAGES[i + 1], `clearing stage ${i + 1} announces stage ${i + 2}`);
+    }
+    check(Pulse.Campaign.totalStars(save) === 36, 'all 12 stages × 3 stars = 36');
+    const violet = Pulse.Skins.byId('violet-nova'), whiteout = Pulse.Skins.byId('whiteout');
+    check(violet.unlockStars === 12 && whiteout.unlockStars === 15, 'new skins unlock at 12 and 15 stars');
+    check(Pulse.Skins.isUnlocked(save, violet) && Pulse.Skins.isUnlocked(save, whiteout), 'all six skins unlocked with 36 stars');
+    save = fresh();
+    for (let i = 0; i < 4; i++) Pulse.Campaign.recordCompletion(save, STAGES[i].id, 3);
+    check(Pulse.Skins.isUnlocked(save, violet) && !Pulse.Skins.isUnlocked(save, whiteout), '12 stars: Violet Nova yes, Whiteout not yet');
+
+    // ---- Migration from the 3-stage campaign (same save key, same ids) ----
+    mem = memoryStorage({
+      'pulse.save.v1': JSON.stringify({
+        version: 1, endless: { best: 88 },
+        campaign: { stages: { 's1-first-pulse': { completed: true, bestStars: 3 }, 's2-find-the-rhythm': { completed: true, bestStars: 2 }, 's3-controlled-overload': { completed: true, bestStars: 1 } } },
+        skins: { selected: 'solar-flare', unlocked: ['classic', 'solar-flare', 'void-prism'] },
+      }),
+      'pulse.best': '88',
+    });
+    loaded = S.load(mem);
+    check(loaded.endless.best === 88, 'old save: Endless best kept');
+    check(Pulse.Campaign.totalStars(loaded) === 6, 'old save: stars from stages 1–3 kept (6)');
+    check(Pulse.Campaign.isUnlocked(loaded, 3) && !Pulse.Campaign.isUnlocked(loaded, 4), 'old save: stage 4 unlocked, stage 5 still locked');
+    check(Pulse.Campaign.nextStageIndex(loaded) === 3, 'old save: continues at stage 4');
+    check(Pulse.Skins.selected(loaded).id === 'solar-flare', 'old save: selected skin kept');
+    check(loaded.settings.music === 0.8 && loaded.settings.sfx === 1, 'old save: audio settings get defaults');
+    // A stage already beaten stays open even if an earlier one isn't (stages inserted later).
+    loaded.campaign.stages['s2-find-the-rhythm'] = { completed: false, bestStars: 0 };
+    check(Pulse.Campaign.isUnlocked(loaded, 2), 'a completed stage never re-locks');
+
+    // ---- Audio settings in the save ----
+    loaded = S.sanitize({ settings: { music: 3, sfx: -1 } });
+    check(loaded.settings.music === 1 && loaded.settings.sfx === 0, 'settings clamped to 0–1');
+    loaded = S.sanitize({ settings: { music: 'loud' } });
+    check(loaded.settings.music === 0.8, 'bad setting falls back to default');
+    mem = memoryStorage();
+    save = S.load(mem);
+    save.settings.music = 0.4;
+    save.settings.sfx = 0;
+    S.write(save, mem);
+    loaded = S.load(mem);
+    check(loaded.settings.music === 0.4 && loaded.settings.sfx === 0, 'audio settings survive a save/load round trip');
+
+    lines.unshift(`${failures === 0 ? 'PASS' : 'FAIL'} ${checks - failures}/${checks} checks`);
+    document.getElementById('out').textContent = lines.join('\n');
+    document.title = lines.join(' | ');
+  </script>
+</body>
+</html>

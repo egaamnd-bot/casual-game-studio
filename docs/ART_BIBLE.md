@@ -1,14 +1,61 @@
 # Art Bible & Asset Specifications
 
-> Owner: Gemini (Creative Director). Status: **Draft, not approved.** All assets follow this document once the producer approves it.
+> Owner: Gemini (Creative Director). **Direction approved by the producer:** Direction A, *Kinetic Vector / Precision Cyber-Grid* (see DECISIONS.md #7).
+>
+> **Artwork status:** the **v4.0 pack** (three worlds, six skins, synthwave audio) is integrated on `feature/pulse-12-stage-campaign`; v4 documents are in [art/v4/](art/v4/). It keeps every v3 sprite at identical size and geometry (verified). One correction to Gemini's changelog: the 12 stage-card plates are separate PNGs, not atlas frames; they're loaded from `src/assets/stage_cards/`. Not used yet: the world decor atlas, `fx_world_transition_wave`, the skin morph frames, the tutorial callout, and the star-trio frames.
+>
+> Before that: the **v3.0 pack (landscape)** was integrated on `feature/pulse-landscape`. How it's used: [LANDSCAPE.md](LANDSCAPE.md). v3 documents: [art/v3/](art/v3/) (style guide, landscape layout guide, charged-barrier spec, integration guide, reference sheets). The v2.0 pack (portrait) is on `feature/pulse-art-v2`; its documents remain in [art/](art/).
+>
+> The v3 integration rules match v2's below: art is scaled to gameplay sizes, and the v3 sprites keep v2's measured geometry. v3's new barrier bands measure 44 px (plain) and 60 px (charged), which become 22 and 30 px in-game, the collision thicknesses.
+
+## Integration Rules (v2.0)
+
+Gemini authored the art for a 1080 px wide screen; the game is 540 px wide. **Gameplay sizes never change to fit the art. The art is scaled to fit the gameplay** (producer decision, DECISIONS.md #8). Scale factors are measured from the files and kept in `Pulse.ART` (`src/js/config.js`):
+
+| Art | Measured in file | Drawn so that |
+|-----|------------------|---------------|
+| `*_normal` orb | solid radius 46 px | its edge = the orb's collision radius (56 px full size, shrinking smoothly) |
+| `*_shrunk` orb, tension arcs | solid radius 22 px | its edge = 20 px when fully shrunk; fades in as the orb shrinks |
+| `wall_body_tile`, `wall_cap_left/right` | 72 px hazard band, 12 px margin | band = the 36 px collision wall; cap edges sit exactly on the gap edges |
+| `orb_energy_gold_*` (standard energy) | solid radius 24 px | 16 px on screen (collection radius unchanged at 14 px plus orb) |
+| `orb_energy_mint_*` (bonus energy) | solid radius 28 px | 16 px on screen |
+| UI frames, backgrounds | 1080-space | half size; buttons use nine-slice so corners stay crisp |
+
+Mapping decisions:
+- Gold = standard energy, mint = bonus (campaign only).
+- Gemini's suggested point values (+100 / +250) are **not used**: Endless keeps its multiplier, Campaign keeps stars.
+- Gemini's code samples assume Phaser's Arcade Physics; the game keeps its own collision. Only the visuals were adopted.
+- Near-miss arc: cosmetic only, shown when the orb passes a wall with 8 px or less to spare. It never changes score; a test checks this.
+- Endless tunnels are taller than the wall art, so they're drawn in code using the same palette.
+- If any asset fails to load, the game falls back to the code-drawn shapes in the same palette.
+
+Not used yet: tutorial hands, audio toggle icons, HUD brackets, header banners and badges, `wall_joint_divider`, and the separate `bg_speed_ticks` variants beyond Endless. There's no audio in the pack; sounds remain synthesized placeholders.
+
+Feedback for Gemini:
+- `ui_icon_status_lock` looks like an *open* padlock; a closed one would read better for locked stages.
+- New art request (updated for v2 in [GAMEPLAY_EVOLUTION.md](GAMEPLAY_EVOLUTION.md): adds a charged barrier and a charge ring): a **cyan barrier** (full-width tileable energy membrane, 44 px tall in 1080-space; charged-cyan and danger-red states; shatter effect) and optionally a height-tileable tunnel body. Both are code-drawn for now. See [GAMEPLAY_VARIETY.md](GAMEPLAY_VARIETY.md).
 
 ## Visual Identity
 
-- **Mood:** TODO (e.g. bright, friendly, cozy)
-- **Style:** TODO (e.g. flat vector, soft 3D, pixel art)
-- **Color palette:** TODO (hex codes)
-- **Typography:** TODO (fonts and licenses)
-- **References:** TODO (links or images in `docs/references/`)
+- **Mood:** precise, energetic, high-contrast; a dark blueprint grid with bright plasma and hazard accents
+- **Style:** clean vector shapes with glow, geometric reticles and circuit traces
+- **Core palette (from Gemini's v2.0 style guide):**
+
+| Role | Hex |
+|------|-----|
+| Background | `#0B0F19` |
+| Grid lines | `#162033` / `#1E2D47` |
+| Player orb (default) | `#00F0FF`, shrunk core `#E0FFFF`, rim `#7DF9FF` |
+| Hazard walls | rim `#FF2A54`, body `#2B111B`, gap-edge strip `#FF7A00` |
+| Energy (standard) | `#FFB800` |
+| Bonus energy | `#00FF9D` |
+| Dimmed pickups | `#475569` tint at 45% opacity |
+| Text | `#F8FAFC`, muted `#94A3B8` |
+
+- **Stage themes:** Stage 1 calm blue grid; Stage 2 teal rhythm lanes; Stage 3 dense violet circuits. All keep background brightness low so walls and energy stay readable.
+- **Skins:** Classic (Kinetic Cyan), Solar Flare, Void Prism and Retro Green. All four share the same sprite sizes and pivot.
+- **Typography:** game text is rendered by the game (UI images contain no text). TODO: choose and license a font.
+- **References:** Gemini's full guide and contact sheet will be committed with the asset pack.
 
 ## Technical Specs
 
@@ -48,19 +95,14 @@ An asset counts as integrated only once it is merged into the repository.
 
 ## Folder Structure
 
-TODO: Match the engine's project layout, for example:
+```
+src/assets/
+├── atlases/       pulse_gameplay, pulse_skins, pulse_ui (.png + .json, Phaser JSON hash)
+└── backgrounds/   bg_grid_tile, bg_speed_ticks, bg_stage1..3 + ticks
+```
 
-```
-assets/
-├── art/
-│   ├── characters/
-│   ├── environments/
-│   └── ui/
-└── audio/
-    ├── music/
-    └── sfx/
-```
+Only atlases and backgrounds ship in the app. The pack's loose per-sprite PNGs duplicate the atlas contents and aren't copied. `tests/assets.html` checks that every frame the code uses exists.
 
 ## Credits
 
-TODO: Keep the third-party asset sources and licenses in `ASSET_CREDITS.md`.
+All v2.0 artwork was produced by Gemini (Creative Director) for this project. There are no third-party assets.

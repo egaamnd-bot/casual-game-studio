@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse asset tests</title>
+  <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
+</head>
+<body>
+  <script>
+    // Checks Gemini's v2.0 asset pack as the game actually loads it: every file loads, every
+    // frame the code uses exists, stage backgrounds are known, each scene opens and each skin
+    // renders without errors, and sprite sizes match the gameplay sizes.
+    // In Chrome/Edge, open with --allow-file-access-from-files (file:// loading), or serve the repo.
+    try { localStorage.clear(); } catch (e) {}
+    window.PULSE_ASSET_BASE = '../src/';
+    window.PULSE_TEST = { autoStart: false };
+    const errors = [];
+    window.addEventListener('error', (ev) => errors.push(ev.message));
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/patterns.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script src="../src/js/render.js"></script>
+  <script src="../src/js/ui.js"></script>
+  <script src="../src/js/assets.js"></script>
+  <script src="../src/js/sprite-view.js"></script>
+  <script src="../src/js/game-scene.js"></script>
+  <script src="../src/js/menu-scenes.js"></script>
+  <script src="../src/js/main.js"></script>
+  <script>
+    const C = Pulse.CONFIG;
+    const A = Pulse.ART;
+    const fails = [];
+    const notes = [];
+    const check = (ok, msg) => { if (!ok) fails.push(msg); };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const active = () => window.__pulseGame.scene.getScenes(true)[0];
+    const near = (a, b) => Math.abs(a - b) < 0.6;
+
+    async function run() {
+      for (let i = 0; i < 50 && !active(); i++) await wait(100);
+      await wait(500);
+      check(Pulse.Assets.ok === true, `assets ok (missing: ${(Pulse.Assets.missingList || []).join(', ')})`);
+      check(Pulse.Assets.failed.length === 0, `load errors: ${Pulse.Assets.failed.join(', ')}`);
+      check(active().scene.key === 'menu', 'boot opens the menu');
+      let frames = 0;
+      const req = Pulse.Assets.requiredFrames();
+      for (const k of Object.keys(req)) frames += req[k].length;
+      notes.push(`${frames} required frames present`);
+
+      for (const stage of Pulse.STAGES) {
+        const v = stage.world.visual;
+        check(v && ['background', 'mid', 'rail'].every((k) => Pulse.Assets.IMAGES.includes(v[k])),
+          `${stage.id}: world background images are known`);
+        check(Pulse.Assets.IMAGES.includes(stage.world.banner), `${stage.id}: world banner is known`);
+      }
+      for (const key of ['anim_orb_gold', 'anim_orb_mint', ...Pulse.SKINS.map((s) => `anim_arcs_${s.id}`)]) {
+        const anim = active().anims.get(key);
+        check(anim && anim.frames.length === 4, `animation ${key} has 4 frames`);
+      }
+
+      // Audio: every effect and sting decodes; every music track the game asks for exists.
+      await Pulse.Audio.loading;
+      const st = Pulse.Audio.status();
+      check(st.buffers === st.expected && st.failed.length === 0, `audio decoded ${st.buffers}/${st.expected} (failed: ${st.failed.join(', ')})`);
+      notes.push(`${st.buffers} sounds decoded`);
+      const tracks = new Set(['MENU_THEME', ...Pulse.WORLDS.map((w) => w.music), 'WORLD_1_GAMEPLAY', 'WORLD_2_GAMEPLAY', 'WORLD_3_GAMEPLAY']);
+      for (const t of tracks) {
+        const ok = await fetch(`../src/assets/audio/music/${t}.ogg`).then((r) => r.ok && r.arrayBuffer()).then((b) => b && b.byteLength > 100000).catch(() => false);
+        check(ok, `music track ${t} present`);
+      }
+      for (let i = 0; i < Pulse.STAGES.length; i++) {
+        check(active().textures.exists(Pulse.Assets.stageCardKey(i)), `stage card plate ${Pulse.Assets.stageCardKey(i)} loaded`);
+      }
+
+      // Menus.
+      active().scene.start('stages'); await wait(400);
+      check(active().scene.key === 'stages', 'stage select opens');
+
+      // Gameplay in every stage and Endless, every skin: sizes match gameplay.
+      const runs = Pulse.STAGES.map((s, i) => ({ mode: 'campaign', stageIndex: i })).concat([{ mode: 'endless' }]);
+      for (let k = 0; k < runs.length; k++) {
+        const save = Pulse.Save.load();
+        save.skins.unlocked = Pulse.SKINS.map((s) => s.id);
+        save.skins.selected = Pulse.SKINS[k % Pulse.SKINS.length].id;
+        Pulse.Save.write(save);
+        active().scene.start('game', runs[k]); await wait(400);
+        const g = active();
+        check(g.view && g.skin.id === save.skins.selected, `run ${k}: sprite view with skin ${save.skins.selected}`);
+        g.test = { bot: true };
+        g.startRun();
+        await wait(3000);
+        check(g.state === 'playing', `run ${k}: still playing after 3s with autopilot`);
+        // Orb art edge equals the collision radius at full size.
+        g.radius = C.orb.radius; g.draw();
+        // (Comet look: the round disc is the orb; it is never smaller than the collision circle, at most a few px bigger while it springs, and never shorter along travel.)
+        const body = g.view.comet ? g.view.cometBody : null;
+        const within = (rad) => body.displayWidth / 2 >= rad - 0.01 && body.displayWidth / 2 <= rad + Pulse.Rhythm.OrbFx.maxExtra + 0.01;
+        check(body ? within(C.orb.radius) && body.displayHeight >= body.displayWidth - 0.01
+          : near(g.view.body.displayWidth / 2 * (A.orbBodyRadius / 64), C.orb.radius), `run ${k}: orb art radius = ${C.orb.radius}`);
+        g.radius = C.orb.minRadius; g.draw();
+        check(body ? within(C.orb.minRadius) && body.displayHeight >= body.displayWidth - 0.01
+          : near(g.view.core.displayWidth / 2 * (A.orbShrunkRadius / 38), C.orb.minRadius), `run ${k}: shrunk art radius = ${C.orb.minRadius}`);
+        const gates = g.level.segments.filter((s) => s.active && s._vis && s._vis.kind === 'gate' && s._vis.parts[1].visible);
+        if (gates.length) {
+          const s = gates[0];
+          const [, capL, capR] = s._vis.parts;
+          check(Math.abs(capL.x + A.capReach * A.base - s.gapL) < 1 && Math.abs(capR.x + (64 - A.capReach) * A.base - s.gapR) < 1,
+            `run ${k}: wall art edges match collision gap`);
+          check(Math.abs(capL.y + A.wallBandTop * A.base - s.y) < 1, `run ${k}: wall art band aligned with collision`);
+        }
+      }
+
+      // Barrier art: right tiles, bands aligned with collision, and the state shown matches the
+      // rules (Level.canSmash vs Level.resolve) for plain and charged barriers.
+      const g = active();
+      const view = g.view;
+      const R = C.orb.radius;
+      for (const charged of [false, true]) {
+        const seg = { kind: 'barrier', charged, y: 200, h: charged ? C.barrier.chargedThickness : C.barrier.thickness, broken: false };
+        const v = view.makeBarrier();
+        for (const [r, charge] of [[R, 1], [R, 0.5], [R, 0], [30, 1], [R - 8, 1]]) {
+          const ready = g.level.canSmash(seg, r, charge);
+          view.placeBarrier(v, seg, true, ready);
+          const want = (charged ? 'barrier_charged_' : 'barrier_smash_') + (ready ? 'ready' : 'danger') + '_tile';
+          const shownFrame = (v.parts[0].displayFrame || v.parts[0].frame).name; // TileSprite: displayFrame = tile image
+          check(shownFrame === want, `${charged ? 'charged' : 'plain'} barrier at r=${r} charge=${charge} shows ${want} (got ${shownFrame})`);
+          const probe = Object.assign(g.level.obtain(), seg, { active: true, y: g.orbY - R - 5, scored: false });
+          const outcome = g.level.resolve(probe, g.orbY, r, charge);
+          probe.active = false;
+          check(ready === (outcome === 'break'), `${charged ? 'charged' : 'plain'} barrier: shown ${ready ? 'ready' : 'danger'} but outcome ${outcome}`);
+          if (charged) check(v.parts[1].visible && v.parts[1].frame.name === `barrier_charged_emblem_${ready ? 'ready' : 'danger'}`, 'charged emblem matches state');
+        }
+        const band = charged ? 12 : 10;
+        check(Math.abs(v.parts[0].y + band * A.base - seg.y) < 0.5 && Math.abs(v.parts[0].displayHeight - (charged ? 42 : 32)) < 0.5,
+          `${charged ? 'charged' : 'plain'} barrier band aligned with its ${seg.h}px collision band`);
+        v.show(false);
+      }
+      // Charge ring: A empty, B steps, C full with a one-off completion burst.
+      view.renderChargeRing(true, 0, R);
+      check(view.chargeRing.frame.name === 'charge_ring_state_a_empty', 'charge ring: empty state');
+      view.renderChargeRing(true, 0.5, R);
+      check(view.chargeRing.frame.name === 'charge_ring_state_b_step_03', 'charge ring: 50% shows step 3 of 4');
+      view.renderChargeRing(true, 1, R);
+      check(view.chargeRing.frame.name === 'charge_ring_state_c_full' && (view.comet ? view.cometEcho.visible : view.chargeBurst.visible), 'charge ring: full state with burst');
+      view.renderChargeRing(false, 1, R);
+      check(!view.chargeRing.visible, 'charge ring hidden when no charged barrier is on screen');
+
+      // Cosmetic near miss: forcing one must not change score.
+      const before = g.score;
+      const fakeGate = { need: g.radius + 2, gapL: g.orbX - g.radius - 2, gapR: g.orbX + 80 };
+      g.checkNearMiss(fakeGate, g.radius);
+      check(g.score === before && g.nearMisses >= 1, 'near-miss effect does not change score');
+
+      check(errors.length === 0, `page errors: ${errors.join(' | ')}`);
+      document.title = (fails.length ? `FAIL ${fails.length}: ${fails.join(' | ')}` : 'PASS asset tests') + ' | ' + notes.join(' | ');
+    }
+    run().catch((e) => { document.title = 'ERROR ' + e.message; });
+  </script>
+</body>
+</html>

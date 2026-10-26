@@ -2,7 +2,7 @@
   "name": "casual-game-studio",
   "version": "0.0.1",
   "private": true,
-  "description": "Android pipeline smoke test (Phaser 3 + Capacitor). Not the game.",
+  "description": "Pulse playable prototype (Phaser 3 + Capacitor).",
   "scripts": {
     "build": "node scripts/build.mjs"
   },

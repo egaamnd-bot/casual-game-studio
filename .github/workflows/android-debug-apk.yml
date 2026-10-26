@@ -47,6 +47,15 @@ jobs:
           npx cap add android
           npx cap sync android
 
+      # Pulse is a landscape game (either landscape direction, following the phone's sensor).
+      # Warn (don't fail) if the generated manifest changes shape.
+      - name: Lock landscape orientation
+        run: |
+          manifest=android/app/src/main/AndroidManifest.xml
+          sed -i 's/<activity\b/<activity android:screenOrientation="sensorLandscape"/' "$manifest"
+          grep -q 'screenOrientation="sensorLandscape"' "$manifest" \
+            || echo "::warning::Landscape lock not applied; AndroidManifest.xml format changed"
+
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
@@ -54,7 +63,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: pipeline-test-debug-apk-run${{ github.run_number }}
+          name: pulse-debug-apk-run${{ github.run_number }}
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14
           if-no-files-found: error

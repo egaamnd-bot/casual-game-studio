@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse scene tests</title>
+  <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
+</head>
+<body>
+  <script>
+    // Drives the real game with synthetic mouse input: hold/release, focus loss, pause button,
+    // retry lock, pickup dimming, campaign save rules and Endless best-score preservation.
+    // Results go into the page title. Needs internet for Phaser (CDN).
+    try { localStorage.clear(); localStorage.setItem('pulse.best', '77'); } catch (e) {}
+    // ?noassets=1 runs the same checks with the code-drawn shapes instead of sprites.
+    window.PULSE_ASSET_BASE = '../src/';
+    window.PULSE_TEST = {
+      autoStart: true, bot: false, mode: 'campaign', stageIndex: 0,
+      noAssets: new URLSearchParams(location.search).get('noassets') === '1',
+    };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/patterns.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script src="../src/js/render.js"></script>
+  <script src="../src/js/ui.js"></script>
+  <script src="../src/js/assets.js"></script>
+  <script src="../src/js/sprite-view.js"></script>
+  <script src="../src/js/game-scene.js"></script>
+  <script src="../src/js/menu-scenes.js"></script>
+  <script src="../src/js/main.js"></script>
+  <script>
+    const C = Pulse.CONFIG;
+    const results = [];
+    let failures = 0;
+    const check = (ok, msg) => { if (!ok) failures++; if (!ok) results.push('FAIL ' + msg); };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const scene = () => window.__pulseScene;
+
+    function at(gx, gy) {
+      const rect = document.querySelector('canvas').getBoundingClientRect();
+      const k = rect.width / window.__pulseGame.scale.width; // screen (landscape) game px
+      return { clientX: rect.left + gx * k, clientY: rect.top + gy * k };
+    }
+    function down(gx, gy) {
+      const p = at(gx, gy);
+      document.querySelector('canvas').dispatchEvent(new MouseEvent('mousedown', Object.assign({ bubbles: true, button: 0, buttons: 1 }, p)));
+    }
+    function up(gx, gy) {
+      const p = at(gx, gy);
+      window.dispatchEvent(new MouseEvent('mouseup', Object.assign({ bubbles: true, button: 0, buttons: 0 }, p)));
+      document.querySelector('canvas').dispatchEvent(new MouseEvent('mouseup', Object.assign({ bubbles: true, button: 0, buttons: 0 }, p)));
+    }
+    const savedData = () => JSON.parse(localStorage.getItem('pulse.save.v1') || '{"campaign":{"stages":{}}}');
+
+    // Record whether pickups are drawn dimmed.
+    const dimLog = [];
+    const origPickup = Pulse.Render.pickup;
+    Pulse.Render.pickup = function (g, seg, x, dimmed) { dimLog.push(dimmed); return origPickup.apply(this, arguments); };
+
+    async function run() {
+      for (let i = 0; i < 150 && !(scene() && scene().state === 'playing'); i++) await wait(100); // slow servers load assets late
+      await wait(300);
+      const s = scene();
+      check(s && s.mode === 'campaign' && s.state === 'playing', 'campaign stage starts');
+      const cx = s.SW * 0.75, cy = s.SH / 2; // tap in the open lane ahead of the orb
+
+      // Hold and release.
+      down(cx, cy); await wait(300);
+      check(s.radius === C.orb.minRadius, `hold shrinks orb fully (r=${s.radius})`);
+      check(!s.canCollect(), 'shrunk orb cannot collect');
+      up(cx, cy); await wait(300);
+      check(s.radius === C.orb.radius, `release restores orb (r=${s.radius})`);
+      check(s.canCollect(), 'full-size orb can collect');
+
+      // Focus loss while holding: released and paused, orb regrows.
+      down(cx, cy); await wait(150);
+      s.game.events.emit('blur'); await wait(300);
+      check(s.state === 'paused', 'focus loss pauses');
+      check(!s.isHeld(), 'focus loss releases touch');
+      check(s.radius === C.orb.radius, 'orb not stuck shrunk after focus loss');
+      up(cx, cy);
+      down(cx, cy); up(cx, cy); await wait(100);
+      check(s.state === 'playing', 'tap resumes');
+
+      // Pause button.
+      down(s.pauseBtn.x, s.pauseBtn.y); up(s.pauseBtn.x, s.pauseBtn.y); await wait(100);
+      check(s.state === 'paused', 'pause button pauses');
+      down(cx, cy); up(cx, cy); await wait(100);
+      check(s.state === 'playing', 'tap resumes after pause button');
+
+      // Rhythm clock: runs only while playing, stays in step with the level, restarts on retry.
+      check(s.clock.bpm === Pulse.STAGES[0].world.bpm, `stage 1 clock runs at the world's tempo (${s.clock.bpm})`);
+      check(Math.abs(s.clock.t - s.level.time) < 1e-6, 'run clock and level clock agree');
+      s.pause(); const frozen = s.clock.t; await wait(300);
+      check(s.clock.t === frozen, 'run clock is frozen while paused');
+      down(cx, cy); up(cx, cy); await wait(300);
+      check(s.state === 'playing' && s.clock.t > frozen && Math.abs(s.clock.t - s.level.time) < 1e-6, 'run clock continues after resume');
+      check(s.orbFx && s.orbFx.glow >= 1 && s.orbFx.along >= 1 && s.orbFx.across >= 1 && s.orbFx.radius >= s.radius - 1e-9, 'orb effects never shrink the drawn orb');
+      check(s.radius === C.orb.radius, 'orb effects leave the collision radius alone');
+
+      // Input sounds are never delayed to the beat.
+      check(C.groove.inputDelay === 0, 'shrink and release sounds play at once');
+
+      // Pickup dimming: wait until a pickup is on screen, then hold.
+      const sprites = !!s.view;
+      check(sprites === !window.PULSE_TEST.noAssets, `renderer is ${sprites ? 'sprites' : 'shapes'} as requested`);
+      const pickupSprites = () => sprites
+        ? s.view.free.pickup.concat(s.level.segments.filter((g) => g._vis && g._vis.kind === 'pickup').map((g) => g._vis))
+          .flatMap((v) => [v.parts[0], v.parts[2]]).filter((o) => o.visible) // parts: orb, lock, orb, lock
+        : [];
+      // Wait until a pickup is actually on screen.
+      const pickupVisible = () => s.level.segments.some((g) => g.active && g.kind === 'pickup' && !g.taken && g.y > 0 && g.y < s.orbY - 40);
+      for (let i = 0; i < 100 && !pickupVisible(); i++) await wait(100);
+      check(pickupVisible(), 'a pickup scrolls onto the screen');
+      dimLog.length = 0;
+      down(cx, cy); await wait(300);
+      const shrunkDraws = sprites ? pickupSprites().map((o) => o.alpha === C.pickup.dimAlpha) : dimLog.slice(-5);
+      up(cx, cy); await wait(400);
+      const fullDraws = sprites ? pickupSprites().map((o) => o.alpha === 1 ? false : true) : dimLog.slice(-5);
+      check(shrunkDraws.length > 0 && shrunkDraws.every((d) => d === true), 'pickups dimmed to 45% while shrunk');
+      check(fullDraws.length > 0 && fullDraws.every((d) => d === false), 'pickups at full opacity when grown');
+
+      // Crash (no input): no completion recorded, next stage stays locked, retry lock.
+      for (let i = 0; i < 100 && s.state !== 'over'; i++) await wait(100);
+      check(s.state === 'over', 'idle play crashes');
+      check(!savedData().campaign.stages[Pulse.STAGES[0].id], 'crash records no completion');
+      check(!Pulse.Campaign.isUnlocked(Pulse.Save.load(), 1), 'crash does not unlock stage 2');
+      down(cx, cy); up(cx, cy); await wait(50);
+      check(s.state === 'over', 'tap right after crash is ignored (retry lock)');
+      await wait(500);
+      down(cx, cy); up(cx, cy); await wait(100);
+      check(s.state === 'playing' && s.level.travelled < 200, 'tap after lock restarts from the beginning');
+      check(s.clock.t < 0.3 && s.level.time < 0.3, `retry restarts the run clock (t=${s.clock.t.toFixed(2)})`);
+
+      // Completion with autopilot: recorded, unlocks next, legacy best untouched.
+      s.test.bot = true;
+      for (let i = 0; i < 400 && s.state !== 'complete'; i++) await wait(100);
+      check(s.state === 'complete', 'autopilot completes stage 1');
+      const rec = savedData().campaign.stages[Pulse.STAGES[0].id];
+      check(rec && rec.completed && rec.bestStars === s.result.stars && rec.bestStars >= 1, 'completion saved with stars');
+      check(Pulse.Campaign.isUnlocked(Pulse.Save.load(), 1), 'completion unlocks stage 2');
+      check(localStorage.getItem('pulse.best') === '77', 'prototype best score preserved');
+      check(s.nextBtn.visible && s.retryBtn.visible && s.backBtn.visible, 'completion shows next/retry/stages');
+
+      // Endless regression.
+      s.test.bot = false;
+      s.scene.start('game', { mode: 'endless' });
+      await wait(300);
+      const e = scene();
+      check(e.mode === 'endless' && e.level instanceof Pulse.EndlessLevel, 'endless uses the pattern generator');
+      check(e.best === 77, `endless best migrated (best=${e.best})`);
+      e.startRun(); e.test.bot = true; await wait(5000);
+      check(e.state === 'playing' && e.score > 0, `endless plays and scores (score=${e.score})`);
+
+      // ---- Audio lifecycle (state checks; real playback needs a genuine tap on a device) ----
+      const A = () => Pulse.Audio.status();
+      check(Pulse.Music.wanted === 'WORLD_1_GAMEPLAY', `endless starts on the World 1 track (${Pulse.Music.wanted})`);
+      e.elapsed = 35; e.step(1 / 60);
+      check(Pulse.Music.wanted === 'WORLD_2_GAMEPLAY', `endless moves to the World 2 track after 30 s (${Pulse.Music.wanted})`);
+      e.elapsed = 65; e.step(1 / 60);
+      check(Pulse.Music.wanted === 'WORLD_3_GAMEPLAY', `endless moves to the World 3 track after 60 s (${Pulse.Music.wanted})`);
+      check(e.clock.bpm === 140 && Pulse.Rhythm.trackTime(e.clock) < 0.1, `endless clock follows the track change (${e.clock.bpm} BPM)`);
+      e.pause();
+      check(e.state === 'paused' && Pulse.Music.level < 1, 'pause ducks the music');
+      check(Pulse.Music.holding === true, 'pause holds the music where it is, so resuming needs no seek');
+      down(cx, cy); up(cx, cy); await wait(100);
+      check(e.state === 'playing' && Pulse.Music.level === 1 && Pulse.Music.holding === false, 'resume restores the music level and releases the hold');
+      e.game.events.emit('hidden'); await wait(50);
+      check(A().hidden && A().musicPaused && !A().holding, 'app in background: music paused, hum stopped');
+      e.game.events.emit('visible'); await wait(50);
+      check(!A().hidden, 'app back in foreground');
+      check(e.state === 'paused', 'going to the background also pauses the run');
+      down(cx, cy); up(cx, cy); await wait(100);
+      e.test.bot = false;
+      for (let i = 0; i < 100 && e.state !== 'over'; i++) await wait(100);
+      check(e.state === 'over' && Pulse.Music.wanted === null, 'crash stops the gameplay music (game-over sting plays instead)');
+      check(typeof e.crashReason === 'string' && e.reasonText.visible, `crash shows a reason ("${e.crashReason}")`);
+      Pulse.Audio.setVolume('music', 0);
+      check(A().musicPaused && Pulse.Audio.volume('music') === 0, 'music volume 0 silences music');
+      Pulse.Audio.setVolume('music', 0.8);
+
+      // Campaign: a world's first stage opens with the transition sting; others play the world track.
+      window.PULSE_TEST.holdReady = true; // stay on ready screens from here on
+      e.scene.start('game', { mode: 'campaign', stageIndex: 4 }); await wait(300);
+      check(Pulse.Music.wanted === null, 'stage 5 (World 2 opener): music waits for the run, sting plays');
+      scene().startRun(); await wait(100);
+      check(Pulse.Music.wanted === 'WORLD_2_GAMEPLAY', 'stage 5 run: World 2 track');
+      scene().scene.start('game', { mode: 'campaign', stageIndex: 9 }); await wait(300);
+      check(Pulse.Music.wanted === 'WORLD_3_GAMEPLAY', 'stage 10: World 3 track from the ready screen');
+
+      // Menus render, with the menu theme.
+      scene().scene.start('menu'); await wait(300);
+      check(Pulse.Music.wanted === 'MENU_THEME', 'menu plays the menu theme');
+      window.__pulseGame.scene.getScenes(true)[0].scene.start('stages'); await wait(300);
+      check(window.__pulseGame.scene.getScenes(true)[0].scene.key === 'stages', 'stage select opens');
+
+      document.title = (failures ? `FAIL ${failures}` : 'PASS scene tests') + (results.length ? ' | ' + results.join(' | ') : '');
+    }
+    window.addEventListener('error', (ev) => { document.title = 'ERROR ' + ev.message + ' @ ' + String(ev.error && ev.error.stack).split('\n').slice(1, 3).join(' <- '); });
+    run().catch((err) => { document.title = 'ERROR ' + err.message + ' @ ' + String(err.stack).split('\n').slice(1, 3).join(' <- '); });
+  </script>
+</body>
+</html>
