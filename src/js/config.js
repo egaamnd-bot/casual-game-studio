@@ -139,6 +139,9 @@ Pulse.CONFIG = {
   // orb could smash it right now (Level.canSmash, the collision rule itself), the orb gets a restrained corona.
   barrierCue: { enabled: true, lookAhead: 420 },
 
+  // Prototype Lab (docs/LAB.md): the menu's LAB button, listing isolated experiments that are not part of the campaign.
+  lab: { enabled: true },
+
   // Gemini audio pack (docs/ASSET_MANIFEST.md): short event samples and the per-world Overdrive stems.
   // Audio only; switch either off to hear the earlier mix.
   audioPack: { samples: true, stems: true },

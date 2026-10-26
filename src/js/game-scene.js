@@ -49,7 +49,10 @@
       const test = window.PULSE_TEST || {};
       data = data && data.mode ? data : test;
       this.mode = data.mode === 'campaign' ? 'campaign' : 'endless';
-      this.stageIndex = data.stageIndex || 0;
+      // A Lab prototype (docs/LAB.md) plays a stage that is not in the campaign: it inherits the look of its base
+      // stage, never records a completion and never unlocks anything.
+      this.lab = data.lab && Pulse.Lab ? Pulse.Lab.find(data.lab) : null;
+      this.stageIndex = this.lab ? this.lab.baseIndex : (data.stageIndex || 0);
       this.mirrorClears = 0;
       this.crashedByEcho = false;
       this.resetMirror(); // a new scene never inherits an echo
@@ -72,7 +75,7 @@
       this.best = this.save.endless.best;
       let visual = Pulse.Assets.ENDLESS_VISUAL;
       if (this.mode === 'campaign') {
-        this.stage = Pulse.STAGES[this.stageIndex];
+        this.stage = this.lab ? this.lab.stage : Pulse.STAGES[this.stageIndex];
         this.level = new Pulse.Campaign.CampaignLevel(this.W, this.H, this.stage);
         visual = this.stage.look.visual;
       } else {
@@ -181,7 +184,7 @@
     }
 
     worldOpener() {
-      return this.mode === 'campaign' && Pulse.isOpener(this.stageIndex);
+      return this.mode === 'campaign' && !this.lab && Pulse.isOpener(this.stageIndex);
     }
 
     startMusic() {
@@ -319,9 +322,9 @@
         const r = this.result;
         this.titleText.setFontSize(56);
         // The last stage of an arc is a world finale (presentation only): its own title and the existing sting.
-        const finale = campaign && (this.stageIndex + 1) % Pulse.ARC_SIZE === 0;
+        const finale = campaign && !this.lab && (this.stageIndex + 1) % Pulse.ARC_SIZE === 0;
         if (finale) this.titleText.setFontSize(44);
-        show(this.titleText, finale ? (this.stageIndex + 1 >= Pulse.STAGES.length ? 'Campaign complete' : `World ${this.stage.arc.index} complete`) : 'Stage clear', finale ? T.textBonus : T.text);
+        show(this.titleText, finale ? (this.stageIndex + 1 >= Pulse.STAGES.length ? 'Campaign complete' : `World ${this.stage.arc.index} complete`) : this.lab ? 'Prototype clear' : 'Stage clear', finale ? T.textBonus : T.text);
         if (finale) this.time.delayedCall(900, () => { if (this.state === 'complete') Pulse.Sfx.play('milestone'); });
         // Dim the frozen play field so the results and buttons read cleanly over it.
         this.overlay.fillStyle(T.background, 0.82).fillRect(0, 0, this.SW, this.SH);
@@ -342,14 +345,14 @@
       }
 
       // End-screen buttons stack along the bottom, primary action highest.
-      const hasNext = campaign && state === 'complete' && this.stageIndex + 1 < Pulse.STAGES.length;
+      const hasNext = campaign && !this.lab && state === 'complete' && this.stageIndex + 1 < Pulse.STAGES.length;
       const row = state === 'complete' ? (hasNext ? [this.nextBtn] : []).concat([this.retryBtn, this.backBtn])
         : state === 'playing' ? [] : [this.backBtn];
       const bottom = this.SH - 64;
       row.forEach((b, i) => b.setY(bottom - (row.length - 1 - i) * 72));
       this.pauseBtn.setEnabled(state === 'playing');
       this.backBtn.setEnabled(row.includes(this.backBtn));
-      this.backBtn.label.setText(state === 'paused' ? 'Quit' : (campaign ? 'Stages' : 'Menu'));
+      this.backBtn.label.setText(state === 'paused' ? 'Quit' : (this.lab ? 'Lab' : campaign ? 'Stages' : 'Menu'));
       this.retryBtn.setEnabled(row.includes(this.retryBtn));
       this.nextBtn.setEnabled(row.includes(this.nextBtn));
       this.updateHud();
@@ -501,7 +504,7 @@
 
     leave() {
       if (this.state === 'over' && !this.canAct()) return;
-      this.scene.start(this.mode === 'campaign' ? 'stages' : 'menu');
+      this.scene.start(this.lab ? 'lab' : this.mode === 'campaign' ? 'stages' : 'menu');
     }
 
     nextStage() {
@@ -1070,8 +1073,9 @@
     completeStage() {
       const track = this.level.track;
       const stars = Pulse.Campaign.computeStars(this.stage, true, this.energy, track.energyTotal);
-      const record = Pulse.Campaign.recordCompletion(this.save, this.stage.id, stars);
-      Pulse.Save.write(this.save);
+      // Lab prototypes show their stars but never touch the save (no record, no unlock, no skin).
+      const record = this.lab ? { bestStars: stars, unlockedNext: null, newSkins: [] } : Pulse.Campaign.recordCompletion(this.save, this.stage.id, stars);
+      if (!this.lab) Pulse.Save.write(this.save);
       this.result = { stars, record };
       if (this.test && this.test.onComplete) this.test.onComplete(this.elapsed, this.energy, this.bonus, stars);
       this.endHold();

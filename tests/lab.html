@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse Lab tests</title>
+  <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
+</head>
+<body>
+  <script>
+    // Prototype Lab (docs/LAB.md): registry rules, lab runs never touch the save, menu entry.
+    try { localStorage.clear(); } catch (e) {}
+    window.PULSE_ASSET_BASE = '../src/';
+    window.PULSE_TEST = { autoStart: true, holdReady: true, bot: false, mode: 'campaign', stageIndex: 0 };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/melody.js"></script>
+  <script src="../src/js/overdrive.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/mirror.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/patterns.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script src="../src/js/render.js"></script>
+  <script src="../src/js/ui.js"></script>
+  <script src="../src/js/assets.js"></script>
+  <script src="../src/js/trail.js"></script>
+  <script src="../src/js/sprite-view.js"></script>
+  <script src="../src/js/game-scene.js"></script>
+  <script src="../src/js/menu-scenes.js"></script>
+  <script src="../src/js/lab.js"></script>
+  <script src="../src/js/lab-scene.js"></script>
+  <script src="../src/js/main.js"></script>
+  <script>
+    const C = Pulse.CONFIG;
+    const L = Pulse.Lab;
+    const fails = [];
+    let checks = 0;
+    const check = (ok, msg) => { checks++; if (!ok) fails.push(msg); };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const scene = () => window.__pulseScene;
+    const fake = new WeakMap();
+    const clockOf = (sc) => { let c = fake.get(sc); if (!c) { c = { now: sc.time.now }; fake.set(sc, c); Object.defineProperty(sc.time, 'now', { get: () => c.now, set: () => {}, configurable: true }); } return c; };
+    const frames = (sc, n, until, ms) => { const c = clockOf(sc); const dt = ms || 16.667; for (let i = 0; i < n; i++) { c.now += dt; sc.update(c.now, dt); sc.draw && sc.draw(); if (until && until()) return true; } return !until; };
+    const errors = [];
+    window.addEventListener('error', (e) => errors.push(e.message));
+    const throws = (f) => { try { f(); return null; } catch (e) { return e.message; } };
+    const saveText = () => localStorage.getItem(Pulse.Save.KEY);
+
+    async function run() {
+      for (let i = 0; i < 200 && !(scene() && scene().state); i++) await wait(100);
+      await Pulse.Audio.loading; await wait(300);
+      const stagesBefore = Pulse.STAGES.length, idsBefore = Pulse.STAGES.map((s) => s.id).join();
+
+      // ---- Registry ----
+      check(L.list().length === 0, 'no prototype is registered by the lab itself');
+      check(/unknown base/.test(throws(() => L.derive('nope', {})) || ''), 'derive: unknown base is an error');
+      check(/id is required/.test(throws(() => L.register({})) || ''), 'register: id required');
+      const lab = L.derive(Pulse.STAGES[2].id, { id: 'lab-test', name: 'Lab test' });
+      check(lab.id === 'lab-test' && lab.name === 'Lab test' && lab.speed === Pulse.STAGES[2].speed && Pulse.STAGES[2].id !== 'lab-test', 'derive copies a campaign stage under a new id without touching the original');
+      check(/collides with a campaign stage/.test(throws(() => L.register({ id: 'x', base: Pulse.STAGES[2].id, stage: Object.assign({}, lab, { id: Pulse.STAGES[2].id }) })) || ''), 'register: a stage id equal to a campaign stage is refused');
+      check(/unknown base/.test(throws(() => L.register({ id: 'x', base: 'nope', stage: lab })) || ''), 'register: unknown base refused');
+      check(/not a valid stage/.test(throws(() => L.register({ id: 'bad', base: Pulse.STAGES[2].id, stage: Object.assign({}, lab, { id: 'bad', items: [] }) })) || ''), 'register: a stage the campaign validator rejects (no items) is refused')
+      const entry = L.register({ id: 'lab-test', title: 'Test prototype', desc: 'Used by the tests', base: Pulse.STAGES[2].id, stage: lab, flags: { demo: true } });
+      check(L.find('lab-test') === entry && entry.baseIndex === 2 && entry.flags.demo === true, 'register: stored, found by id, base index resolved, flags kept');
+      check(/duplicate/.test(throws(() => L.register({ id: 'lab-test', base: Pulse.STAGES[2].id, stage: lab })) || ''), 'register: duplicate id refused');
+      check(L.list().length === 1 && Pulse.STAGES.length === stagesBefore && Pulse.STAGES.map((s) => s.id).join() === idsBefore, 'the campaign list is untouched (same length, same ids, same order)');
+
+      // ---- A lab run: plays, finishes, and leaves the save exactly as it was ----
+      const before = saveText();
+      scene().scene.start('game', { mode: 'campaign', lab: 'lab-test' }); await wait(500);
+      let q = scene(); q.test = { holdReady: true, bot: true, route: 'safe' };
+      check(q.lab === entry && q.stage === lab && q.stageIndex === 2 && q.mode === 'campaign', 'GameScene plays the lab stage with its base index (look, arc, backdrop)');
+      q.startRun(); frames(q, 60000, () => q.state !== 'playing');
+      check(q.state === 'complete', `the bot completes the lab stage (state ${q.state})`);
+      check(q.result && q.result.stars >= 1 && q.result.record.unlockedNext === null && q.result.record.newSkins.length === 0, 'it shows stars but unlocks nothing');
+      check(saveText() === before, 'the save is byte-identical after a completed lab run');
+      check(Pulse.Campaign.totalStars(Pulse.Save.load()) === 0, 'no campaign stars were recorded');
+      q.setState('complete');
+      check(q.backBtn.label.text === 'Lab', 'the end screen says Lab, not Stages');
+      check(q.titleText.text === 'Prototype clear', `title reads 'Prototype clear' (got '${q.titleText.text}')`);
+      // A crash and a retry also leave the save alone.
+      q.startRun(); frames(q, 3); q.test.bot = false; q.crash && q.crash('wall');
+      check(q.state === 'over', 'a crash ends the run');
+      q.startRun(); frames(q, 5);
+      check(q.state === 'playing' && saveText() === before, 'retry works and the save is still unchanged');
+      // The same stage as a normal campaign stage still records (the lab did not break the real path).
+      scene().scene.start('game', { mode: 'campaign', stageIndex: 0 }); await wait(500);
+      q = scene(); q.test = { holdReady: true, bot: true, route: 'safe' }; q.startRun(); frames(q, 60000, () => q.state !== 'playing');
+      check(q.state === 'complete' && q.lab === null && Pulse.Campaign.totalStars(Pulse.Save.load()) >= 1, 'a real campaign stage still records its completion');
+      check(q.titleText.text === 'Stage clear' && q.backBtn.label.text === 'Stages', 'and still says Stage clear / Stages');
+      // The last stage of an arc keeps its finale presentation for real stages, never for lab stages.
+      const labFinale = L.register({ id: 'lab-finale', title: 'f', desc: 'f', base: Pulse.STAGES[9].id, stage: L.derive(Pulse.STAGES[9].id, { id: 'lab-finale', name: 'F' }) });
+      scene().scene.start('game', { mode: 'campaign', lab: 'lab-finale' }); await wait(500);
+      q = scene(); q.test = { holdReady: true, bot: true, route: 'safe' }; q.startRun(); frames(q, 60000, () => q.state !== 'playing');
+      check(q.state === 'complete' && q.titleText.text === 'Prototype clear', `a lab stage based on a finale does not show the finale title (got '${q.titleText.text}')`);
+
+      // ---- Menu ----
+      scene().scene.start('menu'); await wait(600);
+      const kids = () => scene().children.list.map((c) => c.list ? c.list.map((x) => x.text).filter(Boolean).join('') : c.text).filter(Boolean);
+      check(kids().includes('LAB'), 'the menu shows LAB when there are prototypes');
+      C.lab.enabled = false; scene().scene.restart(); await wait(600);
+      check(!kids().includes('LAB'), 'CONFIG.lab.enabled = false hides it');
+      C.lab.enabled = true;
+      L._remove('lab-test'); L._remove('lab-finale'); scene().scene.restart(); await wait(600);
+      check(!kids().includes('LAB'), 'and so does having no prototypes');
+      L.register({ id: 'lab-test', title: 'Test prototype', desc: 'Used by the tests', base: Pulse.STAGES[2].id, stage: lab });
+      scene().scene.start('lab'); await wait(600);
+      check(scene().scene.key === 'lab' && kids().includes('Test prototype'), 'the LAB screen lists the prototype');
+      check(errors.length === 0, `page errors: ${errors.join(' | ')}`);
+    }
+    run().then(() => { document.title = fails.length ? `FAIL ${fails.length}: ${fails.join(' | ')}` : `PASS lab tests ${checks} checks`; })
+      .catch((e) => { document.title = 'FAIL error ' + e.message + ' ' + (e.stack || '').split('\n')[1]; });
+  </script>
+</body>
+</html>
