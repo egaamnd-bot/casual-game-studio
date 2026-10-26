@@ -7,7 +7,8 @@
 </head>
 <body>
   <script>
-    // Runs the real game scene. ?bot=1 uses the autopilot; without it nobody touches the screen.
+    // Runs the real game scene in PORTRAIT (give the window a portrait size, e.g. 540x960).
+    // ?bot=1 uses the autopilot (it steers and holds); without it nobody touches the screen.
     // ?mode=campaign&stage=N plays campaign stage N (0-based); ?start=0 opens the menu instead;
     // ?fresh=1 clears saved data first. Results go into the page title.
     // Phaser loads from a CDN because there is no local node_modules.
@@ -20,6 +21,8 @@
     window.PULSE_TEST = {
       noAssets: params.get('noassets') === '1',
       bot: params.get('bot') === '1',
+      skill: params.get('skill') ? Number(params.get('skill')) : undefined, // bot aim precision 0..1
+      noKeys: true,
       autoStart: params.get('start') !== '0',
       mode: params.get('mode') || 'endless',
       stageIndex: Number(params.get('stage') || 0),
@@ -53,6 +56,7 @@
   <script src="../src/js/rhythm.js"></script>
   <script src="../src/js/storage.js"></script>
   <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/melody.js"></script>
   <script src="../src/js/level.js"></script>
   <script src="../src/js/stages.js"></script>
   <script src="../src/js/campaign.js"></script>

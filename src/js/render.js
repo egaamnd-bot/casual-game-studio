@@ -69,8 +69,8 @@ Pulse.Render = (function () {
       // deterministic, so this is exact). The live gap glides to meet them.
       if (ghost) {
         const m = Pulse.Rhythm.motionShape(seg.slide, seg.arriveBeat, seg.arriveBeat);
-        const gx0 = width / 2 + m.off - m.half;
-        const gx1 = width / 2 + m.off + m.half;
+        const gx0 = seg.cx0 + m.off - m.half;
+        const gx1 = seg.cx0 + m.off + m.half;
         g.lineStyle(2, T.gapEdge, 0.45);
         g.beginPath();
         for (const [gx, d] of [[gx0, 1], [gx1, -1]]) {
@@ -238,23 +238,21 @@ Pulse.Render = (function () {
     }
   }
 
-  // Energy is a circle, bonus a diamond. `dimmed` while the orb is too small to collect.
-  function pickup(g, seg, orbX, dimmed) {
+  // A note pickup at lane position seg.x: energy is a circle, bonus a diamond. It can be taken at
+  // any orb size, so it is never dimmed.
+  function pickup(g, seg) {
     if (seg.taken) return;
     const r = C.pickup.radius;
-    const a = dimmed ? C.pickup.dimAlpha : 1;
     const color = seg.variant === 'bonus' ? T.bonus : T.pickup;
-    for (let side = -1; side <= 1; side += 2) {
-      const x = orbX + side * seg.offset;
-      g.fillStyle(color, 0.25 * a);
-      g.fillCircle(x, seg.y, r + 6);
-      g.fillStyle(color, a);
-      if (seg.variant === 'bonus') {
-        g.fillTriangle(x, seg.y - r - 3, x - r, seg.y, x + r, seg.y);
-        g.fillTriangle(x, seg.y + r + 3, x - r, seg.y, x + r, seg.y);
-      } else {
-        g.fillCircle(x, seg.y, r);
-      }
+    const x = seg.x;
+    g.fillStyle(color, 0.25);
+    g.fillCircle(x, seg.y, r + 6);
+    g.fillStyle(color, 1);
+    if (seg.variant === 'bonus') {
+      g.fillTriangle(x, seg.y - r - 3, x - r, seg.y, x + r, seg.y);
+      g.fillTriangle(x, seg.y + r + 3, x - r, seg.y, x + r, seg.y);
+    } else {
+      g.fillCircle(x, seg.y, r);
     }
   }
 

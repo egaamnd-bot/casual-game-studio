@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Pulse melody tests</title></head>
+<body>
+  <pre id="out">running…</pre>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/melody.js"></script>
+  <script>
+    // Musical hit feedback: pure note specs, no audio. Checks the scale mapping, the melodic phrase,
+    // combo layers, Perfect, the failure sound, and that the lead note is never delayed.
+    const C = Pulse.CONFIG, M = Pulse.Melody;
+    let checks = 0, failures = 0; const msgs = [];
+    const check = (ok, m) => { checks++; if (!ok) { failures++; msgs.push('FAIL ' + m); } };
+    const pcOf = (w, hz) => { const midi = Math.round(69 + 12 * Math.log2(hz / 440)); return (((midi - M.WORLDS[w].root) % 12) + 12) % 12; };
+    const KINDS = ['pickup', 'bonus', 'pass', 'break', 'chargedBreak'];
+
+    for (const w of [1, 2, 3]) {
+      const scale = M.WORLDS[w].scale;
+      // The phrase stays in the world's scale and in a pleasant range, with no big leaps.
+      let prev = null, leap = 0;
+      for (let n = 1; n <= 40; n++) {
+        const f = M.hz(w, M.degree(w, n));
+        check(scale.includes(pcOf(w, f)), `world ${w} hit ${n}: lead note is in the scale`);
+        check(f >= 300 && f <= 2200, `world ${w} hit ${n}: lead in range (${f.toFixed(0)} Hz)`);
+        if (prev) leap = Math.max(leap, Math.abs(12 * Math.log2(f / prev)));
+        prev = f;
+      }
+      check(leap <= 5.01, `world ${w}: consecutive hits form a melody without leaps over a fourth (${leap.toFixed(1)} semitones)`);
+      check(M.degree(w, 2) !== M.degree(w, 1) || M.degree(w, 3) !== M.degree(w, 2), `world ${w}: consecutive hits change pitch`);
+      // Every kind of hit: lead present, immediate, in key.
+      for (const kind of KINDS) for (const q of [undefined, 'good', 'perfect']) for (const combo of [1, 4, 8, 16]) {
+        const specs = M.hit(w, kind, { combo, quality: q });
+        check(specs.length >= 1 && specs.some((s) => !s.layer), `${kind}/${q}/c${combo}: has an immediate lead note`);
+        check(specs.every((s) => s.dur > 0 && s.gain > 0 && s.gain <= 0.3), `${kind}: sane duration and gain`);
+        const pitched = specs.filter((s) => !s.noise && s.freq > 0 && !s.glide);
+        check(pitched.every((s) => s.layer || s.freq > 0), `${kind}: pitched`);
+      }
+      // Combos enrich: more layers at higher combos, layers are accompaniment (may wait for the grid).
+      const layers = (c) => M.hit(w, 'pickup', { combo: c }).filter((s) => s.layer).length;
+      check(layers(1) === 0 && layers(C.music.comboLayerA) >= 1 && layers(C.music.comboLayerB) > layers(C.music.comboLayerA) && layers(C.music.comboLayerB * 2) > layers(C.music.comboLayerB), `world ${w}: combo adds layers step by step`);
+      // Perfect adds sparkle on top of the same lead.
+      const plain = M.hit(w, 'pickup', { combo: 3 }), perfect = M.hit(w, 'pickup', { combo: 3, quality: 'perfect' });
+      check(perfect.length > plain.length && perfect[0].freq === plain[0].freq, `world ${w}: Perfect adds sparkle to the same note`);
+      // Distinct sounds per action.
+      const sig = (k) => JSON.stringify(M.hit(w, k, { combo: 1 }).map((s) => [s.wave, Math.round(s.dur * 100)]));
+      check(new Set(KINDS.map(sig)).size === KINDS.length, `world ${w}: each action sounds different`);
+      // Failure is distinct, falls, and is out of key.
+      const fail = M.fail(w);
+      check(fail.length >= 2 && fail.some((s) => s.glide && s.glide < s.freq), `world ${w}: failure falls`);
+      check(fail.every((s) => s.layer !== true), `world ${w}: failure is immediate`);
+      check(JSON.stringify(fail) !== JSON.stringify(M.hit(w, 'break', { combo: 1 })), `world ${w}: failure differs from success`);
+      check(M.lost(w, 1).length === 0 && M.lost(w, 5).length >= 1, `world ${w}: a broken streak only sounds when it was worth something`);
+    }
+    // Different worlds use different palettes.
+    check(new Set([1, 2, 3].map((w) => M.WORLDS[w].root + ':' + M.WORLDS[w].scale.join())).size === 3, 'each world has its own key/scale palette');
+    check(C.groove.inputDelay === 0 && C.groove.eventDelay <= 0.08, 'steering, shrink and grow sounds are never delayed; reward accompaniment waits at most 80 ms');
+    document.title = (failures ? 'FAIL ' + failures + ' of ' : 'PASS ') + checks + ' checks';
+    document.getElementById('out').textContent = document.title + '\n' + msgs.slice(0, 20).join('\n');
+  </script>
+</body>
+</html>

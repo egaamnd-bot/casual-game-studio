@@ -162,7 +162,84 @@
     return src;
   }
 
+  // ---- Synthesised notes (Pulse.Melody) ----
+  // One oscillator (or filtered noise) through an envelope: a quick attack and an exponential
+  // decay. Starts on the AudioContext clock (`currentTime + delay`), so the sound begins in the
+  // audio thread the instant it is called. At most MAX_NOTES sound at once; the oldest quiet ones
+  // are simply allowed to finish (they are all under a second).
+  const MAX_NOTES = 14;
+  state.notes = 0;
+  state.stats = { notes: 0, dropped: 0, last: null };
+
+  function noiseBuffer(ctx) {
+    if (state.noise) return state.noise;
+    const len = Math.floor(ctx.sampleRate * 0.6);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    state.noise = buf;
+    return buf;
+  }
+
+  function playNote(spec, delay) {
+    const ctx = state.ctx;
+    if (!ctx || ctx.state !== 'running' || state.volumes.sfx <= 0) return false;
+    if (state.notes >= MAX_NOTES) {
+      state.stats.dropped++;
+      return false;
+    }
+    const t0 = ctx.currentTime + (delay > 0 ? delay : 0);
+    const dur = spec.dur || 0.2;
+    const peak = spec.gain === undefined ? 0.15 : spec.gain;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t0);
+    env.gain.linearRampToValueAtTime(peak, t0 + (spec.attack || 0.004));
+    env.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    let src;
+    if (spec.noise) {
+      src = ctx.createBufferSource();
+      src.buffer = noiseBuffer(ctx);
+    } else {
+      src = ctx.createOscillator();
+      src.type = spec.wave || 'sine';
+      src.frequency.setValueAtTime(spec.freq, t0);
+      if (spec.glide) src.frequency.exponentialRampToValueAtTime(Math.max(20, spec.glide), t0 + dur);
+    }
+    let node = src;
+    if (spec.cutoff) {
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.setValueAtTime(spec.cutoff, t0);
+      if (!spec.noise) f.frequency.exponentialRampToValueAtTime(Math.max(200, spec.cutoff * 0.35), t0 + dur);
+      src.connect(f);
+      node = f;
+    }
+    node.connect(env).connect(state.sfxGain);
+    state.notes++;
+    src.onended = () => { state.notes--; };
+    src.start(t0);
+    src.stop(t0 + dur + 0.05);
+    state.stats.notes++;
+    state.stats.last = { freq: spec.freq, wave: spec.wave, delay: delay || 0, at: ctx.currentTime };
+    return true;
+  }
+
   const Sfx = {
+    // Plays note specs from Pulse.Melody. Leads start at once; `layer` specs (accompaniment) may be
+    // given a short `layerDelay` by the scene so they land on the next 16th note.
+    notes(specs, layerDelay) {
+      let any = false;
+      for (let i = 0; i < specs.length; i++) {
+        const sp = specs[i];
+        if (playNote(sp, sp.layer ? layerDelay || 0 : 0)) any = true;
+      }
+      return any;
+    },
+
+    stats() {
+      return Object.assign({}, state.stats, { active: state.notes });
+    },
+
     // opts (all optional): rate = pitch factor, delay = seconds to wait (used to land a sound on
     // the beat: see Pulse.Rhythm.Groove), gain = extra volume factor.
     play(name, opts) {

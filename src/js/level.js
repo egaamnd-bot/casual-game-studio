@@ -3,11 +3,12 @@
 // Pure logic with no Phaser dependency, so it can be tested on its own.
 //
 // Item types (campaign data and Endless patterns use the same ones):
-//   gate     wall with a gap; the orb must be no bigger than `need` (or longer: `length` = a tunnel)
-//   barrier  full-width cyan barrier; the orb must be charged (near full size) to smash it.
+//   gate     wall with a gap centred `x` px off the lane centre, `need` px half-width (or longer:
+//            `length` = a tunnel). The orb must be inside the gap, steered there, and small enough.
+//   barrier  full-width barrier; the orb must be charged (near full size) to smash it, wherever it is.
 //            `charged: true` = charged barrier: also needs a full charge ring (held full size)
-//   energy   gold pickup pair; collected only while charged
-//   bonus    mint pickup pair; optional extra, allowed tighter timing
+//   energy   gold note pickup at lane position `x`; collected on contact at any orb size
+//   bonus    mint note pickup; optional extra, allowed tighter timing
 (function () {
   const C = Pulse.CONFIG;
   const R = C.orb.radius;
@@ -24,43 +25,69 @@
   const CHARGED_RADIUS = R - C.pickup.sizeTolerance;
   const isCharged = (r) => r > CHARGED_RADIUS;
 
-  // Orb state shared by the game and the tests: radius follows the touch, and the charge ring
-  // fills while the orb stays charged (full in `chargeTime` s) and empties the moment it isn't.
+  // Orb state shared by the game and the tests. Size: the radius follows the touch, and the charge
+  // ring fills while the orb stays charged (full in `chargeTime` s) and empties the moment it isn't.
+  // Position: `x` chases the steering target `tx` with a speed limit and an acceleration limit,
+  // integrated in fixed slices (`SLICE`) so the motion is the same at 30, 60 or 144 fps.
+  const S = C.steer;
+  const SLICE = 0.004;
   const Orb = {
     create() {
-      return { radius: R, charge: 1 };
+      return { radius: R, charge: 1, x: C.orb.x, vx: 0, tx: C.orb.x };
     },
-    step(o, held, dt) {
+    // Steering target, kept inside the lane margins.
+    setTarget(o, tx, width) {
+      o.tx = clamp(tx, S.margin, (width || C.width) - S.margin);
+      return o;
+    },
+    slide(o, dt, width) {
+      const lo = S.margin;
+      const hi = (width || C.width) - S.margin;
+      const n = Math.max(1, Math.ceil(dt / SLICE - 1e-9));
+      const h = dt / n;
+      for (let i = 0; i < n; i++) {
+        const want = clamp(S.follow * (o.tx - o.x), -S.maxSpeed, S.maxSpeed);
+        const dv = clamp(want - o.vx, -S.accel * h, S.accel * h);
+        o.vx += dv;
+        o.x += o.vx * h;
+        if (o.x < lo) { o.x = lo; if (o.vx < 0) o.vx = 0; }
+        if (o.x > hi) { o.x = hi; if (o.vx > 0) o.vx = 0; }
+      }
+      return o;
+    },
+    step(o, held, dt, width) {
       const target = held ? C.orb.minRadius : R;
       o.radius = o.radius > target
         ? Math.max(target, o.radius - C.orb.shrinkRate * dt)
         : Math.min(target, o.radius + C.orb.growRate * dt);
       o.charge = isCharged(o.radius) ? Math.min(1, o.charge + dt / C.barrier.chargeTime) : 0;
+      Orb.slide(o, dt, width);
       return o;
     },
   };
 
-  // Pickups sit this far left and right of the orb's path, reachable only when charged.
-  const PICKUP_OFFSET = R + C.pickup.radius - C.pickup.sizeTolerance;
-
-  // Gap edges around the orb's path. `need` is the clearance on the tight side; `shift` widens
-  // the gap to the right (positive) or left (negative) without changing that clearance.
-  function setGap(seg, need, shift, width) {
-    const ox = C.orb.x;
-    seg.gapL = Math.max(C.wallMinWidth, ox - need + Math.min(0, shift));
-    seg.gapR = Math.min(width - C.wallMinWidth, ox + need + Math.max(0, shift));
-    seg.need = Math.min(ox - seg.gapL, seg.gapR - ox);
+  // Gap geometry. `half` is the half-width of the opening and `x` its centre offset from the lane
+  // centre; the opening is clamped so a wall of at least `wallMinWidth` stays on each side.
+  // The orb fits when its radius is within the opening, and it must also be steered there.
+  function setGap(seg, half, x, width) {
+    const cx = clamp(C.orb.x + (x || 0), C.wallMinWidth + half, width - C.wallMinWidth - half);
+    seg.cx = seg.cx0 = cx;
+    seg.half = half;
+    seg.gapL = cx - half;
+    seg.gapR = cx + half;
+    seg.need = half;
   }
 
   const isPickup = (type) => type === 'energy' || type === 'bonus';
   const itemHeight = (src) => (src.type === 'gate' ? (src.length || C.gate.thickness)
     : src.type === 'barrier' ? (src.charged ? C.barrier.chargedThickness : C.barrier.thickness) : 0);
 
-  // What size an item demands: 'small' (gate narrower than the orb), 'big' (barrier, pickups)
-  // or null (wide gate: any size passes).
+  // What size an item demands: 'small' (a gate too narrow for a full-size orb to aim through
+  // comfortably), 'big' (barrier) or null (wide gate, pickups: any size passes).
   function demand(it) {
-    if (it.type === 'gate') return it.need < R ? 'small' : null;
-    return 'big';
+    if (it.type === 'gate') return it.need < R + C.lateral.minWindow ? 'small' : null;
+    if (it.type === 'barrier') return 'big';
+    return null;
   }
 
   // Distance the orb itself takes up between two items when measuring clear time.
@@ -75,52 +102,144 @@
     const h = itemHeight(src);
     const item = { type: src.type, at: prevTop + src.space, h, space: src.space };
     if (src.type === 'gate' && src.ring) {
-      // Rotating ring: geometry (radius, notch, timing) is filled in by Pulse.Campaign.compile,
-      // which knows the speed ramp. Until then it is an ordinary gap of clearance `need`.
+      // Rotating ring (unused by the portrait campaign): geometry is filled in by
+      // Pulse.Campaign.compile. Until then it is an ordinary centred gap of half-width `need`.
       Pulse.setGap(item, src.need, 0, width);
       item.ring = { dir: src.ring.dir < 0 ? -1 : 1, beats: src.ring.beats || 2 };
     } else if (src.type === 'gate' && src.slide) {
-      // Moving gap: `need` is the clearance at its tightest, so the gap is `amp` wider than that
-      // when centred. It starts centred; Level.applyMotion moves it.
+      // Moving gap: it swings `amp` px either side of its centre line (`slide`), or opens and
+      // closes between `need` and `need + amp` half-width (`breathe`). Level.applyMotion moves it.
       const s = src.slide;
       const breathe = s.kind === 'breathe';
-      Pulse.setGap(item, breathe ? src.need : src.need + s.amp, 0, width);
-      item.need = src.need;
+      Pulse.setGap(item, src.need, src.x, width);
       item.slide = { kind: breathe ? 'breathe' : 'slide', amp: s.amp, beats: s.beats, phase: s.phase || 0,
-        half: breathe ? src.need : src.need + s.amp, base: src.need };
-    } else if (src.type === 'gate') Pulse.setGap(item, src.need, src.shift || 0, width);
+        half: src.need, base: src.need };
+    } else if (src.type === 'gate') Pulse.setGap(item, src.need, src.x, width);
     if (src.type === 'barrier' && src.charged) item.charged = true;
+    if (isPickup(src.type)) item.x = clamp(C.orb.x + (src.x || 0), S.margin, width - S.margin);
     if (src.pattern) item.pattern = src.pattern;
     return item;
   }
 
-  // Minimum time to switch from one demand to the other, by what the orb is switching to/from.
+  // Minimum time to switch from one size demand to the other.
   function minSwitchTime(from, to) {
     const T = C.track;
     if (to.type === 'barrier' && to.charged) return T.toChargedBarrier;
-    if (from.type === 'bonus' || to.type === 'bonus') return T.bonusTime;
     if (to.type === 'barrier') return T.toBarrier;
-    if (to.type === 'energy') return T.toEnergy;
-    return from.type === 'energy' ? T.energyToSmall : T.toSmall;
+    return T.toSmall;
   }
 
-  // Fairness of a compiled item list. Tracks the last moment the orb had to be small and the last
-  // moment it had to be big, and checks there is time to switch between them, however many items
-  // sit in between. `speedOf(item)` gives the speed when the item reaches the orb.
-  function validateItems(items, speedOf, label) {
+  // The x range a centred orb of radius `r` may occupy while it crosses this gate, and the same for a
+  // moving gate over the whole time the orb overlaps it (`bpm` needed for moving gates).
+  function gateSpan(it, r, speed, bpm) {
+    if (!it.slide || !bpm) return [it.gapL + r, it.gapR - r];
+    let lo = -Infinity;
+    let hi = Infinity;
+    const toBeats = bpm / 60 / speed;
+    const b0 = it.arriveBeat - r * toBeats;
+    const b1 = it.arriveBeat + (it.h + r) * toBeats;
+    const N = 16;
+    for (let k = 0; k <= N; k++) {
+      const m = Pulse.Rhythm.motionShape(it.slide, b0 + ((b1 - b0) * k) / N, it.arriveBeat);
+      lo = Math.max(lo, it.cx0 + m.off - m.half + r);
+      hi = Math.min(hi, it.cx0 + m.off + m.half - r);
+    }
+    return [lo, hi];
+  }
+
+  // ---- Fairness floors for authoring ----
+  // The campaign compiler treats an item's authored `t` as a request: it never places an item
+  // closer to the previous one than the fairness floor below, so no stage can ask for a size switch
+  // that is too quick or a sideways move too far for the clear time. (Pulse.Track.validateItems
+  // re-checks the finished track independently.) State is carried from item to item.
+  const FLOOR_EPS = 1.5; // px of slack so rounding can never leave a track a hair under the limit
+  function fairState() {
+    return { lastBig: { type: 'start', top: 0 }, lastSmall: null, prevTop: 0, reachTop: 0, reachType: 'start', reach: [C.orb.x, C.orb.x] };
+  }
+
+  // The x range the orb should aim for at this item (null = barrier / optional bonus: no constraint).
+  // `exact` uses the item's real swing timing (needs arriveBeat); otherwise a moving gap is
+  // represented by its swing range.
+  function wantRange(it, speed, bpm, exact) {
+    if (it.type === 'barrier' || it.type === 'bonus') return null;
+    if (it.type !== 'gate') return [it.x - C.pickup.window, it.x + C.pickup.window];
+    const r = demand(it) === 'small' ? C.orb.minRadius : R;
+    if (it.slide && !exact) {
+      const amp = it.slide.kind === 'breathe' ? 0 : it.slide.amp;
+      return [it.cx0 - amp, it.cx0 + amp];
+    }
+    return gateSpan(it, r, speed, bpm);
+  }
+
+  // Smallest distance (px) after the previous item's far edge at which `it` may sit.
+  function floorSpace(st, it, speed, bpm, exact) {
+    let at = st.prevTop; // absolute position of the item's near edge
+    const prev = st.prevType;
+    const minGap = prev === undefined ? 0
+      : isPickup(it.type) || isPickup(prev) ? 2 * C.pickup.radius
+        : it.type !== prev ? C.track.minMixedSpace : C.track.minWallSpace;
+    at = Math.max(at, st.prevTop + minGap);
+    const need = demand(it);
+    const from = need === 'small' ? st.lastBig : need === 'big' ? st.lastSmall : null;
+    if (from) {
+      at = Math.max(at, from.top + spaceFor(from.type === 'start' ? 'gate' : from.type, it.type, minSwitchTime(from, it), speed));
+    }
+    const want = wantRange(it, speed, bpm, exact);
+    if (want) {
+      const d = Math.max(0, want[0] - st.reach[1], st.reach[0] - want[1]);
+      if (d > 0) {
+        const c = S.latency + d / S.fairSpeed;
+        at = Math.max(at, st.reachTop + spaceFor(st.reachType === 'start' ? 'gate' : st.reachType, it.type, c, speed));
+      }
+    }
+    return at + FLOOR_EPS - st.prevTop;
+  }
+
+  function commitFair(st, it, speed, bpm, exact) {
+    const want = wantRange(it, speed, bpm, exact);
+    if (want) {
+      const clear = clearTime(st.reachType === 'start' ? 'gate' : st.reachType, it.type, it.at - st.reachTop, speed);
+      const e = S.fairSpeed * Math.max(0, clear - S.latency);
+      st.reach = [Math.max(st.reach[0] - e, S.margin, want[0]), Math.min(st.reach[1] + e, C.width - S.margin, want[1])];
+      if (st.reach[0] > st.reach[1]) st.reach = [(want[0] + want[1]) / 2, (want[0] + want[1]) / 2];
+      st.reachType = it.type;
+      st.reachTop = it.at + it.h;
+    }
+    const need = demand(it);
+    const rec = { type: it.type, top: it.at + it.h };
+    if (need === 'small') st.lastSmall = rec;
+    if (need === 'big') st.lastBig = rec;
+    st.prevTop = it.at + it.h;
+    st.prevType = it.type;
+  }
+
+  // Fairness of a compiled item list. Two checks:
+  //  1. Size: the last moment the orb had to be small and the last it had to be big, and that
+  //     there is time to switch between them, however many items sit in between.
+  //  2. Steering: the set of x positions the orb can be in when it meets each item, assuming it
+  //     drifts at only `steer.fairSpeed` after a `steer.latency` pause (well under what the orb can
+  //     do), must never become empty, and every gate must leave `lateral.minWindow` of aiming room.
+  // `speedOf(item)` gives the speed when the item reaches the orb. `opts.bpm` is needed for moving gaps.
+  function validateItems(items, speedOf, label, opts) {
     const errors = [];
+    const bpm = opts && opts.bpm;
+    const width = (opts && opts.width) || C.width;
     const err = (i, msg) => errors.push(`${label}: item ${i} (${items[i].type}): ${msg}`);
-    const minNeed = C.orb.minRadius + C.fairMargin;
-    // The run starts with a full-size orb.
+    const minNeed = C.orb.minRadius + C.lateral.minWindow;
+    const lo0 = S.margin;
+    const hi0 = width - S.margin;
     let lastBig = { type: 'start', top: 0 };
     let lastSmall = null;
     let prevTop = 0;
+    let reachTop = 0; // far edge of the last item that constrains x
+    let reachType = 'start';
+    let reach = [C.orb.x, C.orb.x];
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
       const speed = speedOf(it);
       if (it.type === 'gate') {
-        if (it.need < minNeed - 1e-9) err(i, `clearance ${it.need.toFixed(1)} below fair minimum ${minNeed}`);
-        if (!(it.gapL < C.orb.x && it.gapR > C.orb.x)) err(i, "gap does not contain the orb's path");
+        if (it.need < minNeed - 1e-9) err(i, `half-width ${it.need.toFixed(1)} below the fair minimum ${minNeed}`);
+        if (it.gapL < C.wallMinWidth - 1e-9 || it.gapR > width - C.wallMinWidth + 1e-9) err(i, 'gap leaves less than the minimum wall at the lane edge');
       }
       if (i > 0) {
         const prev = items[i - 1];
@@ -134,6 +253,26 @@
         const t = clearTime(from.type === 'start' ? 'gate' : from.type, it.type, it.at - from.top, speed);
         const min = minSwitchTime(from, it);
         if (t < min - 1e-9) err(i, `${t.toFixed(2)}s to become ${need} after ${from.type} (min ${min})`);
+      }
+      // Steering reach. Mint bonuses are optional, so they never constrain the path.
+      if (it.type !== 'bonus' && it.type !== 'barrier') {
+        let want;
+        if (it.type === 'gate') {
+          const r = need === 'small' ? C.orb.minRadius : R;
+          want = gateSpan(it, r, speed, bpm);
+          if (want[1] - want[0] < 2 * C.lateral.minWindow - 1e-9) err(i, `aiming room ${(want[1] - want[0]).toFixed(0)} px is below the ${2 * C.lateral.minWindow} px minimum`);
+        } else {
+          want = [it.x - C.pickup.window, it.x + C.pickup.window];
+        }
+        const clear = clearTime(reachType === 'start' ? 'gate' : reachType, it.type, it.at - reachTop, speed);
+        const e = S.fairSpeed * Math.max(0, clear - S.latency);
+        const lo = Math.max(reach[0] - e, lo0, want[0]);
+        const hi = Math.min(reach[1] + e, hi0, want[1]);
+        if (lo > hi + 1e-9) {
+          err(i, `unreachable: the orb can be at x ${Math.max(reach[0] - e, lo0).toFixed(0)}-${Math.min(reach[1] + e, hi0).toFixed(0)} but needs ${want[0].toFixed(0)}-${want[1].toFixed(0)} (${clear.toFixed(2)}s clear)`);
+        } else reach = [lo, hi];
+        reachType = it.type;
+        reachTop = it.at + it.h;
       }
       const rec = { type: it.type, top: it.at + it.h };
       if (need === 'small') lastSmall = rec;
@@ -185,20 +324,27 @@
       this.applyMotion();
     }
 
+    // Where a moving gap is at run time `time`: { gapL, gapR, half, cx }.
+    gapAt(s, time) {
+      if (!s.slide || !this.bpm) return { gapL: s.gapL, gapR: s.gapR, half: s.half, cx: s.cx };
+      const m = Pulse.Rhythm.motionShape(s.slide, (time * this.bpm) / 60, s.arriveBeat);
+      const cx = s.cx0 + m.off;
+      return { gapL: cx - m.half, gapR: cx + m.half, half: m.half, cx };
+    }
+
     // Moves every active moving gap to where the beat puts it. `bpm` is set by the campaign level;
-    // without one (Endless) nothing moves. The orb's path stays inside the gap at all times:
-    // the clearance never drops below the item's `need` (checked by Track.validateItems).
+    // without one (Endless) nothing moves. Whether the orb can follow is checked by
+    // Track.validateItems (the aiming room over the whole crossing).
     applyMotion() {
       if (!this.bpm) return;
-      const beat = (this.time * this.bpm) / 60;
-      const ox = C.orb.x;
       for (let i = 0; i < this.segments.length; i++) {
         const s = this.segments[i];
         if (!s.active || !s.slide) continue;
-        const m = Pulse.Rhythm.motionShape(s.slide, beat, s.arriveBeat);
-        s.gapL = ox + m.off - m.half;
-        s.gapR = ox + m.off + m.half;
-        s.need = m.half - Math.abs(m.off);
+        const g = this.gapAt(s, this.time);
+        s.gapL = g.gapL;
+        s.gapR = g.gapR;
+        s.cx = g.cx;
+        s.half = s.need = g.half;
       }
     }
 
@@ -235,7 +381,7 @@
       seg.pinged = false;
       seg.whooshed = false;
       seg.arriveBeat = it.arriveBeat || 0;
-      seg.minNeed = it.need; // tightest clearance over a moving gap's whole cycle
+      seg.quality = null;
       // Segments are pooled: reset flags a previous use may have left (a recycled charged
       // barrier must not make a gate look charged).
       seg.charged = it.type === 'barrier' && !!it.charged;
@@ -243,13 +389,15 @@
         seg.kind = 'gate';
         seg.gapL = it.gapL;
         seg.gapR = it.gapR;
-        seg.need = it.need;
+        seg.need = seg.half = it.need;
+        seg.cx = seg.cx0 = it.cx0;
       } else if (it.type === 'barrier') {
         seg.kind = 'barrier';
       } else {
         seg.kind = 'pickup';
         seg.variant = it.type;
-        seg.offset = PICKUP_OFFSET;
+        seg.x = it.x;
+        seg.quality = null;
       }
     }
 
@@ -276,24 +424,30 @@
       return isCharged(r) && (!seg.charged || (charge === undefined ? 1 : charge) >= 1);
     }
 
-    touchesPickup(seg, y, r) {
+    // A note pickup is collected when the orb's centre comes within `collectRadius` of it, at any
+    // orb size (so a trail of notes can be steered through even while shrunk).
+    touchesPickup(seg, x, y) {
+      const dx = seg.x - x;
       const dy = seg.y - y;
-      const reach = r + C.pickup.radius;
-      return seg.offset * seg.offset + dy * dy < reach * reach;
+      const reach = C.pickup.collectRadius;
+      return dx * dx + dy * dy < reach * reach;
     }
 
     // The game's rules for one segment this frame. Marks the segment and returns what happened:
     // 'crash' | 'pass' (wall cleared) | 'break' (barrier smashed) | 'collect' | 'miss' | null.
-    // `charge` (0..1) is the orb's charge ring; charged barriers need it full.
-    // Shared by the game scene and the tests so they can't drift apart.
-    resolve(s, orbY, r, charge) {
+    // `x` is the orb's lane position, `charge` (0..1) its charge ring; charged barriers need it full.
+    // `seg.quality` is set to 'perfect' or 'good' on pass/collect/break. Shared by the game scene
+    // and the tests so they can't drift apart.
+    resolve(s, orbY, r, charge, x) {
+      if (x === undefined) x = C.orb.x;
       if (s.kind === 'pickup') {
         if (s.resolved) return null;
-        if (this.touchesPickup(s, orbY, r)) {
+        if (this.touchesPickup(s, x, orbY)) {
           s.taken = s.resolved = true;
+          s.quality = Math.abs(s.x - x) <= C.pickup.perfect ? 'perfect' : 'good';
           return 'collect';
         }
-        if (s.y - C.pickup.radius > orbY + r) {
+        if (s.y - C.pickup.collectRadius > orbY) {
           s.resolved = true;
           return 'miss';
         }
@@ -303,11 +457,13 @@
         if (s.broken || !this.touchesBarrier(s, orbY, r)) return null;
         if (!this.canSmash(s, r, charge)) return 'crash';
         s.broken = s.scored = true;
+        s.quality = 'perfect';
         return 'break';
       }
-      if (this.hitsWall(s, C.orb.x, orbY, r)) return 'crash';
+      if (this.hitsWall(s, x, orbY, r)) return 'crash';
       if (!s.scored && s.y > orbY + r) {
         s.scored = true;
+        s.quality = Math.abs(x - s.cx) <= Math.max(C.pickup.perfect, 0.3 * s.half) ? 'perfect' : 'good';
         return 'pass';
       }
       return null;
@@ -315,9 +471,9 @@
   }
 
   // Test autopilot with perfect reading: acts on the nearest obstacle within ~`lookSeconds`.
-  // Shrinks for a gate narrower than the orb, stays full size for a barrier (looking further
-  // ahead for charged barriers, to fill the ring), otherwise grows, which collects pickups.
-  // A larger `lookSeconds` gives the cautious player: it holds through every close dare.
+  // Shrinks for a gate that needs it, stays full size for a barrier (looking further ahead for
+  // charged barriers, to fill the ring), otherwise grows. A larger `lookSeconds` gives the cautious
+  // player: it holds through every close dare. Returns whether to hold (shrink).
   function autopilot(level, orbY, speed, lookSeconds) {
     const look = speed * (lookSeconds || 0.3);
     const chargeLook = speed * C.barrier.chargeTime;
@@ -327,7 +483,7 @@
     for (let i = 0; i < segs.length; i++) {
       const s = segs[i];
       if (!s.active || s.kind === 'pickup' || s.broken) continue;
-      if (s.kind === 'gate' && ((s.minNeed === undefined ? s.need : s.minNeed) >= R || s.y >= orbY + R)) continue;
+      if (s.kind === 'gate' && (s.half >= R + C.lateral.minWindow || s.y >= orbY + R)) continue;
       const bottom = s.y + s.h;
       if (bottom < orbY - R - look - (s.charged ? chargeLook : 0)) continue;
       if (bottom > nearestBottom) {
@@ -338,16 +494,60 @@
     return !!nearest && nearest.kind === 'gate';
   }
 
+  // Test autopilot steering: the lane x the orb should head for. It aims for the middle of the gap
+  // of the nearest gate not yet passed (where that gap will be when the orb gets there), leaning
+  // toward the next gate or note so it is already on its way; a gold note ahead of a gate is taken
+  // only when it is on the way. `lookSeconds` is how far ahead it looks. `skill` 0..1 scales how
+  // precisely it aims (1 = dead centre of the free range, less = sloppier).
+  function autosteer(level, orbX, orbY, speed, lookSeconds, skill) {
+    const sk = skill === undefined ? 1 : skill;
+    const look = speed * (lookSeconds || 1.2);
+    const list = [];
+    const segs = level.segments;
+    for (let i = 0; i < segs.length; i++) {
+      const s = segs[i];
+      if (!s.active || s.kind === 'barrier') continue;
+      if (s.kind === 'gate' ? s.y > orbY + R : s.resolved) continue;
+      if (s.y + s.h < orbY - look) continue;
+      list.push(s);
+    }
+    if (!list.length) return C.orb.x;
+    list.sort((a, b) => b.y - a.y); // nearest the orb first
+    const span = (s) => {
+      if (s.kind === 'pickup') return [s.x, s.x];
+      const small = s.half < R + C.lateral.minWindow;
+      const r = small ? C.orb.minRadius : R;
+      const dist = Math.max(0, orbY - (s.y + s.h / 2));
+      const g = level.gapAt(s, level.time + dist / speed);
+      return [g.gapL + r, g.gapR - r];
+    };
+    const first = list.find((s) => s.kind === 'gate' || s.variant === 'energy') || list[0];
+    const [lo, hi] = span(first);
+    let aim = (lo + hi) / 2;
+    const next = list.find((s) => s !== first && s.y < first.y && (s.kind === 'gate' || s.variant === 'energy'));
+    if (next) {
+      const [l2, h2] = span(next);
+      const want = (l2 + h2) / 2;
+      const room = Math.max(0, (hi - lo) / 2 - 4) * sk;
+      aim = clamp(want, (lo + hi) / 2 - room, (lo + hi) / 2 + room);
+    }
+    return clamp(aim, S.margin, level.width - S.margin);
+  }
+
   // Endless scoring, shared by the game and the tests. Values are unchanged from v1:
   // +1 × multiplier per wall passed or barrier smashed; gold or mint adds +1 to the multiplier
   // (max ×5); missing gold resets it, missing mint does not. Returns feedback flags only.
   const Scoring = {
     create() {
-      return { score: 0, multiplier: 1, maxStreak: 0 };
+      return { score: 0, multiplier: 1, maxStreak: 0, combo: 0 };
     },
     apply(st, event, seg) {
       const out = {};
       const max = C.multiplierMax;
+      // The combo counts consecutive successes (never affects score); any miss or crash resets it.
+      if (event === 'pass' || event === 'break' || event === 'collect') st.combo++;
+      else if ((event === 'miss' && (!seg || seg.variant !== 'bonus')) || event === 'crash') st.combo = 0;
+      out.combo = st.combo;
       if (event === 'pass' || event === 'break') {
         st.score += st.multiplier;
         if (st.multiplier === max) {
@@ -374,10 +574,10 @@
   Pulse.Level = Level;
   Pulse.circleRect = circleRect;
   Pulse.setGap = setGap;
-  Pulse.PICKUP_OFFSET = PICKUP_OFFSET;
-  Pulse.isCharged = isCharged;
+    Pulse.isCharged = isCharged;
   Pulse.Orb = Orb;
   Pulse.Scoring = Scoring;
-  Pulse.Track = { placeItem, validateItems, clearTime, spaceFor, demand, itemHeight };
+  Pulse.Track = { placeItem, validateItems, clearTime, spaceFor, demand, itemHeight, gateSpan, fairState, floorSpace, commitFair };
   Pulse.autopilot = autopilot;
+  Pulse.autosteer = autosteer;
 })();

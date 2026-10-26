@@ -13,7 +13,7 @@
   <script src="../src/js/campaign.js"></script>
   <script src="../src/js/patterns.js"></script>
   <script>
-    // Core rules, scoring and Endless pattern generator tests. No Phaser needed.
+    // Core rules, steering physics, scoring and Endless pattern generator tests. No Phaser needed.
     // Open in a browser; the page title becomes "PASS ..." or "FAIL ...".
     const C = Pulse.CONFIG;
     const R = C.orb.radius;
@@ -51,6 +51,81 @@
     const regrowAndCharge = frames / 60;
     check(regrowAndCharge > C.barrier.chargeTime && regrowAndCharge < C.track.toChargedBarrier,
       `regrow + full charge takes ${regrowAndCharge.toFixed(2)}s, within the ${C.track.toChargedBarrier}s fairness window`);
+
+    // ---- Steering physics (docs/PORTRAIT_REWORK.md) ----
+    const S = C.steer;
+    check(o.x === C.orb.x && o.vx === 0 && o.tx === C.orb.x, 'orb starts centred and still');
+    // The same drag gives the same path at 30, 60 and 144 fps (fixed integration slices).
+    const at = (fps, seconds) => {
+      const q = Pulse.Orb.create();
+      Pulse.Orb.setTarget(q, C.orb.x + 150);
+      for (let i = 0; i < Math.round(seconds * fps); i++) Pulse.Orb.step(q, false, 1 / fps);
+      return q.x;
+    };
+    for (const sec of [1 / 6, 1 / 3, 0.5]) { // whole frame counts at 30, 60 and 144 fps
+      const xs = [30, 60, 144].map((f) => at(f, sec));
+      check(Math.max(...xs) - Math.min(...xs) < 2.5, `lateral motion is frame-rate independent after ${sec.toFixed(2)}s: ${xs.map((x) => x.toFixed(1)).join(' / ')}`);
+    }
+    // Speed and acceleration limits, bounds, and settling without overshoot.
+    const q = Pulse.Orb.create();
+    Pulse.Orb.setTarget(q, W);
+    check(q.tx === W - S.margin, `target is clamped inside the lane (${q.tx})`);
+    let peak = 0, firstSlow = null;
+    for (let i = 0; i < 240; i++) {
+      const v0 = q.vx;
+      Pulse.Orb.step(q, false, 1 / 60);
+      peak = Math.max(peak, Math.abs(q.vx));
+      check(Math.abs(q.vx - v0) <= S.accel / 60 + 1e-6, 'acceleration stays within the limit');
+      check(q.x >= S.margin - 1e-6 && q.x <= W - S.margin + 1e-6, 'orb never leaves the lane margins');
+    }
+    check(peak <= S.maxSpeed + 1e-6, `top lateral speed ${peak.toFixed(0)} ≤ ${S.maxSpeed}`);
+    check(Math.abs(q.x - q.tx) < 0.5 && Math.abs(q.vx) < 1, 'orb settles on its target');
+    const settle = Pulse.Orb.create();
+    Pulse.Orb.setTarget(settle, C.orb.x - 120);
+    let over = 0;
+    for (let i = 0; i < 180; i++) { Pulse.Orb.step(settle, false, 1 / 60); over = Math.max(over, settle.tx - settle.x); }
+    check(over < 2, `no overshoot past the target (${over.toFixed(2)} px)`);
+    // The target persists: lifting the finger does not send the orb back.
+    const keep = Pulse.Orb.create();
+    Pulse.Orb.setTarget(keep, C.orb.x + 100);
+    for (let i = 0; i < 120; i++) Pulse.Orb.step(keep, i < 5, 1 / 60);
+    check(Math.abs(keep.x - (C.orb.x + 100)) < 1, 'orb stays where it was sent after release');
+    // Shrinking and steering are independent.
+    const both = Pulse.Orb.create();
+    Pulse.Orb.setTarget(both, C.orb.x - 100);
+    for (let i = 0; i < 30; i++) Pulse.Orb.step(both, true, 1 / 60);
+    check(both.radius === C.orb.minRadius && both.x < C.orb.x - 60, 'holding shrinks while steering moves the orb');
+
+    // ---- Gates with a lateral position ----
+    const g1 = {}; Pulse.setGap(g1, 40, 100, W);
+    check(g1.gapL === C.orb.x + 100 - 40 && g1.gapR === C.orb.x + 100 + 40 && g1.need === 40, 'gap is centred where asked');
+    const g2 = {}; Pulse.setGap(g2, 40, 400, W);
+    check(g2.gapR <= W - C.wallMinWidth, 'a gap near the edge keeps its minimum wall');
+    const lvG = new Pulse.Level(W, 1100);
+    const gate = (cxOff, half) => { const g = Object.assign(lvG.obtain(), { active: true, kind: 'gate', y: orbY0 - 18, h: 36, scored: false }); Pulse.setGap(g, half, cxOff, W); g.cx0 = g.cx; g.slide = null; g.ring = null; return g; };
+    var orbY0 = 770;
+    let gt = gate(100, 40);
+    check(lvG.resolve(gt, orbY0, C.orb.minRadius, 1, C.orb.x + 100) === null && !lvG.hitsWall(gt, C.orb.x + 100, orbY0, C.orb.minRadius), 'a shrunk orb in the middle of a gap passes');
+    check(lvG.resolve(gate(100, 40), orbY0, C.orb.minRadius, 1, C.orb.x) === 'crash', 'the same gap crashes an orb left in the lane centre');
+    check(lvG.resolve(gate(100, 40), orbY0, R, 1, C.orb.x + 100) === 'crash', 'a full-size orb does not fit a 40 px half-width gap');
+    check(lvG.resolve(gate(100, 40), orbY0, C.orb.minRadius, 1, C.orb.x + 100 + 25) === 'crash', 'touching the gap edge while steering crashes');
+    gt = gate(-80, 40); gt.y = orbY0 + C.orb.minRadius + 4;
+    check(lvG.resolve(gt, orbY0, C.orb.minRadius, 1, C.orb.x - 80) === 'pass', 'a cleared wall scores a pass');
+    check(gt.quality === 'perfect', 'dead centre of the gap is a Perfect pass');
+
+    // ---- Pickups are notes: collected at any size, within the collect radius ----
+    const lvP = new Pulse.Level(W, 1100);
+    const note = (x, dy) => Object.assign(lvP.obtain(), { active: true, kind: 'pickup', variant: 'energy', x, y: orbY0 - dy, resolved: false, taken: false });
+    check(lvP.resolve(note(C.orb.x, 10), orbY0, C.orb.minRadius, 0, C.orb.x) === 'collect', 'a shrunk orb collects a note');
+    check(lvP.resolve(note(C.orb.x, 10), orbY0, R, 1, C.orb.x) === 'collect', 'a full-size orb collects a note');
+    let nt = note(C.orb.x + C.pickup.collectRadius + 6, 0);
+    check(lvP.resolve(nt, orbY0, R, 1, C.orb.x) === null, 'a note outside the collect radius is not taken');
+    nt = note(C.orb.x + 10, 5);
+    check(lvP.resolve(nt, orbY0, C.orb.minRadius, 1, C.orb.x) === 'collect' && nt.quality === 'perfect', 'a note taken near its centre is Perfect');
+    nt = note(C.orb.x + 30, 5);
+    check(lvP.resolve(nt, orbY0, R, 1, C.orb.x) === 'collect' && nt.quality === 'good', 'a note taken off-centre is Good (still collected)');
+    nt = note(C.orb.x + 200, C.pickup.collectRadius + 10); nt.y = orbY0 + C.pickup.collectRadius + 5;
+    check(lvP.resolve(nt, orbY0, R, 1, C.orb.x) === 'miss', 'a note left behind is a miss');
 
     // Barrier rules, frame by frame.
     const lv = new Pulse.Level(W, 1100);
@@ -99,8 +174,19 @@
     fb = Pulse.Scoring.apply(st2, 'collect', { variant: 'energy' });
     check(fb.reachedMax && st2.multiplier === 5, 'reaching ×5 flags the milestone once');
 
+    // Combo (melody streak): counts consecutive successes, resets on a missed gold or a crash.
+    const sc = Pulse.Scoring.create();
+    for (const e of ['pass', 'collect', 'break', 'collect']) Pulse.Scoring.apply(sc, e, {});
+    check(sc.combo === 4, 'combo counts successes in a row');
+    Pulse.Scoring.apply(sc, 'miss', { variant: 'bonus' });
+    check(sc.combo === 4, 'skipping a mint does not break the combo');
+    Pulse.Scoring.apply(sc, 'miss', { variant: 'energy' });
+    check(sc.combo === 0, 'missing gold breaks the combo');
+    Pulse.Scoring.apply(sc, 'pass', {}); Pulse.Scoring.apply(sc, 'crash', {});
+    check(sc.combo === 0, 'a crash breaks the combo');
+
     // ---- Endless runs with five player strategies ----
-    function simulate(seed, seconds, policy) {
+    function simulate(seed, seconds, policy, steering) {
       const height = 1100;
       const oy = Math.round(height * C.orb.yRatio);
       const level = new Pulse.EndlessLevel(W, height, seeded(seed));
@@ -115,16 +201,17 @@
       while (elapsed < seconds) {
         const speed = level.speedAt(elapsed);
         const held = policy(level, oy, speed, orb);
+        Pulse.Orb.setTarget(orb, (steering || DEFAULT_STEER)(level, orb, oy, speed), W);
         if (held !== lastHeld) ev.transitions++;
         lastHeld = held;
         if (held) ev.holdFrames++;
         ev.frames++;
-        Pulse.Orb.step(orb, held, dt);
+        Pulse.Orb.step(orb, held, dt, W);
         elapsed += dt;
         level.update(dt, level.speedAt(elapsed), elapsed);
         for (const s of level.segments) {
           if (!s.active) continue;
-          const e = level.resolve(s, oy, orb.radius, orb.charge);
+          const e = level.resolve(s, oy, orb.radius, orb.charge, orb.x);
           if (e === 'crash') {
             crashedOn = s.kind === 'barrier' ? (s.charged ? 'charged barrier' : 'barrier') : 'gap';
             return { crashed: true, crashedOn, elapsed, ev, level, late, score: score.score };
@@ -144,6 +231,9 @@
       return { crashed: false, elapsed, ev, level, late, score: score.score };
     }
 
+    // Steering policies: the bot aims for the middle of the next gap/note; 'centre' never steers.
+    const DEFAULT_STEER = (lv2, orb, oy, sp) => Pulse.autosteer(lv2, orb.x, oy, sp);
+    const CENTRE = () => C.orb.x;
     const STRATEGIES = {
       'always shrink': () => true,
       'always large': () => false,
@@ -155,6 +245,7 @@
     };
 
     const SEEDS = 60, SECONDS = 150;
+    let wander = 0, wanderN = 0;
     const used = {};
     let items = 0, repeats = 0, transitions = 0, holdShare = 0, smashed = 0, bonusSeen = 0, bonusTaken = 0;
     let firstCharged = Infinity, requiresBroken = 0, unlockBroken = 0, recoveries = 0, budgetBreaches = 0;
@@ -163,7 +254,7 @@
       const run = simulate(seed, SECONDS, STRATEGIES.competent);
       check(!run.crashed, `seed ${seed}: competent autopilot crashed on a ${run.crashedOn} at ${run.elapsed.toFixed(1)}s (unfair pattern?)`);
       check(run.late.length === 0, `seed ${seed}: ${run.late.length} items arrived faster than their spacing assumed`);
-      const errs = Pulse.Track.validateItems(run.level.items, (it) => it.speed, `seed ${seed}`);
+      const errs = Pulse.Track.validateItems(run.level.items, (it) => it.speed, `seed ${seed}`, { width: W });
       check(errs.length === 0, errs.slice(0, 2).join('; '));
       const log = run.level.patternLog, times = run.level.patternTimes;
       const seen = new Set();
@@ -183,6 +274,7 @@
       }
       // Variety after the first minute: distinct patterns between 60 s and 150 s.
       lateVariety.push(new Set(log.filter((_, i) => times[i] >= 60)).size);
+      for (const it of run.level.items) if (it.type === 'gate') { wander += Math.abs(it.cx0 - C.orb.x); wanderN++; }
       items += run.level.items.length;
       transitions += run.ev.transitions;
       holdShare += run.ev.holdFrames / run.ev.frames;
@@ -220,6 +312,28 @@
     check(T.cautious.survived === 20, `cautious player (skips dares) survives every seed (${T.cautious.survived}/20)`);
     check(T.competent.survived === 20, `competent player survives every seed (${T.competent.survived}/20)`);
     check(T.competent.avgScore >= T.cautious.avgScore, 'competent play scores at least as well as cautious play');
+    // Steering is not optional: a player who only holds and releases (never steers) fails.
+    let centreSurvived = 0, centreTime = 0;
+    for (let seed = 1; seed <= 20; seed++) { const run = simulate(seed, SECONDS, STRATEGIES.competent, CENTRE); if (!run.crashed) centreSurvived++; centreTime += run.elapsed; }
+    check(centreSurvived === 0 && centreTime / 20 < 40, `a player who never steers fails early (survived ${centreSurvived}/20, avg ${(centreTime / 20).toFixed(1)}s)`);
+    // The gaps really use the lane: Endless wanders edge to edge after a while.
+    check(wander / wanderN > 25, `Endless gaps sit off-centre on average (${(wander / wanderN).toFixed(0)} px)`);
+    // A sloppy steerer (aims a little off) still survives the early part of a run.
+    let sloppy = 0;
+    for (let seed = 1; seed <= 20; seed++) { const run = simulate(seed, 30, STRATEGIES.competent, (l, ob, oy, sp) => Pulse.autosteer(l, ob.x, oy, sp, 1.2, 0.2)); if (!run.crashed) sloppy++; }
+    check(sloppy >= 18, `a sloppy steerer still survives the first 30s (${sloppy}/20)`);
+    // Intensity: the generator gets denser the longer the run lasts (items per second, 0-30s vs 90-120s).
+    let early = 0, late2 = 0;
+    for (let seed = 1; seed <= 10; seed++) {
+      const lv3 = new Pulse.EndlessLevel(W, 1100, seeded(seed));
+      lv3.speedAt = (e) => C.speed.start + C.speed.perSecond * Math.min(e, 120);
+      for (let t = 0; t < 130; t += 1 / 30) lv3.update(1 / 30, lv3.speedAt(t), t);
+      const times = lv3.items.map((it) => { const tt = (it.at + Math.round(1100 * C.orb.yRatio)); return tt; });
+      // convert distance back to time with the (increasing) speed model
+      const timeAt = (d) => { let tt = 0, dist = 0; while (dist < d && tt < 400) { dist += lv3.speedAt(tt) / 60; tt += 1 / 60; } return tt; };
+      for (const it of lv3.items) { const tt = timeAt(it.at); if (tt < 30) early++; else if (tt >= 90 && tt < 120) late2++; }
+    }
+    check(late2 / 30 > early / 30 * 1.15, `Endless is denser late in a run (items/s: ${(early / 300).toFixed(2)} early vs ${(late2 / 300).toFixed(2)} late)`);
 
     // Same seed → same pattern stream.
     const a = simulate(11, 40, STRATEGIES.competent), b2 = simulate(11, 40, STRATEGIES.competent);

@@ -1,13 +1,11 @@
-// Draws gameplay with Gemini's v3.0 sprites (landscape). It only reads game state (segments,
+// Draws gameplay with Gemini's v3.0 sprites (portrait). It only reads game state (segments,
 // orb radius and charge) and never changes it, so collision, scoring and timing are identical
 // to the shape renderer.
 //
-// Two spaces:
-//   - Gameplay objects live in `layer`, a container that maps track space onto the screen
-//     (GameScene.create): track x (across the lane) → screen y, track y (along travel) → screen
-//     x reversed. Art is authored for this: walls and barriers are bands across the lane.
-//   - Backgrounds and screen effects (multiplier chevron) are in screen space, laid out for
-//     landscape: base tile, ceiling/floor ridges, top/bottom tick rails, all scrolling left.
+// Track space and screen space are the same in portrait (GameScene.create): x across the lane,
+// y down the screen, obstacles falling toward the orb. Walls and barriers are bands across the
+// lane. The backdrop is procedural (a deep navy field, a faint grid and neon lane rails moving
+// down with the run), so it works at any screen height; Gemini's wall/barrier/pickup art is reused.
 // All art is scaled to the existing gameplay sizes using the measurements in Pulse.ART.
 (function () {
   const C = Pulse.CONFIG;
@@ -39,18 +37,11 @@
       const SW = scene.SW;
       const SH = scene.SH;
 
-      // ---- Screen-space landscape background (below the gameplay layer) ----
-      this.bg = scene.add.tileSprite(0, 0, SW, SH, visual.background).setOrigin(0).setTileScale(A.base).setDepth(0);
-      const midH = 256 * A.base;
-      this.midBottom = scene.add.tileSprite(0, SH - midH, SW, midH, visual.mid).setOrigin(0).setTileScale(A.base)
-        .setAlpha(0.5).setDepth(1);
-      this.midTop = scene.add.tileSprite(0, 0, SW, midH, visual.mid).setOrigin(0).setTileScale(A.base)
-        .setFlipY(true).setAlpha(0.5).setDepth(1);
-      const railH = 128 * A.base;
-      this.railBottom = scene.add.tileSprite(0, SH - railH, SW, railH, visual.rail).setOrigin(0).setTileScale(A.base)
-        .setAlpha(0.7).setDepth(1);
-      this.railTop = scene.add.tileSprite(0, 0, SW, railH, visual.rail).setOrigin(0).setTileScale(A.base)
-        .setFlipY(true).setAlpha(0.7).setDepth(1);
+      // ---- Procedural portrait backdrop (below the gameplay layer) ----
+      this.makeBackdropTextures();
+      this.bg = scene.add.rectangle(0, 0, SW, SH, T.background).setOrigin(0).setDepth(0);
+      this.grid = scene.add.tileSprite(0, 0, SW, SH, 'pulse_grid').setOrigin(0).setDepth(0.5).setAlpha(C.comet.backdropAlpha + 0.1);
+      this.streaks = scene.add.tileSprite(0, 0, SW, SH, 'pulse_streaks').setOrigin(0).setDepth(0.6).setAlpha(0.5);
 
       // ---- Gameplay layer (track space) ----
       const x = scene.orbX;
@@ -179,19 +170,53 @@
       this.nodeNext = 0;
       this.nodeClock = 0;
       this.lastRender = 0;
-      // Quieter backdrop and neon lane rails, as in the trailer.
-      const a = C.comet.backdropAlpha;
-      this.bg.setAlpha(a);
-      this.midTop.setAlpha(0.5 * a);
-      this.midBottom.setAlpha(0.5 * a);
+      // Neon-blue lane rails down both edges, as in the trailer (glow, body, bright core).
       const SW = sc.SW;
       const SH = sc.SH;
       const rails = this.rails = sc.add.graphics().setDepth(1.5);
       for (const [w, al] of [[12, 0.1], [5, 0.25], [2, 0.9]]) {
         rails.lineStyle(w, 0x1e6bff, al);
-        rails.lineBetween(0, 6, SW, 6);
-        rails.lineBetween(0, SH - 6, SW, SH - 6);
+        rails.lineBetween(6, 0, 6, SH);
+        rails.lineBetween(SW - 6, 0, SW - 6, SH);
       }
+    }
+
+    // Tileable textures for the backdrop: a faint grid with brighter cross ticks, and sparse speed streaks.
+    makeBackdropTextures() {
+      const tex = this.scene.textures;
+      const make = (key, w, h, draw) => {
+        if (tex.exists(key)) return;
+        const t = tex.createCanvas(key, w, h);
+        draw(t.getContext(), w, h);
+        t.refresh();
+      };
+      make('pulse_grid', 90, 90, (g, w, h) => {
+        g.strokeStyle = 'rgba(30,107,255,0.16)';
+        g.lineWidth = 1;
+        g.beginPath();
+        g.moveTo(0.5, 0);
+        g.lineTo(0.5, h);
+        g.moveTo(0, 0.5);
+        g.lineTo(w, 0.5);
+        g.stroke();
+        g.fillStyle = 'rgba(80,160,255,0.35)';
+        g.fillRect(0, 0, 3, 3);
+      });
+      make('pulse_streaks', 270, 360, (g, w, h) => {
+        // Deterministic pseudo-random streaks so the tile is identical every run.
+        let seed = 7;
+        const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+        for (let i = 0; i < 16; i++) {
+          const x = Math.floor(rnd() * w);
+          const y = Math.floor(rnd() * h);
+          const len = 16 + Math.floor(rnd() * 46);
+          const grad = g.createLinearGradient(0, y, 0, y + len);
+          grad.addColorStop(0, 'rgba(120,190,255,0)');
+          grad.addColorStop(1, 'rgba(120,190,255,0.5)');
+          g.fillStyle = grad;
+          g.fillRect(x, y, 2, len);
+        }
+      });
     }
 
     // The orb colour moves from its normal to its shrunk tint as it gets small.
@@ -211,7 +236,7 @@
       if (!this.comet) return;
       const k = calm ? 0 : Pulse.Rhythm.pulse(phase, 3);
       this.rails.setAlpha(0.78 + 0.22 * k);
-      this.bg.setAlpha(C.comet.backdropAlpha * (1 + 0.1 * k));
+      this.grid.setAlpha(C.comet.backdropAlpha + 0.1 + 0.08 * k);
     }
 
     // Draws the comet from the collision radius (`radius`, authoritative) and the springy visual
@@ -238,7 +263,13 @@
       if (!this.tailLen) this.tailLen = Rh.createSpring(target);
       const len = Math.max(8, Rh.springStep(this.tailLen, target, dt, 4.5, 0.75));
       const beat = Rh.position(sc.clock).beat;
-      const sway = (dead ? 0 : 0.03) * Math.sin(beat * Math.PI); // the tail lilts once per two beats
+      // Steering: the tail leans away from the direction of travel (eased, so it swings rather
+      // than snaps) and a little extra stretch shows while the orb is gliding sideways.
+      const vx = dead ? 0 : (sc.orbState.vx || 0);
+      const leanTarget = Math.max(-1, Math.min(1, vx / 650)) * 0.5;
+      if (this.lean === undefined) this.lean = 0;
+      this.lean += (leanTarget - this.lean) * (1 - Math.exp(-dt * 12));
+      const sway = (dead ? 0 : 0.03) * Math.sin(beat * Math.PI) + this.lean; // the tail also lilts once per two beats
       const wide = (2 * vr * 0.92) / 64;
       const show = !dead;
       this.cometTail.setVisible(show).setPosition(x, y).setTint(col).setAlpha(0.8).setRotation(sway)
@@ -261,7 +292,7 @@
         n.age = 0;
         n.px = x + (Math.random() - 0.5) * vr * 0.7;
         n.py = y + vr * 0.35;
-        n.vx = (n.px - x) * 2.2 + (Math.random() - 0.5) * 24;
+        n.vx = (n.px - x) * 2.2 + (Math.random() - 0.5) * 24 - vx * 0.18;
         n.sz = vr / 56;
         n.setTint(col);
       }
@@ -319,10 +350,9 @@
     // `scroll` is the scene's background scroll (half the distance travelled).
     // `canSmash(seg)` says whether hitting a barrier now would smash it.
     render(level, scroll, dimmed, wallGraphics, canSmash) {
-      const travel = scroll * 2;
-      this.bg.tilePositionX = (travel * this.visual.bgSpeed) / A.base;
-      this.midTop.tilePositionX = this.midBottom.tilePositionX = (travel * this.visual.midSpeed) / A.base;
-      this.railTop.tilePositionX = this.railBottom.tilePositionX = (travel * this.visual.railSpeed) / A.base;
+      const travel = scroll * 2; // distance travelled; the backdrop moves up the screen's opposite way: down
+      this.grid.tilePositionY = -travel * 0.55;
+      this.streaks.tilePositionY = -travel * 1.15;
       this.dimmed = dimmed;
 
       const H = this.scene.H;
@@ -350,7 +380,7 @@
         } else if (s.kind === 'gate') {
           this.placeGate(this.acquire(s, 'gate'), s, onScreen);
         } else {
-          this.placePickup(this.acquire(s, 'pickup'), s, onScreen && !s.taken, dimmed);
+          this.placePickup(this.acquire(s, 'pickup'), s, onScreen && !s.taken);
         }
       }
     }
@@ -424,7 +454,7 @@
       }
       edgeL.setPosition(s.gapL - CAP_REACH, s.y);
       edgeR.setPosition(s.gapR - (ART_W - CAP_REACH), s.y);
-      guide.setPosition(this.scene.orbX, s.y);
+      guide.setPosition(s.cx, s.y);
     }
 
     makeBarrier() {
@@ -458,43 +488,27 @@
 
     makePickup() {
       const sc = this.scene;
-      const parts = [];
-      for (let i = 0; i < 2; i++) {
-        parts.push(this.add(sc.add.sprite(0, 0, 'pulse_gameplay', 'orb_energy_gold_01'), 4));
-        parts.push(this.add(sc.add.image(0, 0, 'pulse_gameplay', 'orb_lock_ring'), 4));
-      }
+      const parts = [
+        this.add(sc.add.sprite(0, 0, 'pulse_gameplay', 'orb_energy_gold_01'), 4),
+        this.add(sc.add.image(0, 0, 'pulse_gameplay', 'orb_lock_ring'), 4),
+      ];
       return this.group('pickup', parts, { variant: null });
     }
 
-    placePickup(v, s, visible, dimmed) {
+    // A note pickup at lane position s.x. It can be taken at any orb size, so it is never dimmed.
+    placePickup(v, s, visible) {
       v.show(visible);
       if (!visible) return;
-      const p = v.parts; // [orb, lock, orb, lock]
+      const [orb, lock] = v.parts;
       if (v.variant !== s.variant) {
         v.variant = s.variant;
         const bonus = s.variant === 'bonus';
         const scale = A.pickupDrawRadius / (bonus ? A.bonusRadius : A.energyRadius);
-        p[0].play(bonus ? 'anim_orb_mint' : 'anim_orb_gold').setScale(scale);
-        p[2].play(bonus ? 'anim_orb_mint' : 'anim_orb_gold').setScale(scale);
-        p[1].setScale((A.pickupDrawRadius + 6) / 28);
-        p[3].setScale((A.pickupDrawRadius + 6) / 28);
+        orb.play(bonus ? 'anim_orb_mint' : 'anim_orb_gold').setScale(scale);
+        lock.setScale((A.pickupDrawRadius + 6) / 28);
       }
-      const x0 = this.scene.orbX;
-      for (let side = 0; side < 2; side++) {
-        const x = side ? x0 + s.offset : x0 - s.offset;
-        const orb = p[side * 2];
-        const lock = p[side * 2 + 1];
-        orb.setPosition(x, s.y);
-        lock.setPosition(x, s.y);
-        // Shrunk: collectibles can't be taken, so they dim (45%, slate tint) per the style guide.
-        if (dimmed) {
-          orb.setTint(T.dimTint).setAlpha(C.pickup.dimAlpha);
-          lock.setTint(T.dimTint).setAlpha(C.pickup.dimAlpha);
-        } else {
-          orb.clearTint().setAlpha(1);
-          lock.clearTint().setAlpha(0.85);
-        }
-      }
+      orb.setPosition(s.x, s.y).clearTint().setAlpha(1);
+      lock.setPosition(s.x, s.y).clearTint().setAlpha(0.85);
     }
 
     renderFinish(y, visible) {
@@ -582,12 +596,9 @@
     collect(seg) {
       const em = seg.variant === 'bonus' ? this.sparksMint : this.sparksGold;
       const frame = seg.variant === 'bonus' ? 'fx_collect_mint_burst' : 'fx_collect_gold_burst';
-      const x = this.scene.orbX;
-      for (const px of [x - seg.offset, x + seg.offset]) {
-        em.explode(6, px, seg.y);
-        const img = this.collectFx[this.collectNext++ % this.collectFx.length].setFrame(frame);
-        this.pulse(img, A.base * 0.4, A.base * 0.9, 260, px, seg.y);
-      }
+      em.explode(seg.quality === 'perfect' ? 10 : 6, seg.x, seg.y);
+      const img = this.collectFx[this.collectNext++ % this.collectFx.length].setFrame(frame);
+      this.pulse(img, A.base * 0.4, A.base * (seg.quality === 'perfect' ? 1.15 : 0.9), 260, seg.x, seg.y);
     }
 
     // Plain smash: octagonal burst; charged smash: the bigger double-diamond nova.

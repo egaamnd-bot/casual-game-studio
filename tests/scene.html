@@ -23,6 +23,7 @@
   <script src="../src/js/rhythm.js"></script>
   <script src="../src/js/storage.js"></script>
   <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/melody.js"></script>
   <script src="../src/js/level.js"></script>
   <script src="../src/js/stages.js"></script>
   <script src="../src/js/campaign.js"></script>
@@ -45,7 +46,7 @@
 
     function at(gx, gy) {
       const rect = document.querySelector('canvas').getBoundingClientRect();
-      const k = rect.width / window.__pulseGame.scale.width; // screen (landscape) game px
+      const k = rect.width / window.__pulseGame.scale.width; // screen game px
       return { clientX: rect.left + gx * k, clientY: rect.top + gy * k };
     }
     function down(gx, gy) {
@@ -57,6 +58,8 @@
       window.dispatchEvent(new MouseEvent('mouseup', Object.assign({ bubbles: true, button: 0, buttons: 0 }, p)));
       document.querySelector('canvas').dispatchEvent(new MouseEvent('mouseup', Object.assign({ bubbles: true, button: 0, buttons: 0 }, p)));
     }
+    // Steps the scene by hand (16.7 ms frames) so the checks do not depend on how fast this machine renders.
+    const frames = (sc, n, until) => { for (let i = 0; i < n; i++) { sc.update(performance.now(), 16.667); if (until && until()) return true; } return !until; };
     const savedData = () => JSON.parse(localStorage.getItem('pulse.save.v1') || '{"campaign":{"stages":{}}}');
 
     // Record whether pickups are drawn dimmed.
@@ -72,22 +75,21 @@
       const cx = s.SW * 0.75, cy = s.SH / 2; // tap in the open lane ahead of the orb
 
       // Hold and release.
-      down(cx, cy); await wait(300);
+      down(cx, cy); await wait(50); frames(s, 40);
       check(s.radius === C.orb.minRadius, `hold shrinks orb fully (r=${s.radius})`);
-      check(!s.canCollect(), 'shrunk orb cannot collect');
-      up(cx, cy); await wait(300);
+      check(s.canCollect(), 'notes are collected at any size (intentional portrait rule)');
+      up(cx, cy); await wait(50); frames(s, 60);
       check(s.radius === C.orb.radius, `release restores orb (r=${s.radius})`);
-      check(s.canCollect(), 'full-size orb can collect');
 
       // Focus loss while holding: released and paused, orb regrows.
-      down(cx, cy); await wait(150);
-      s.game.events.emit('blur'); await wait(300);
+      down(cx, cy); await wait(50); frames(s, 10);
+      s.game.events.emit('blur'); await wait(100); frames(s, 10);
       check(s.state === 'paused', 'focus loss pauses');
       check(!s.isHeld(), 'focus loss releases touch');
-      check(s.radius === C.orb.radius, 'orb not stuck shrunk after focus loss');
       up(cx, cy);
-      down(cx, cy); up(cx, cy); await wait(100);
+      down(cx, cy); up(cx, cy); await wait(100); frames(s, 60);
       check(s.state === 'playing', 'tap resumes');
+      check(s.radius === C.orb.radius, 'orb not stuck shrunk after focus loss (regrows once play resumes)');
 
       // Pause button.
       down(s.pauseBtn.x, s.pauseBtn.y); up(s.pauseBtn.x, s.pauseBtn.y); await wait(100);
@@ -98,9 +100,9 @@
       // Rhythm clock: runs only while playing, stays in step with the level, restarts on retry.
       check(s.clock.bpm === Pulse.STAGES[0].world.bpm, `stage 1 clock runs at the world's tempo (${s.clock.bpm})`);
       check(Math.abs(s.clock.t - s.level.time) < 1e-6, 'run clock and level clock agree');
-      s.pause(); const frozen = s.clock.t; await wait(300);
+      s.pause(); const frozen = s.clock.t; await wait(300); frames(s, 10);
       check(s.clock.t === frozen, 'run clock is frozen while paused');
-      down(cx, cy); up(cx, cy); await wait(300);
+      down(cx, cy); up(cx, cy); await wait(100); frames(s, 20);
       check(s.state === 'playing' && s.clock.t > frozen && Math.abs(s.clock.t - s.level.time) < 1e-6, 'run clock continues after resume');
       check(s.orbFx && s.orbFx.glow >= 1 && s.orbFx.along >= 1 && s.orbFx.across >= 1 && s.orbFx.radius >= s.radius - 1e-9, 'orb effects never shrink the drawn orb');
       check(s.radius === C.orb.radius, 'orb effects leave the collision radius alone');
@@ -108,40 +110,25 @@
       // Input sounds are never delayed to the beat.
       check(C.groove.inputDelay === 0, 'shrink and release sounds play at once');
 
-      // Pickup dimming: wait until a pickup is on screen, then hold.
       const sprites = !!s.view;
       check(sprites === !window.PULSE_TEST.noAssets, `renderer is ${sprites ? 'sprites' : 'shapes'} as requested`);
-      const pickupSprites = () => sprites
-        ? s.view.free.pickup.concat(s.level.segments.filter((g) => g._vis && g._vis.kind === 'pickup').map((g) => g._vis))
-          .flatMap((v) => [v.parts[0], v.parts[2]]).filter((o) => o.visible) // parts: orb, lock, orb, lock
-        : [];
-      // Wait until a pickup is actually on screen.
-      const pickupVisible = () => s.level.segments.some((g) => g.active && g.kind === 'pickup' && !g.taken && g.y > 0 && g.y < s.orbY - 40);
-      for (let i = 0; i < 100 && !pickupVisible(); i++) await wait(100);
-      check(pickupVisible(), 'a pickup scrolls onto the screen');
-      dimLog.length = 0;
-      down(cx, cy); await wait(300);
-      const shrunkDraws = sprites ? pickupSprites().map((o) => o.alpha === C.pickup.dimAlpha) : dimLog.slice(-5);
-      up(cx, cy); await wait(400);
-      const fullDraws = sprites ? pickupSprites().map((o) => o.alpha === 1 ? false : true) : dimLog.slice(-5);
-      check(shrunkDraws.length > 0 && shrunkDraws.every((d) => d === true), 'pickups dimmed to 45% while shrunk');
-      check(fullDraws.length > 0 && fullDraws.every((d) => d === false), 'pickups at full opacity when grown');
+      check(C.pickup.dimAlpha === undefined, 'pickups are never dimmed: one note, same look at any size');
 
       // Crash (no input): no completion recorded, next stage stays locked, retry lock.
-      for (let i = 0; i < 100 && s.state !== 'over'; i++) await wait(100);
+      frames(s, 6000, () => s.state === 'over');
       check(s.state === 'over', 'idle play crashes');
       check(!savedData().campaign.stages[Pulse.STAGES[0].id], 'crash records no completion');
       check(!Pulse.Campaign.isUnlocked(Pulse.Save.load(), 1), 'crash does not unlock stage 2');
       down(cx, cy); up(cx, cy); await wait(50);
       check(s.state === 'over', 'tap right after crash is ignored (retry lock)');
       await wait(500);
-      down(cx, cy); up(cx, cy); await wait(100);
+      down(cx, cy); up(cx, cy); await wait(100); frames(s, 3);
       check(s.state === 'playing' && s.level.travelled < 200, 'tap after lock restarts from the beginning');
       check(s.clock.t < 0.3 && s.level.time < 0.3, `retry restarts the run clock (t=${s.clock.t.toFixed(2)})`);
 
       // Completion with autopilot: recorded, unlocks next, legacy best untouched.
       s.test.bot = true;
-      for (let i = 0; i < 400 && s.state !== 'complete'; i++) await wait(100);
+      frames(s, 12000, () => s.state === 'complete');
       check(s.state === 'complete', 'autopilot completes stage 1');
       const rec = savedData().campaign.stages[Pulse.STAGES[0].id];
       check(rec && rec.completed && rec.bestStars === s.result.stars && rec.bestStars >= 1, 'completion saved with stars');
@@ -156,7 +143,7 @@
       const e = scene();
       check(e.mode === 'endless' && e.level instanceof Pulse.EndlessLevel, 'endless uses the pattern generator');
       check(e.best === 77, `endless best migrated (best=${e.best})`);
-      e.startRun(); e.test.bot = true; await wait(5000);
+      e.startRun(); e.test.bot = true; frames(e, 600);
       check(e.state === 'playing' && e.score > 0, `endless plays and scores (score=${e.score})`);
 
       // ---- Audio lifecycle (state checks; real playback needs a genuine tap on a device) ----
@@ -179,7 +166,7 @@
       check(e.state === 'paused', 'going to the background also pauses the run');
       down(cx, cy); up(cx, cy); await wait(100);
       e.test.bot = false;
-      for (let i = 0; i < 100 && e.state !== 'over'; i++) await wait(100);
+      frames(e, 9000, () => e.state === 'over');
       check(e.state === 'over' && Pulse.Music.wanted === null, 'crash stops the gameplay music (game-over sting plays instead)');
       check(typeof e.crashReason === 'string' && e.reasonText.visible, `crash shows a reason ("${e.crashReason}")`);
       Pulse.Audio.setVolume('music', 0);
