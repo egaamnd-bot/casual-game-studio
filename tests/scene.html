@@ -34,6 +34,7 @@
   <script src="../src/js/render.js"></script>
   <script src="../src/js/ui.js"></script>
   <script src="../src/js/assets.js"></script>
+  <script src="../src/js/trail.js"></script>
   <script src="../src/js/sprite-view.js"></script>
   <script src="../src/js/game-scene.js"></script>
   <script src="../src/js/menu-scenes.js"></script>
@@ -204,6 +205,8 @@
       check(e.state === 'paused' && Pulse.Music.level < 1, 'pause ducks the music');
       check(Pulse.Music.holding === true, 'pause holds the music where it is, so resuming needs no seek');
       down(cx, cy); up(cx, cy); await wait(100);
+      // A hit right after resuming can dip the music for 160 ms (pulseDuck), so wait out that blip: the claim is that the level comes back to 1.
+      for (let i = 0; i < 12 && Pulse.Music.level !== 1; i++) await wait(50);
       check(e.state === 'playing' && Pulse.Music.level === 1 && Pulse.Music.holding === false, 'resume restores the music level and releases the hold');
       e.game.events.emit('hidden'); await wait(50);
       check(A().hidden && A().musicPaused && !A().holding, 'app in background: music paused, hum stopped');
