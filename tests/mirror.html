@@ -26,7 +26,7 @@
     const STAGE = Pulse.STAGES.find((s) => s.id === 's7-double-trouble');
     const zoneStages = Pulse.STAGES.filter((s) => s.items.some((it) => it.zone));
     // Mirror stages are a deliberate list: add a stage here only together with its tests (section 9).
-    const MIRROR_STAGE_IDS = ['s7-double-trouble', 's16-echo-chamber'];
+    const MIRROR_STAGE_IDS = ['s7-double-trouble', 's16-echo-chamber', 's20-chromatic-overload', 's23-feedback'];
     const compile = (st, h) => Pulse.Campaign.compile(st, W, h);
 
     // ---- 1. The reflection: echoX = 2 * laneCenterX - playerX ----
@@ -377,7 +377,8 @@
     for (const st of zoneStages.filter((q) => q !== STAGE)) {
       check(Pulse.Campaign.validate(st, W).length === 0, `${st.id}: validates`);
       const trk = compile(st, 960);
-      check(trk.mirrors.length >= 2, `${st.id}: ${trk.mirrors.length} mirror zones`);
+      const minZones = st.id === 's20-chromatic-overload' ? 1 : 2; // the arc-2 finale reprises Mirror Pulse once (docs/CAMPAIGN_30.md)
+      check(trk.mirrors.length >= minZones, `${st.id}: ${trk.mirrors.length} mirror zones`);
       const zneeds = st.items.filter((it) => it.zone && it.type === 'gate').map((it) => it.need);
       // Provisional until phone-tested: never tighter than the hardest zone of stage 7.
       check(Math.min(...zneeds) >= Math.min(...s7needs), `${st.id}: zone openings (min ${Math.min(...zneeds)}) are no tighter than stage 7's (min ${Math.min(...s7needs)})`);

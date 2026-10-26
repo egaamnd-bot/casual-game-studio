@@ -316,7 +316,11 @@
       } else if (state === 'complete') {
         const r = this.result;
         this.titleText.setFontSize(56);
-        show(this.titleText, 'Stage clear', T.text);
+        // The last stage of an arc is a world finale (presentation only): its own title and the existing sting.
+        const finale = campaign && (this.stageIndex + 1) % Pulse.ARC_SIZE === 0;
+        if (finale) this.titleText.setFontSize(44);
+        show(this.titleText, finale ? (this.stageIndex + 1 >= Pulse.STAGES.length ? 'Campaign complete' : `World ${this.stage.arc.index} complete`) : 'Stage clear', finale ? T.textBonus : T.text);
+        if (finale) this.time.delayedCall(900, () => { if (this.state === 'complete') Pulse.Sfx.play('milestone'); });
         // Dim the frozen play field so the results and buttons read cleanly over it.
         this.overlay.fillStyle(T.background, 0.82).fillRect(0, 0, this.SW, this.SH);
         Pulse.UI.stars(this, this.overlay, this.titleText.x, this.titleText.y + 70, 26, r.stars, 3, this.overlayImages, 17);

@@ -59,6 +59,8 @@
     AudioBufferSourceNode.prototype.start = function (...a) { starts.push({ loop: this.loop, dur: this.buffer && this.buffer.duration, args: a }); return realStart.apply(this, a); };
     const mlog = []; const rp = Pulse.Music.play.bind(Pulse.Music); Pulse.Music.play = (t) => { mlog.push('play ' + t + ' paused=' + (Pulse.Music.el && Pulse.Music.el.paused) + ' track=' + Pulse.Music.track); rp(t); mlog.push(' ->started=' + Pulse.Music.started); };
     const rs = Pulse.Music.stop.bind(Pulse.Music); Pulse.Music.stop = (m) => { mlog.push('stop'); rs(m); };
+    // Waits (real time, up to 8 s) until the streamed music is in step with the run clock, as it is on a phone after a moment.
+    const settle = async (x) => { for (let i = 0; i < 80 && !x.aligned(); i++) { await wait(100); frames(x, 1); } };
     const odOn = (x) => { x.od.active = true; x.od.remaining = C.overdrive.duration; x.od.meter = C.overdrive.threshold; };
     const count = (n) => played.filter((p) => p.name === n).length;
     const packCount = () => played.filter((p) => /^pack/.test(p.name) && p.ok).length;
@@ -146,7 +148,7 @@
       // ---- Stems (a non-opener stage, so the music is simply playing; openers stop it for the world intro) ----
       q = await startStage(1, { bot: true, route: 'safe' });
       q.startRun(); frames(q, 20);
-      await Pulse.Sfx.stemPrepare(1); await wait(1500); frames(q, 5);
+      await Pulse.Sfx.stemPrepare(1); await settle(q);
       check(Pulse.Sfx.stemFits(1, 125) && !Pulse.Sfx.stemFits(1, 140) && !Pulse.Sfx.stemFits(1, 100), 'a stem fits only its own tempo (16 beats)');
       check(stemFetches0 === 0, 'stems are fetched on demand: none at boot');
       check(!Pulse.Sfx.stemActive(), 'no stem before Overdrive');
@@ -160,13 +162,13 @@
       frames(q, 300); check(starts.filter((s) => s.loop && s.dur > 5).length === 1, `it is not restarted while Overdrive lasts (${starts.filter((s) => s.loop && s.dur > 5).length} starts, od ${q.od.active}/${q.od.remaining.toFixed(1)}, state ${q.state}, stem ${Pulse.Sfx.stemActive()})`);
       // Pause stops it, resume restarts it in phase.
       q.pause(); check(q.state === 'paused' && !Pulse.Sfx.stemActive(), `pause stops the stem (state ${q.state}, stem ${Pulse.Sfx.stemActive()})`);
-      q.setState('playing'); await wait(400); frames(q, 5);
+      q.setState('playing'); await settle(q);
       check(Pulse.Sfx.stemActive() === 1 && starts.filter((s) => s.loop && s.dur > 5).length === 2, 'resume brings it back');
       // End of Overdrive.
       q.od.active = false; frames(q, 2);
       check(!Pulse.Sfx.stemActive(), 'the stem stops when Overdrive ends');
       // Crash and clear.
-      await wait(600); frames(q, 3); odOn(q); frames(q, 3); check(!!Pulse.Sfx.stemActive(), `on again (aligned ${q.aligned()})`); q.crash && q.crash({ kind: 'gate' });
+      await settle(q); odOn(q); frames(q, 3); check(!!Pulse.Sfx.stemActive(), `on again (aligned ${q.aligned()})`); q.crash && q.crash({ kind: 'gate' });
       check(q.state === 'over' && !Pulse.Sfx.stemActive(), 'a crash stops the stem');
       // Retry cycles: no growth, nothing decoded again.
       const dec = decodes;
@@ -174,7 +176,7 @@
       check(decodes === dec, `15 retries decode nothing more (${decodes - dec})`);
       check(!Pulse.Sfx.stemActive(), 'and leave no stem running');
       // Mute: music volume 0 prevents and stops the stem; sfx 0 mutes the samples.
-      await wait(1500); frames(q, 3); odOn(q); frames(q, 3); check(!!Pulse.Sfx.stemActive(), `on before mute (aligned ${q.aligned()}, started ${Pulse.Music.started}, track ${Pulse.Music.track})`);
+      await settle(q); odOn(q); frames(q, 3); check(!!Pulse.Sfx.stemActive(), `on before mute (aligned ${q.aligned()}, started ${Pulse.Music.started}, track ${Pulse.Music.track})`);
       Pulse.Audio.setVolume('music', 0); check(!Pulse.Sfx.stemActive(), 'music mute stops the stem');
       frames(q, 5); check(!Pulse.Sfx.stemActive(), 'and it does not come back while muted');
       Pulse.Audio.setVolume('music', 0.8); frames(q, 3); check(!!Pulse.Sfx.stemActive(), 'unmuting during Overdrive brings it back');
@@ -187,7 +189,7 @@
       const realBpm = q.trackBpm; q.trackBpm = () => 100; odOn(q); frames(q, 3); check(!Pulse.Sfx.stemActive(), 'a tempo that does not fit gets no stem'); q.trackBpm = realBpm; q.od.active = false; frames(q, 2);
       // Worlds 2 and 3.
       for (const [idx, w] of [[6, 2], [9, 3]]) {
-        q = await startStage(idx, { bot: true, route: 'safe' }); q.startRun(); frames(q, 20); await Pulse.Sfx.stemPrepare(w); await wait(1500); frames(q, 5);
+        q = await startStage(idx, { bot: true, route: 'safe' }); q.startRun(); frames(q, 20); await Pulse.Sfx.stemPrepare(w); await settle(q);
         odOn(q); frames(q, 3);
         check(Pulse.Sfx.stemActive() === w || (q.trackBpm() !== BPM[w]), `world ${w} stem plays in stage ${idx + 1} (bpm ${q.trackBpm()}, aligned ${q.aligned()}, started ${Pulse.Music.started}, music ${Pulse.Music.track}/${q.playingTrack}, fits ${Pulse.Sfx.stemFits(w, q.trackBpm())})`);
         q.od.active = false; frames(q, 2);
