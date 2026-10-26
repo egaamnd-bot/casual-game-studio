@@ -122,7 +122,7 @@
     // ---- Stage definitions ----
     const ids = new Set();
     const STAGES = Pulse.STAGES;
-    check(STAGES.length === 12, `expected 12 stages, found ${STAGES.length}`);
+    check(STAGES.length >= 12 && STAGES.length <= 30, `the campaign has 12 shipped stages plus up to 18 new ones, found ${STAGES.length}`);
     check(['s1-first-pulse', 's2-find-the-rhythm', 's3-controlled-overload', 's4-split-decision', 's5-charged-energy', 's6-the-long-hold',
       's7-double-trouble', 's8-greed-is-optional', 's9-overload', 's10-precision', 's11-final-circuit', 's12-the-final-pulse'].every((id, i) => STAGES[i].id === id),
       'all 12 stage ids keep their places (save compatibility)');
@@ -131,7 +131,10 @@
       check(errors.length === 0, `stage ${i + 1} invalid: ${errors.join('; ')}`);
       check(!ids.has(stage.id), `duplicate stage id ${stage.id}`);
       ids.add(stage.id);
-      check(stage.world.index === Math.floor(i / 4) + 1, `stage ${i + 1} is in world ${Math.floor(i / 4) + 1}`);
+      // Shipped stages keep their audio theme (music, tempo, melody palette): worlds of four. Progression
+      // worlds ("arcs") are ten stages each and set the look, banner and stage-select page.
+      if (i < 12) check(stage.world.index === Math.floor(i / 4) + 1, `stage ${i + 1} keeps its audio world ${Math.floor(i / 4) + 1}`);
+      check(stage.arc && stage.arc.index === Math.floor(i / 10) + 1 && stage.look === stage.arc.look, `stage ${i + 1} is in progression world ${Math.floor(i / 10) + 1} and takes its look`);
       check(typeof stage.teaches === 'string' && stage.teaches.length > 10, `stage ${i + 1} documents what it teaches`);
       check(typeof stage.profile === 'string' && stage.profile.length > 20, `stage ${i + 1} documents its difficulty profile`);
       const track = Pulse.Campaign.compile(stage, W);
@@ -202,17 +205,26 @@
     const OLD_MEDIAN = [1.14, 1.14, 1.04, 0.90, 0.97, 0.79, 0.74, 0.74, 0.69, 0.69, 0.67, 0.66];
     const OLD_WALLS = [0.32, 0.39, 0.54, 0.53, 0.48, 0.48, 0.67, 0.54, 0.69, 0.80, 0.70, 0.78];
     const stat = STAGES.map(stats);
-    const cut = stat.map((s, i) => 1 - s.median / OLD_MEDIAN[i]);
+    const cut = stat.map((s, i) => (i < 12 ? 1 - s.median / OLD_MEDIAN[i] : 0));
     stat.forEach((s, i) => {
-      check(cut[i] >= 0.05, `${STAGES[i].id}: clear time is shorter than before (${(100 * cut[i]).toFixed(0)}% shorter)`);
+      if (i < 12) check(cut[i] >= 0.05, `${STAGES[i].id}: clear time is shorter than before (${(100 * cut[i]).toFixed(0)}% shorter)`);
       check(s.max <= 1.35, `${STAGES[i].id}: no long empty stretch (longest clear ${s.max.toFixed(2)}s)`);
       check(s.items >= 30, `${STAGES[i].id}: at least 30 items (${s.items})`);
-      check(s.wallsPerSec >= OLD_WALLS[i] * 0.9, `${STAGES[i].id}: obstacle rate ${s.wallsPerSec.toFixed(2)}/s is not below before (${OLD_WALLS[i]})`);
+      if (i < 12) check(s.wallsPerSec >= OLD_WALLS[i] * 0.9, `${STAGES[i].id}: obstacle rate ${s.wallsPerSec.toFixed(2)}/s is not below before (${OLD_WALLS[i]})`);
     });
-    const meanCut = cut.reduce((a, b) => a + b, 0) / cut.length;
+    const cut12 = cut.slice(0, 12);
+    const meanCut = cut12.reduce((a, b) => a + b, 0) / cut12.length;
     check(meanCut >= 0.15, `clear time is ${(100 * meanCut).toFixed(0)}% shorter on average (target ≥ 15%; the brief asked for 20–30%)`);
     // Difficulty curve: top speed rises every stage and clear time falls world by world.
     for (let i = 1; i < 12; i++) check(stat[i].speed > stat[i - 1].speed, `top speed rises every stage (${i}→${i + 1})`);
+    // New stages: speed is capped (late stages get harder through precision and sequencing, not speed), never
+    // falls inside a progression world after its second stage, and a world may open a little slower than the last finale.
+    for (let i = 12; i < STAGES.length; i++) {
+      check(STAGES[i].speed.end <= 460, `${STAGES[i].id}: top speed ${STAGES[i].speed.end} is within the 460 px/s ceiling`);
+      const opens = i === 12 || i % 10 === 0; // the first new stage after the shipped 12, and each later world opener
+      if (!opens) check(STAGES[i].speed.end >= STAGES[i - 1].speed.end, `${STAGES[i].id}: top speed does not fall inside its world`);
+      if (opens) check(STAGES[i].speed.end >= STAGES[i - 1].speed.end - 60, `${STAGES[i].id}: a new world opens at most 60 px/s below the last stage`);
+    }
     const avgW = (a, b, k) => stat.slice(a, b).reduce((s, c) => s + c[k], 0) / (b - a);
     check(avgW(0, 4, 'median') > avgW(4, 8, 'median') && avgW(4, 8, 'median') > avgW(8, 12, 'median'), `clear time falls world by world (${avgW(0, 4, 'median').toFixed(2)} > ${avgW(4, 8, 'median').toFixed(2)} > ${avgW(8, 12, 'median').toFixed(2)} s)`);
     check(avgW(0, 4, 'wallsPerSec') < avgW(8, 12, 'wallsPerSec'), 'obstacles per second rise from world 1 to world 3');
@@ -221,12 +233,12 @@
     const FEATURES = ['median', 'wallsPerSec', 'jump', 'barriers', 'notes', 'tight'];
     const scale = FEATURES.map((k) => Math.max(...stat.map((s) => s[k])) || 1);
     let closest = Infinity, closestPair = '';
-    for (let i = 0; i < 12; i++) for (let j = i + 1; j < 12; j++) {
+    for (let i = 0; i < STAGES.length; i++) for (let j = i + 1; j < STAGES.length; j++) {
       const d = Math.sqrt(FEATURES.reduce((acc, k, n) => acc + Math.pow((stat[i][k] - stat[j][k]) / scale[n], 2), 0));
       if (d < closest) { closest = d; closestPair = `${i + 1}/${j + 1}`; }
     }
     check(closest > 0.08, `every stage has a distinct difficulty profile (closest pair ${closestPair}: ${closest.toFixed(2)})`);
-    check(new Set(STAGES.map((s) => s.profile)).size === 12, 'every stage describes its own profile');
+    check(new Set(STAGES.map((s) => s.profile)).size === STAGES.length, 'every stage describes its own profile');
     lines.push('density: ' + stat.map((s, i) => `${i + 1}:med${s.median.toFixed(2)}(-${(100 * cut[i]).toFixed(0)}%) max${s.max.toFixed(2)} ${s.items}it ${s.wallsPerSec.toFixed(2)}w/s jump${s.jump.toFixed(0)}`).join(' | '));
 
     const [s1, s2, s3] = STAGES;
@@ -239,6 +251,7 @@
     check(bad(s1, (s) => { s.world = null; }).length > 0, 'missing world is rejected');
     check(bad(s1, (s) => { s.items = []; }).length > 0, 'empty items are rejected');
     check(bad(s1, (s) => { s.items.find((it) => it.type === 'gate').need = 20; }).length > 0, 'unfair narrow gap is rejected');
+    check(bad(Pulse.STAGES.find((q) => q.id === 's14-safe-or-sorry'), (s) => { const i = s.items.findIndex((it) => it.routeEnd); s.items.splice(i + 1, 0, { type: 'bonus', t: 0.35, x: 150, route: s.items[i].route, role: 'risk', lane: 'R' }); }).some((e) => /after its last row/.test(e)), 'a route note after its last row is rejected');
     check(bad(s1, (s) => { s.items[2].x = 400; }).length > 0, 'a gap outside the lane is rejected');
     check(bad(s7, (s) => { s.items.forEach((it) => { if (it.type === 'gate') it.need = 30; }); }).length > 0, 'a stage of too-narrow gaps is rejected');
     check(bad(s1, (s) => { s.items[0].type = 'laser'; }).length > 0, 'unknown item type is rejected');
@@ -402,7 +415,7 @@
     loaded = S.load(mem);
     check(loaded.campaign.stages[s1.id].bestStars === 3 && Pulse.Skins.selected(loaded).id === 'solar-flare', 'progress and skin survive a save/load round trip');
 
-    // ---- 12-stage progression ----
+    // ---- Full-campaign progression ----
     save = fresh();
     for (let i = 0; i < STAGES.length; i++) {
       check(Pulse.Campaign.isUnlocked(save, i), `stage ${i + 1} unlocked after clearing the stages before it`);
@@ -411,10 +424,17 @@
       r = Pulse.Campaign.recordCompletion(save, STAGES[i].id, 3);
       if (i + 1 < STAGES.length) check(r.unlockedNext === STAGES[i + 1], `clearing stage ${i + 1} announces stage ${i + 2}`);
     }
-    check(Pulse.Campaign.totalStars(save) === 36, 'all 12 stages × 3 stars = 36');
+    check(Pulse.Campaign.totalStars(save) === 3 * STAGES.length, `all ${STAGES.length} stages × 3 stars = ${3 * STAGES.length}`);
     const violet = Pulse.Skins.byId('violet-nova'), whiteout = Pulse.Skins.byId('whiteout');
     check(violet.unlockStars === 12 && whiteout.unlockStars === 15, 'new skins unlock at 12 and 15 stars');
-    check(Pulse.Skins.isUnlocked(save, violet) && Pulse.Skins.isUnlocked(save, whiteout), 'all six skins unlocked with 36 stars');
+    check(Pulse.Skins.isUnlocked(save, violet) && Pulse.Skins.isUnlocked(save, whiteout), 'all six skins unlocked with every star');
+    // A player who finished the shipped 12 stages (36 stars) keeps everything and simply finds stage 13 open.
+    save = fresh();
+    for (let i = 0; i < 12; i++) Pulse.Campaign.recordCompletion(save, STAGES[i].id, 3);
+    check(Pulse.Campaign.totalStars(save) === 36, 'a save with the original 12 stages complete still counts 36 stars');
+    check(Pulse.Campaign.isUnlocked(save, 12) && (STAGES.length < 14 || !Pulse.Campaign.isUnlocked(save, 13)), 'stage 13 unlocks after stage 12, stage 14 stays locked');
+    check(Pulse.Campaign.nextStageIndex(save) === 12, 'the next stage to play for such a save is stage 13');
+    check(Pulse.Skins.isUnlocked(save, violet) && Pulse.Skins.isUnlocked(save, whiteout), 'skins earned with 36 stars stay unlocked');
     save = fresh();
     for (let i = 0; i < 4; i++) Pulse.Campaign.recordCompletion(save, STAGES[i].id, 3);
     check(Pulse.Skins.isUnlocked(save, violet) && !Pulse.Skins.isUnlocked(save, whiteout), '12 stars: Violet Nova yes, Whiteout not yet');

@@ -82,7 +82,7 @@ Legend: **EXISTS** = shipped (facts from the repository); **PLANNED** = new desi
 **12 The Final Pulse** (EXISTS) - build-up, recovery, densest gauntlet. Difficulty 7.5. About 28 s. Intro text becomes mid-campaign wording.
 
 **13 Prism Sway** (PLANNED, set-piece: COUNTER-SWAY)
-1. World 2 opener, relaxes after stage 12. 2. Chromatic look. 3. Purpose: learn to read *motion phase*: gates that sway in opposite directions. 4. Pairs of swaying gates 1.5 beats apart, phase-offset so the second opens where the first closes, with a gold arc that follows each sway; wide breathers between pairs. 5. Introduces counter-sway; practises sway, standard barrier, hold. 6. Gold sits on the sway path (follow the gap = 90%); mint at the outer sway ends (greed = wait a beat). 7. 133 bpm, sways in 6-beat cycles; grid 0.25. 8. 6.5: slower than stage 12 (360-405 px/s), but two things move at once. 9. Hint card "TWO GATES, OPPOSITE WAYS"; sways never faster than the existing 6-beat minimum; the second gate's opening is always reachable from the first's. 10. Replay: mint at the sway extremes; 3★ = 90% (16 of 18) gold. 11. 42-48 s; 46-52 items; gold 18, mint 4; accept section 4.
+1. First new stage (world 2 starts at stage 11); relaxes after stage 12. 2. Chromatic look. 3. Purpose: learn to read *motion phase*: gates that sway in opposite directions. 4. Pairs of swaying gates 1.5 beats apart, phase-offset so the second opens where the first closes, with a gold arc that follows each sway; wide breathers between pairs. 5. Introduces counter-sway; practises sway, standard barrier, hold. 6. Gold sits on the sway path (follow the gap = 90%); mint at the outer sway ends (greed = wait a beat). 7. 133 bpm (world 2 track), sways in 6-beat cycles; grid 0.25. 8. 6.5: slower than stage 12 (360-405 px/s), but two things move at once. 9. Hint card "TWO GATES, OPPOSITE WAYS"; sways never faster than the existing 6-beat minimum; the second gate's opening is always reachable from the first's. 10. Replay: mint at the sway extremes; 3★ = 90% (16 of 18) gold. 11. 42-48 s; 46-52 items; gold 18, mint 4; accept section 4.
 
 **14 Safe or Sorry** (PLANNED, set-piece: ROUTE ECONOMY)
 Purpose: use risk/reward routes as an Overdrive economy. Two forks (a 4-row and a 6-row), each with a *long* risk lane of narrow gaps holding 4-5 route notes, and a safe lane that is short and wide; the second fork swaps sides and the risk lane has tighter gaps. Mechanics practised: routes, shrink precision, combos (a full risk lane tends to start Overdrive; route clear bonus exists). Gold is on shared tracks so stars never depend on the route (risk is bonus only). Music: 133, the lane notes are the melody. Difficulty 6.8. Fair: a fork is announced by a hint card and a 2 beat preview; both lanes validated independently. Replay: both routes clear (not saved), Overdrive. 3★: 90% gold on either route. 44-50 s, 60-68 items.
@@ -97,7 +97,7 @@ Purpose: master the echo after stage 7's introduction. Three Mirror Pulse zones:
 Purpose: charge economy. Sequences of two or three charged barriers separated by exactly the fair refill window, with gold that forces you to stay big (inside the ring window) rather than shrink. Mechanics: charged, standard barrier, narrow gaps between chains. Difficulty 7.5. Fair: ring refill windows validated at every speed; a hint card shows the ring. 3★: gold between chain links (tight). 44-50 s.
 
 **18 Mint Rush** (PLANNED, set-piece: GROOVE)
-Purpose: a rhythm-forward, forgiving-but-greedy stage built for combos and Overdrive: long mint trails across the lane on the beat, joined by gates, so a perfect run reaches combo 16 and Overdrive twice. Gold is on the safe line (stars easy: 90% is generous); mint rewards play. Difficulty 7.2 (hard to perfect, easy to finish). Music: 136 bpm; the combo melody carries the stage. Replay: a flawless combo. 40-46 s.
+Purpose: a rhythm-forward, forgiving-but-greedy stage built for combos and Overdrive: long mint trails across the lane on the beat, joined by gates, so a perfect run reaches combo 16 and Overdrive twice. Gold is on the safe line (stars easy: 90% is generous); mint rewards play. Difficulty 7.2 (hard to perfect, easy to finish). Music: stays on the stage's world track (133 bpm); the combo melody carries the stage. Replay: a flawless combo. 40-46 s.
 
 **19 Off-Beat** (PLANNED, set-piece: SYNCOPATION)
 Purpose: read rhythm instead of position. Gates and barriers arrive on off-beat positions (beat grid 0.5 of a beat for some items via `on`) in call-and-response phrases (gate-gate-bar, gate-gate-bar, then the pattern breaks). Mechanics: gates, barriers, sway, breathing. Difficulty 7.8. Fair: the grid stays 0.25 beat; each phrase repeats once before it varies. 48-54 s.
@@ -152,3 +152,18 @@ Difficulty 8.2. Reuses Pulse.Melody cues; music: Pulse Collapse audio at 140 bpm
 - Alternate audio (tracks beyond the three world tracks) and art for arcs/finales are requested from Gemini, not invented here. Until delivered, new stages reuse the existing art and music and are labelled provisional.
 - Estimated durations come from path length / mean speed; bot clear times are checked in tests, human times will differ.
 - Eight legacy stages (5-12) change background look only; this is cosmetic and reversible.
+
+## Batch 1 as built (stages 13-18, status: IMPLEMENTED, NOT DEVICE-TESTED)
+
+Measured by the stats script (bot path length / mean speed). Existing stages run 25-41 s, so these sit in the same range; the longer 42-48 s targets above were not needed for readability and are replaced by the measured values.
+
+| # | Stage | Speed px/s | Items | Gold | Signature | Measured |
+|---|-------|-----------|-------|------|-----------|----------|
+| 13 | Prism Sway | 360-405 | 64 | 27 | counter-sway slide pairs | ~41 s |
+| 14 | Safe or Sorry | 370-415 | 47 | 13 | two risk/safe forks, 10 fork rows | ~29 s |
+| 15 | Bend | 375-420 | 47 | 21 | tunnel chains into charged barriers | ~35 s |
+| 16 | Echo Chamber | 380-425 | 68 | 21 | three mirror zones (openings no tighter than stage 7) | ~43 s |
+| 17 | Charge Chain | 385-430 | 52 | 26 | 11 charged barriers, Overdrive refills | ~30 s |
+| 18 | Mint Rush | 385-430 | 68 | 18 | 34 mint notes, combo-first | ~33 s |
+
+Validator rule added in this batch: a route's risk/safe note may not come after the route's last row (it could never count).

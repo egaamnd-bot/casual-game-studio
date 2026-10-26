@@ -423,7 +423,7 @@
     {
       const ids = ['s1-first-pulse', 's2-find-the-rhythm', 's3-controlled-overload'];
       check(ids.every((id, i) => STAGES[i].id === id), 'the original three stage ids are unchanged');
-      check(STAGES.length === 12, 'still 12 stages');
+      check(STAGES.length >= 12 && ['s4-split-decision', 's12-the-final-pulse'].every((id, i) => STAGES[i === 0 ? 3 : 11].id === id), 'the shipped 12 stages are still in place');
       for (const s of STAGES) {
         const t = Pulse.Campaign.compile(s, W);
         check(t.energyTotal === s.items.filter((it) => it.type === 'energy').length, `${s.id}: gold count unchanged by the rhythm layer`);

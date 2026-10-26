@@ -20,11 +20,11 @@ Pulse.Assets = {
     'bg_world3_far', 'bg_world3_mid', 'bg_world3_fg_rail', 'bg_world3_intro_banner',
   ],
 
-  // World-themed stage-card plates (280×320), one per campaign stage, in assets/stage_cards/.
-  // Named ui_stage_card_s01_w1 … s12_w3 (stage number, world number).
+  // World-themed stage-card plates (280×320) in assets/stage_cards/ (frame colour per world).
+  // With ten stages per world the plate is shared: one per arc (the number and name are drawn on top).
+  STAGE_PLATES: ['ui_stage_card_s01_w1', 'ui_stage_card_s05_w2', 'ui_stage_card_s09_w3'],
   stageCardKey(index) {
-    const stage = Pulse.STAGES[index];
-    return `ui_stage_card_s${String(index + 1).padStart(2, '0')}_w${stage.world.index}`;
+    return this.STAGE_PLATES[Pulse.STAGES[index].arc.index - 1];
   },
 
   // Background used by Endless and menus; campaign stages name theirs in `visual` (stages.js).
@@ -90,10 +90,7 @@ Pulse.Assets = {
       scene.load.atlas(key, `${base}.png`, `${base}.json`);
     }
     for (const key of this.IMAGES) scene.load.image(key, `assets/backgrounds/${key}.png`);
-    for (let i = 0; i < Pulse.STAGES.length; i++) {
-      const key = this.stageCardKey(i);
-      scene.load.image(key, `assets/stage_cards/${key}.png`);
-    }
+    for (const key of this.STAGE_PLATES) scene.load.image(key, `assets/stage_cards/${key}.png`);
   },
 
   // Returns the list of missing textures/frames; empty means sprites can be used.
@@ -101,7 +98,7 @@ Pulse.Assets = {
     const tex = scene.textures;
     const out = [];
     for (const key of this.IMAGES) if (!tex.exists(key)) out.push(key);
-    for (let i = 0; i < Pulse.STAGES.length; i++) if (!tex.exists(this.stageCardKey(i))) out.push(this.stageCardKey(i));
+    for (const key of this.STAGE_PLATES) if (!tex.exists(key)) out.push(key);
     const frames = this.requiredFrames();
     for (const atlas of Object.keys(frames)) {
       if (!tex.exists(atlas)) {

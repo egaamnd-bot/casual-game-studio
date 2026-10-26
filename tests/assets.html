@@ -59,10 +59,10 @@
       notes.push(`${frames} required frames present`);
 
       for (const stage of Pulse.STAGES) {
-        const v = stage.world.visual;
+        const v = stage.look.visual;
         check(v && ['background', 'mid', 'rail'].every((k) => Pulse.Assets.IMAGES.includes(v[k])),
           `${stage.id}: world background images are known`);
-        check(Pulse.Assets.IMAGES.includes(stage.world.banner), `${stage.id}: world banner is known`);
+        check(Pulse.Assets.IMAGES.includes(stage.arc.banner), `${stage.id}: world banner is known`);
       }
       for (const key of ['anim_orb_gold', 'anim_orb_mint', ...Pulse.SKINS.map((s) => `anim_arcs_${s.id}`)]) {
         const anim = active().anims.get(key);

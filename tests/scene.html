@@ -345,6 +345,45 @@
         q.test.bot = false;
       }
 
+      // ---- Stages 13+ and the ten-stage worlds in the real scene ----
+      {
+        const savedBefore = localStorage.getItem('pulse.save.v1');
+        // A player who finished the shipped 12 stages: stage select opens on world 2 and stage 13 is open.
+        const sv = Pulse.Save.load();
+        for (let i = 0; i < 12; i++) Pulse.Campaign.recordCompletion(sv, Pulse.STAGES[i].id, 3);
+        Pulse.Save.write(sv);
+        check(Pulse.Campaign.isUnlocked(Pulse.Save.load(), 12), 'finishing stage 12 unlocks stage 13');
+        check(!Pulse.Campaign.isUnlocked(Pulse.Save.load(), 13), 'stage 14 stays locked until 13 is done');
+        scene().scene.start('stages'); await wait(400);
+        const sel = window.__pulseGame.scene.getScenes(true)[0];
+        check(sel.scene.key === 'stages' && sel.worldIndex === 2, `stage select opens on the world of the next stage (world ${sel.worldIndex})`);
+        check(Pulse.arcStages(Pulse.ARCS[0]).length === 10 && Pulse.arcStages(Pulse.ARCS[1]).length >= 8, 'world 1 lists ten stages; world 2 lists its stages');
+        sel.scene.restart({ world: 1 }); await wait(400);
+        check(window.__pulseGame.scene.getScenes(true)[0].worldIndex === 1, 'the arrows page back to world 1');
+
+        for (let idx = 12; idx < Pulse.STAGES.length; idx++) {
+          scene().scene.start('game', { mode: 'campaign', stageIndex: idx }); await wait(300);
+          const q = scene();
+          const id = Pulse.STAGES[idx].id;
+          check(q.stage.id === id && q.stage.look === Pulse.STAGES[idx].arc.look, `${id}: opens with its world's look`);
+          q.test.bot = true; q.test.route = 'safe';
+          q.startRun();
+          // Pause freezes the run; a tap resumes it.
+          frames(q, 120);
+          q.pause(); const tr = q.level.travelled; frames(q, 30);
+          check(q.state === 'paused' && q.level.travelled === tr, `${id}: pause freezes the run`);
+          q.onPointerDown({}, []);
+          check(q.state === 'playing', `${id}: a tap resumes`);
+          frames(q, 40000, () => q.state !== 'playing');
+          check(q.state === 'complete', `${id}: the bot completes it in the real scene (state ${q.state})`);
+          check(q.energy === q.level.track.energyTotal, `${id}: all gold collected (${q.energy}/${q.level.track.energyTotal})`);
+          const rec = savedData().campaign.stages[id];
+          check(rec && rec.completed && rec.bestStars === 3, `${id}: three stars recorded`);
+          q.test.bot = false; q.test.route = undefined;
+        }
+        if (savedBefore === null) localStorage.removeItem('pulse.save.v1'); else localStorage.setItem('pulse.save.v1', savedBefore);
+      }
+
       // Menus render, with the menu theme.
       scene().scene.start('menu'); await wait(300);
       check(Pulse.Music.wanted === 'MENU_THEME', 'menu plays the menu theme');

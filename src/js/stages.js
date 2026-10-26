@@ -1,4 +1,4 @@
-// Campaign: 12 stages in three worlds. Data only: src/js/campaign.js validates and runs them.
+// Campaign: stages in three worlds of ten (see Pulse.ARCS at the end). Data only: src/js/campaign.js validates and runs them.
 // The game is PORTRAIT: obstacles fall from the top, the orb steers left and right (docs/PORTRAIT_REWORK.md).
 //
 // Stage fields:
@@ -323,7 +323,7 @@
     },
     {
       id: 's12-the-final-pulse', name: 'The Final Pulse', world: W3,
-      intro: 'The last run. Everything, at full speed. Breathe when the gold comes.',
+      intro: 'A big one. Everything you know, at full speed. Breathe when the gold comes.',
       teaches: 'Climax: a build-up, a recovery, then a final gauntlet of every mechanic.',
       profile: 'The finale: a build-up, one breather of gold, then the densest gauntlet in the game.',
       speed: { start: 375, end: 440 }, exit: { type: 'finish', runout: 420 },
@@ -343,8 +343,162 @@
         charged(0.6), ...trail(3, 0.3, 60, -60),
       ],
     },
+
+    // ---------------- World 2 (continued) · Chromatic Overdrive: mastery through variation (docs/CAMPAIGN_30.md) ----------------
+    {
+      id: 's13-prism-sway', name: 'Prism Sway', world: W2,
+      intro: 'Gates that sway in opposite directions. Follow the notes through the gap.',
+      teaches: 'Counter-sway: two moving gates swaying in opposite directions, read by their phase; gold follows the gap.',
+      profile: 'Calm speed, busy eyes: pairs of swaying gates that open where the last one closed.',
+      speed: { start: 360, end: 405 }, exit: RUNOUT,
+      pace: 0.5, grid: 0.25, spread: 0.6,
+      hints: [{ from: 0.4, to: 4.5, title: 'TWO GATES, OPPOSITE WAYS.', sub: 'THE NOTES SHOW THE GAP' }],
+      items: [
+        wide(1.0, 0), gold(0.45, 0), gold(0.4, 60),
+        on(slide(52, 0.7, 0, 60, 6, 0.25), 0.5), gold(0.45, 0), bar(0.55), gold(0.4, -60),
+        on(slide(50, 0.6, -40, 60, 6, 0.25), 0.5), on(slide(50, 0.6, 40, 60, 6, 0.75), 0.5), gold(0.45, 0), wide(0.5, 0),
+        gold(0.4, 80), gold(0.4, -80), mint(0.35, 150),
+        on(slide(48, 0.6, 0, 70, 6, 0.75), 0.5), bar(0.5), on(slide(48, 0.6, 0, 70, 6, 0.25), 0.5), gold(0.45, 0), gold(0.4, -70),
+        gap(46, 0.55, -80), on(slide(46, 0.55, 40, 60, 6, 0.25), 0.5), on(slide(46, 0.85, -40, 60, 6, 0.75), 0.5), gold(0.45, 0),
+        wide(0.5, 0), gold(0.4, 70), bar(0.5), gold(0.4, -70),
+        on(slide(46, 0.55, -50, 70, 6, 0.25), 0.5), on(slide(46, 0.55, 50, 70, 6, 0.75), 0.5), bar(0.5), mint(0.35, -150), gold(0.4, 0),
+        on(slide(46, 0.55, 0, 70, 6, 0.75), 0.5), gold(0.4, 70), gap(46, 0.55, 90), gold(0.4, 40), bar(0.5), gold(0.4, -40),
+        on(slide(44, 0.55, -40, 60, 6, 0.25), 0.5), on(slide(44, 0.55, 40, 60, 6, 0.75), 0.5), gold(0.45, 0), wide(0.5, 0), gold(0.4, 0),
+        // Second half: the same two ideas, closer together, with a mint at the far end of the sway.
+        gap(46, 0.6, 80), gold(0.4, 70), on(slide(44, 0.6, -30, 70, 6, 0.75), 0.5), on(slide(44, 0.85, 30, 70, 6, 0.25), 0.5), gold(0.45, 0), bar(0.5), gold(0.4, 40),
+        mint(0.35, -150), on(slide(44, 0.6, 0, 80, 6, 0.25), 0.5), gold(0.4, 0), wide(0.5, 0), gold(0.4, -70),
+        on(slide(44, 0.6, 50, 70, 6, 0.75), 0.5), on(slide(44, 0.85, -50, 70, 6, 0.25), 0.5), bar(0.5), gold(0.4, 0), gold(0.4, 60),
+        on(slide(44, 0.6, 0, 80, 6, 0.75), 0.5), gold(0.4, 0), bar(0.5), gold(0.4, -60),
+      ],
+    },
+    {
+      id: 's14-safe-or-sorry', name: 'Safe or Sorry', world: W2,
+      intro: 'Two forks, and the risky lanes are longer. Take them for the notes, or stay safe.',
+      teaches: 'Route economy: long risk lanes full of notes that charge Overdrive, short wide safe lanes. Stars never depend on the route.',
+      profile: 'Forks you can read from far away: a short fork, then a long one, each paying more for the longer way.',
+      speed: { start: 370, end: 415 }, exit: RUNOUT,
+      pace: 0.5, grid: 0.25, spread: 0.6,
+      routeHints: { 's14-a': { title: 'THE LANE SPLITS', sub: 'LEFT SAFE · RIGHT RISKY (MORE NOTES)' }, 's14-b': { title: 'A LONG FORK', sub: 'LEFT RISKY (MANY NOTES) · RIGHT SAFE' } },
+      items: [
+        gap(48, 0.9, 90), gold(0.4, 80), gold(0.4, 20), bar(0.5), gold(0.4, -50),
+        wide(0.7, 0),
+        forkRow('s14-a', 'R', 0.9, [72, -135], [48, 150]), routeNote('s14-a', 'risk', 0.35, 150),
+        forkRow('s14-a', 'R', 0.5, [72, -135], [48, 120]), routeNote('s14-a', 'risk', 0.35, 135), routeNote('s14-a', 'safe', 0.1, -135),
+        forkRow('s14-a', 'R', 0.5, [72, -135], [46, 170]), routeNote('s14-a', 'risk', 0.35, 160),
+        forkRow('s14-a', 'R', 0.5, [72, -135], [46, 130], true),
+        gold(0.4, 100), bar(0.5), gold(0.4, 40), ...snake(3, 46, 0.5, 90, -90), gold(0.4, -80), gold(0.4, -20),
+        bar(0.5), gap(46, 0.55, 60), gold(0.4, 60), on(breathe(42, 0.55, -40, 26, 4, 0), 0.5), gold(0.4, -40),
+        wide(0.7, 0),
+        forkRow('s14-b', 'L', 0.9, [44, -150], [70, 130]), routeNote('s14-b', 'risk', 0.35, -140),
+        forkRow('s14-b', 'L', 0.5, [44, -110], [70, 150]), routeNote('s14-b', 'risk', 0.35, -130),
+        forkRow('s14-b', 'L', 0.5, [44, -160], [70, 120]), routeNote('s14-b', 'risk', 0.35, -140), routeNote('s14-b', 'safe', 0.1, 135),
+        forkRow('s14-b', 'L', 0.5, [42, -115], [70, 150]), routeNote('s14-b', 'risk', 0.35, -130),
+        forkRow('s14-b', 'L', 0.5, [42, -150], [70, 120]), routeNote('s14-b', 'risk', 0.35, -140),
+        forkRow('s14-b', 'L', 0.5, [42, -120], [70, 140], true),
+        bar(0.5), gold(0.4, 90), gold(0.4, 20), gap(46, 0.5, -60), gold(0.4, -60), bar(0.45), gold(0.4, 0),
+      ],
+    },
+    {
+      id: 's15-bend', name: 'Bend', world: W2,
+      intro: 'Keep holding through the long gaps, and steer while you hold.',
+      teaches: 'Bent tunnels: chains of long gaps at shifting positions, each chain closed by a charged barrier.',
+      profile: 'Long holds that curve: three tunnels, each shifted from the last, then a charged barrier to smash.',
+      speed: { start: 375, end: 420 }, exit: RUNOUT,
+      pace: 0.5, grid: 0.25, spread: 0.6,
+      hints: [{ from: 0.4, to: 4.5, title: 'HOLD AND BEND.', sub: 'STEER WHILE SHRUNK  ·  THEN LET GO' }],
+      items: [
+        wide(1.0, 0), gold(0.4, 0), gap(48, 0.6, -70), gold(0.4, -60),
+        tunnel(46, 280, 0.7, -60), gold(0.4, -60), gap(46, 0.6, 60), gold(0.4, 60),
+        tunnel(46, 280, 0.6, 60), gold(0.4, 60), bar(0.6), gold(0.4, 0),
+        gap(46, 0.55, 80), tunnel(44, 300, 0.55, 80), gold(0.4, 70), gap(44, 0.55, -70), tunnel(44, 300, 0.55, -70), gold(0.4, -70),
+        charged(0.8), gold(0.4, 0), wide(0.5, 0), gold(0.4, 80),
+        gap(44, 0.55, -90), gold(0.4, -80), tunnel(44, 260, 0.55, -90), gold(0.4, -90), gap(44, 0.55, 20), tunnel(44, 260, 0.55, 20), gold(0.4, 20),
+        gap(44, 0.55, 90), tunnel(42, 300, 0.55, 90), gold(0.4, 90), charged(0.8), gold(0.4, 0),
+        ...zig(2, 44, 0.55, 90), bar(0.5), gold(0.4, 80), gold(0.4, 0),
+        tunnel(42, 320, 0.6, -60), gold(0.4, -60), gap(42, 0.55, 70), tunnel(42, 320, 0.55, 70), gold(0.4, 70), charged(0.8), gold(0.4, 0), gold(0.4, -60),
+      ],
+    },
+    {
+      id: 's16-echo-chamber', name: 'Echo Chamber', world: W2,
+      intro: 'Your echo mirrors you, three times, each a little harder. Find a gap for both.',
+      teaches: 'Mirror Pulse mastery: a gentle zone of barriers and centred gates, a zone with a centre pinch, and a weave of pairs. Provisional until phone-tested.',
+      profile: 'Three echoes, each longer and tighter than the last, with a clear road between them.',
+      speed: { start: 380, end: 425 }, exit: RUNOUT,
+      pace: 0.45, grid: 0.25, spread: 0.5,
+      mirrorHints: {
+        's16-m1': { title: 'MIRROR PULSE', sub: 'YOUR ECHO MIRRORS YOU · BARRIERS HIT BOTH' },
+        's16-m2': { title: 'THE ECHO RETURNS', sub: 'MEET IN THE MIDDLE · OR TAKE A SIDE' },
+        's16-m3': { title: 'LAST ECHO', sub: 'TWO ORBS · ONE FINGER' },
+      },
+      items: [
+        wide(1.0, 0), gold(0.4, 0), gap(46, 0.6, -80), gold(0.4, -70), bar(0.55), gold(0.4, 60), ...zig(2, 46, 0.55, 80), gold(0.4, 0),
+        ...mirrorZone('s16-m1', [mgate(78, 0.9, 140), bar(0.6), mgate(74, 0.55, 120), mint(0.35, 130), wide(0.5, 0), mgate(70, 0.55, 140)]),
+        gold(0.4, 0), bar(0.5), gap(44, 0.5, -90), gold(0.4, -80), gap(44, 0.5, 20), gold(0.4, 20), gap(44, 0.5, 100), gold(0.4, 90), bar(0.45), gold(0.4, -40),
+        gap(44, 0.5, -60), gold(0.4, -60), ...zig(2, 44, 0.5, 90), bar(0.45), gold(0.4, 80), gap(44, 0.5, 60),
+        ...mirrorZone('s16-m2', [mgate(60, 0.9, 140), mgate(58, 0.5, 100), wide(0.5, 0), mgate(56, 0.5, 150), bar(0.55), mgate(54, 0.5, 110), mint(0.35, 110)]),
+        gold(0.4, 0), bar(0.5), gap(44, 0.5, 90), gold(0.4, 80), gap(44, 0.5, -80), gold(0.4, -70), gap(44, 0.5, 40), bar(0.45), gold(0.4, 0),
+        gap(44, 0.5, -90), gold(0.4, -80), gap(44, 0.5, 70), gold(0.4, 60), ...zig(2, 44, 0.5, 100, -1), gold(0.4, 90), bar(0.4), gold(0.4, -30),
+        ...mirrorZone('s16-m3', [mgate(54, 0.9, 150), mgate(52, 0.5, 100), mgate(50, 0.5, 160), bar(0.55), mgate(48, 0.55, 120), mint(0.35, 120), mgate(48, 0.5, 150), gap(58, 0.5, 0)]),
+        bar(0.45), gold(0.4, 0), gold(0.4, 60),
+      ],
+    },
+    {
+      id: 's17-charge-chain', name: 'Charge Chain', world: W2,
+      intro: 'Barriers that need a full ring, one after another. Stay big while the ring fills.',
+      teaches: 'Charge management: chains of two or three charged barriers separated by short windows, with notes that reward staying big.',
+      profile: 'Heavy and rhythmic: chains of charged barriers with narrow gaps in between to shrink through.',
+      speed: { start: 385, end: 430 }, exit: RUNOUT,
+      pace: 0.45, grid: 0.25, spread: 0.5,
+      hints: [{ from: 0.4, to: 4.5, title: 'CHAIN THE CHARGES.', sub: 'STAY BIG  ·  LET THE RING CLOSE' }],
+      items: [
+        wide(1.0, 0), gold(0.4, 0), gap(46, 0.6, 70), gold(0.4, 60), charged(0.9), gold(0.4, 0),
+        gap(44, 0.55, -80), gold(0.4, -70), charged(0.8), gold(0.45, 40), charged(0.7), gold(0.4, 0),
+        ...zig(2, 44, 0.55, 90), gold(0.4, 80), bar(0.5), gold(0.4, 0),
+        charged(0.8), gold(0.4, -60), charged(0.65), gold(0.4, 60), bar(0.5), gold(0.4, 0), gap(42, 0.55, -70), gold(0.4, -60),
+        wide(0.5, 0), gold(0.4, 70), gold(0.4, -70), mint(0.35, 150),
+        charged(0.8), gold(0.4, 0), charged(0.65), gold(0.4, 0), charged(0.65), gold(0.4, 60), gap(42, 0.55, 90), gold(0.4, 80),
+        gap(42, 0.55, -90), gold(0.4, -80), bar(0.5), gold(0.4, 0), on(breathe(42, 0.55, 0, 26, 4, 0), 0.5), gold(0.4, 0),
+        charged(0.8), gold(0.4, -50), charged(0.65), gold(0.4, 50), gap(42, 0.55, 0), gold(0.4, 0), charged(0.8), gold(0.4, 0), gold(0.4, 60),
+      ],
+    },
+    {
+      id: 's18-mint-rush', name: 'Mint Rush', world: W2,
+      intro: 'Trails of mint notes on the beat. Chain them for a big streak. The gold is on the safe line.',
+      teaches: 'Groove: mint trails across the lane, gates and barriers to keep a streak, Overdrive from a clean run. Gold stays on the safe line.',
+      profile: 'The rhythm stage: long mint trails and an easy gold line; a hard-to-perfect, easy-to-finish run.',
+      speed: { start: 385, end: 430 }, exit: RUNOUT,
+      pace: 0.5, grid: 0.25, spread: 0.6,
+      hints: [{ from: 0.4, to: 4.5, title: 'RIDE THE GROOVE.', sub: 'TRAILS OF MINT  ·  KEEP THE STREAK' }],
+      items: [
+        wide(1.0, 0), gold(0.4, 0), ...trail(4, 0.3, -80, 80, mint), gold(0.4, 80),
+        gap(46, 0.55, -70), gold(0.4, -60), ...trail(4, 0.3, -60, 100, mint), bar(0.5), gold(0.4, 0),
+        gap(46, 0.55, 80), gold(0.4, 70), ...trail(4, 0.3, 90, -90, mint), gap(46, 0.55, -90), gold(0.4, -80),
+        wide(0.5, 0), ...trail(5, 0.3, -100, 100, mint), gold(0.4, 90), bar(0.5), gold(0.4, 0),
+        on(slide(46, 0.55, 0, 60, 6, 0.25), 0.5), gold(0.4, 0), ...trail(4, 0.3, 80, -80, mint), gold(0.4, -70), bar(0.5),
+        gap(44, 0.55, 90), gold(0.4, 80), ...trail(4, 0.3, 80, -100, mint), gap(44, 0.55, -90), gold(0.4, -80), gold(0.4, 0),
+        charged(0.8), ...trail(4, 0.3, -60, 80, mint), gold(0.4, 80), bar(0.5), gold(0.4, 0),
+        ...zig(3, 44, 0.55, 90), gold(0.4, 80), ...trail(5, 0.3, 90, -90, mint), gold(0.4, -80), gold(0.4, 0),
+      ],
+    },
   ];
 
-  // `sector` is the world (the stage-select screen and older code group by it).
-  for (const s of Pulse.STAGES) s.sector = s.world;
+  // Progression worlds ("arcs", docs/CAMPAIGN_30.md): three of ten stages. An arc owns the stage-select
+  // page, the banner, the background LOOK and the world-complete moment. A stage's `world` stays its
+  // AUDIO theme (music, bpm, melody palette), so the shipped stages 1-12 sound and play exactly as before;
+  // `look` is only the background art, taken from the arc.
+  Pulse.ARC_SIZE = 10;
+  Pulse.ARCS = [
+    { index: 1, id: 'arc-1', name: 'Neon Circuit', banner: W1.banner, look: W1, theme: W1 },
+    { index: 2, id: 'arc-2', name: 'Chromatic Overdrive', banner: W2.banner, look: W2, theme: W2 },
+    { index: 3, id: 'arc-3', name: 'Pulse Collapse', banner: W3.banner, look: W3, theme: W3 },
+  ];
+  Pulse.STAGES.forEach((s, i) => {
+    const arc = Pulse.ARCS[Math.min(Pulse.ARCS.length - 1, Math.floor(i / Pulse.ARC_SIZE))];
+    s.arc = arc;
+    s.look = arc.look;
+    s.sector = arc; // the stage-select screen and older code group by it
+  });
+  Pulse.arcStages = (arc) => Pulse.STAGES.map((s, i) => ({ s, i })).filter(({ s }) => s.arc === arc);
+  // True for the stage that opens a world: the first stage, a new arc, or a change of music.
+  Pulse.isOpener = (i) => i === 0 || Pulse.STAGES[i].arc !== Pulse.STAGES[i - 1].arc || Pulse.STAGES[i].world !== Pulse.STAGES[i - 1].world;
 })();
