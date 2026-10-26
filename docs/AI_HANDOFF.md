@@ -1,21 +1,20 @@
 # Current AI Handoff
 
-> Status snapshot. Historical handoffs live in [`docs/ai-handoffs/`](ai-handoffs/); structure per [AI_HANDOFF_PROTOCOL.md](AI_HANDOFF_PROTOCOL.md). Full note: [2026-10-26-risk-reward-routes.md](ai-handoffs/2026-10-26-risk-reward-routes.md).
+> Status snapshot. Historical handoffs live in [`docs/ai-handoffs/`](ai-handoffs/); structure per [AI_HANDOFF_PROTOCOL.md](AI_HANDOFF_PROTOCOL.md). Full note: [2026-10-26-mirror-pulse.md](ai-handoffs/2026-10-26-mirror-pulse.md).
 
 - Updated: 2026-10-26 (UTC)
 - Project: PULSE
-- Status: UPDATED AGAINST INTEGRATED MAIN; NEEDS FRESH CHATGPT REVIEW (Producer phone-tested run #49: 36/36 stars, fun and fair)
-- Branch: `feature/pulse-risk-reward-routes`
-- PR: [#17](https://github.com/egaamnd-bot/casual-game-studio/pull/17) (not merged)
-- Code head SHA: `2127b54ffa10d105d710ab0c3145421edd5a8bac` (handoff commits after it are docs-only)
-- Base: `main` @ `eca3257150a6fd321d3489ad91cd4b3dc7318c23` (PRs #9, #15, #16 merged 2026-10-26). Retargeted from `feature/pulse-musical-combos-overdrive`; main merged into this branch (only `docs/AI_HANDOFF.md` conflicted; src/ and tests/ identical to code head `2127b54`). Chain complete: #9 ✔ → #15 ✔ → #16 ✔ → #17.
-- APK: `pulse-debug-apk-run49`, [run #49](https://github.com/egaamnd-bot/casual-game-studio/actions/runs/40279857946), source SHA `2127b54…`; NOT DEVICE-TESTED
-- Tests: routes (326), campaign (1827), scene, overdrive, melody, rhythm, logic, assets, portrait PASS headless at 540x960; portrait/scene/assets PASS at 412x915; 360x640 UNKNOWN; gameplay.html needs `?bot=1` (not run to completion)
-- Producer decision needed: phone-test run #49 (does the risk lane feel like a fair, worthwhile choice?). No merge requested.
-- Earlier pending: PR #9 awaiting ChatGPT re-review at `3593160`; PR #15/#16 phone tests; PR #14 docs-only.
+- Status: MILESTONE 1 DONE (PR #17 merged); MILESTONE 2 (Mirror Pulse) REVIEW REQUESTED
+- Branch: `feature/pulse-mirror-break` (PR opened against `main`; not merged)
+- Code head SHA: `5732d423ebd1e2ec2557d113af297169150bc1c3` (handoff commits after it are docs-only)
+- Base: `main` @ `ad9bd4c78ae4cf585455114537f44482ce5dbfc2` (PR #17 merge; integrated build run #57 success)
+- APK: `pulse-debug-apk-run58`, [run #58](https://github.com/egaamnd-bot/casual-game-studio/actions/runs/40300498397), source SHA `5732d42...`; NOT DEVICE-TESTED
+- Tests: all suites PASS at 540x960, 360x640 and 412x915 (campaign 1874, mirror 961, routes 335, overdrive 1690, melody 809, rhythm 10101, logic, assets, portrait, scene); `gameplay.html` (manual `?bot=1`) NOT RUN
+- Evidence kept accurate: Producer phone-tested run #49 (routes, 36/36 stars, fun and fair); later APKs NOT device-tested
+- Approval: ChatGPT review of the exact head requested; Producer phone test requested. No merge until explicit approval for the exact head.
 
 ## Known limitations
-Route feel, preview readability, audio loudness/limiter latency/glow readability/performance NOT DEVICE-TESTED; thresholds bot-tuned; Endless not beat-aligned; no Overdrive score bonus.
+Echo readability, colour contrast, cue loudness, timing feel NOT DEVICE-TESTED; durations reasoned from 300 px/s, not phone-tuned; prototype in stage 7 only.
 
 ## Next recommended task
-Tune from phone feedback.
+Phone-test Mirror Pulse; tune from feedback.
