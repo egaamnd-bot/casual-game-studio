@@ -24,6 +24,7 @@
   <script src="../src/js/storage.js"></script>
   <script src="../src/js/sfx.js"></script>
   <script src="../src/js/melody.js"></script>
+  <script src="../src/js/overdrive.js"></script>
   <script src="../src/js/level.js"></script>
   <script src="../src/js/stages.js"></script>
   <script src="../src/js/campaign.js"></script>
@@ -110,6 +111,47 @@
       // Input sounds are never delayed to the beat.
       check(C.groove.inputDelay === 0, 'shrink and release sounds play at once');
 
+      // ---- Overdrive in the real scene: pause, retry, rules unchanged ----
+      {
+        const OD = Pulse.Overdrive;
+        s.test.bot = true; // keep alive while stepping by hand
+        check(s.od && !s.od.active && s.od.fx === 0, 'a run starts without Overdrive');
+        const radiusBefore = s.radius, rBase = C.orb.radius;
+        while (!s.od.active) OD.charge(s.od, 'chargedBreak', {});
+        s.overdriveStarted();
+        frames(s, 30);
+        check(s.od.active && s.od.fx > 0 && s.od.fx < 1, `Overdrive eases in (fx ${s.od.fx.toFixed(2)})`);
+        frames(s, 60 * 2);
+        check(s.od.fx > 0.97, 'and reaches full glow');
+        check(s.radius === radiusBefore && s.radius === rBase, 'Overdrive never changes the collision radius');
+        check(s.orbFx.radius >= s.radius - 1e-9, 'the drawn orb is still never smaller than the collision circle');
+        const left = s.od.remaining;
+        frames(s, 60);
+        check(Math.abs((left - s.od.remaining) - 1) < 0.03, `it counts down in run time (${(left - s.od.remaining).toFixed(3)} s per 60 frames)`);
+        s.pause();
+        const frozen = s.od.remaining;
+        frames(s, 120);
+        check(s.od.active && s.od.remaining === frozen, 'pause freezes Overdrive');
+        s.game.events.emit('blur'); frames(s, 10);
+        check(s.od.active && s.od.remaining === frozen, 'losing focus does not drain or end it');
+        down(cx, cy); up(cx, cy); await wait(100); frames(s, 6);
+        check(s.state === 'playing' && s.od.active && s.od.remaining < frozen, 'resume continues Overdrive where it stopped');
+        Pulse.Audio.setVolume('sfx', 0);
+        const rem = s.od.remaining; frames(s, 60);
+        check(s.od.active && s.od.remaining < rem, 'muting sound does not change Overdrive');
+        Pulse.Audio.setVolume('sfx', 0.8);
+        s.od.remaining = 0.05; frames(s, 5);
+        check(!s.od.active && s.od.meter === 0, 'Overdrive ends by itself');
+        frames(s, 60 * 3);
+        check(s.od.fx === 0, 'and the glow fades out completely');
+        // Combo and meter after a retry.
+        while (!s.od.active) OD.charge(s.od, 'pass', {});
+        s.combo = 7;
+        s.startRun();
+        check(!s.od.active && s.od.meter === 0 && s.od.fx === 0 && s.od.activations === 0 && s.combo === 0, 'retry (startRun) clears Overdrive, the meter and the combo');
+        s.test.bot = false;
+      }
+
       const sprites = !!s.view;
       check(sprites === !window.PULSE_TEST.noAssets, `renderer is ${sprites ? 'sprites' : 'shapes'} as requested`);
       check(C.pickup.dimAlpha === undefined, 'pickups are never dimmed: one note, same look at any size');
@@ -149,10 +191,13 @@
       // ---- Audio lifecycle (state checks; real playback needs a genuine tap on a device) ----
       const A = () => Pulse.Audio.status();
       check(Pulse.Music.wanted === 'WORLD_1_GAMEPLAY', `endless starts on the World 1 track (${Pulse.Music.wanted})`);
+      while (!e.od.active) Pulse.Overdrive.charge(e.od, 'chargedBreak', {});
+      const odLeft = e.od.remaining;
       e.elapsed = 35; e.step(1 / 60);
       check(Pulse.Music.wanted === 'WORLD_2_GAMEPLAY', `endless moves to the World 2 track after 30 s (${Pulse.Music.wanted})`);
       e.elapsed = 65; e.step(1 / 60);
       check(Pulse.Music.wanted === 'WORLD_3_GAMEPLAY', `endless moves to the World 3 track after 60 s (${Pulse.Music.wanted})`);
+      check(e.od.active && e.od.remaining < odLeft && e.od.remaining > odLeft - 0.1, 'a track change leaves Overdrive running and undisturbed');
       check(e.clock.bpm === 140 && Pulse.Rhythm.trackTime(e.clock) < 0.1, `endless clock follows the track change (${e.clock.bpm} BPM)`);
       e.pause();
       check(e.state === 'paused' && Pulse.Music.level < 1, 'pause ducks the music');
@@ -181,6 +226,7 @@
       check(Pulse.Music.wanted === 'WORLD_2_GAMEPLAY', 'stage 5 run: World 2 track');
       scene().scene.start('game', { mode: 'campaign', stageIndex: 9 }); await wait(300);
       check(Pulse.Music.wanted === 'WORLD_3_GAMEPLAY', 'stage 10: World 3 track from the ready screen');
+      check(scene().od && !scene().od.active && scene().od.meter === 0 && scene().od.fx === 0, 'a new stage starts with a fresh Overdrive state');
 
       // Menus render, with the menu theme.
       scene().scene.start('menu'); await wait(300);

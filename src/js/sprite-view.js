@@ -160,6 +160,7 @@
       this.cometEcho = this.add(sc.add.image(x, y, 'comet_ring').setBlendMode('ADD').setVisible(false), 4.8);
       this.cometRipple = this.add(sc.add.image(x, y, 'comet_ring').setBlendMode('ADD').setVisible(false), 4.9);
       this.cometRing = this.add(sc.add.graphics(), 5.2);
+      this.milestoneRings = [0, 1, 2].map(() => this.add(sc.add.image(x, y, 'comet_ring').setBlendMode('ADD').setVisible(false), 4.85));
       // Pooled sparks behind the orb: a fixed ring buffer, so nothing is ever allocated in play.
       this.nodes = [];
       for (let i = 0; i < C.comet.nodes; i++) {
@@ -231,12 +232,48 @@
       return mix(c.orb, c.shrunk);
     }
 
+    // Linear mix of two 0xRRGGBB colours.
+    mixColor(a, b, t) {
+      if (t <= 0) return a;
+      const ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255;
+      const br = (b >> 16) & 255, bg = (b >> 8) & 255, bb = b & 255;
+      return (Math.round(ar + (br - ar) * t) << 16) | (Math.round(ag + (bg - ag) * t) << 8) | Math.round(ab + (bb - ab) * t);
+    }
+
+    // Combo milestone (4 / 8 / 16): rings round the orb, one more and bigger each time, and a few
+    // sparks at 16. Round, quick and well away from the lane ahead.
+    comboMilestone(m) {
+      const sc = this.scene;
+      const K = C.combo;
+      const rad = this.drawnRadius || C.orb.radius;
+      const s = rad / 64;
+      const rings = m >= K.flourish ? 3 : m >= K.layerB ? 2 : 1;
+      for (let i = 0; i < rings; i++) {
+        const img = this.milestoneRings[i];
+        sc.tweens.killTweensOf(img);
+        img.setVisible(true).setPosition(sc.orbX, sc.orbY).setTint(i === rings - 1 && m >= K.flourish ? 0xfff1b8 : this.cometColor(0, false)).setAlpha(0).setScale(s);
+        sc.tweens.add({ targets: img, scale: s * (1.9 + 0.8 * i + (m >= K.flourish ? 0.5 : 0)), duration: 380 + 60 * i, delay: 70 * i, ease: 'Cubic.easeOut',
+          onStart: () => img.setAlpha(0.6), onUpdate: (tw) => img.setAlpha(0.6 * (1 - tw.progress)), onComplete: () => img.setVisible(false) });
+      }
+      if (m >= K.flourish && this.sparksGold) this.sparksGold.explode(10, sc.orbX, sc.orbY);
+    }
+
+    // Overdrive starts: a big golden ring and a burst of sparks; the glow itself rises by the eased
+    // `od.fx`, so there is no pop in brightness.
+    overdriveBurst() {
+      const sc = this.scene;
+      const rad = this.drawnRadius || C.orb.radius;
+      this.ringPulse(this.cometRipple, (rad / 64) * 0.9, (rad / 64) * 3.2, 460, 0.8);
+      if (this.sparksGold) this.sparksGold.explode(14, sc.orbX, sc.orbY);
+    }
+
     // The whole rail and backdrop breathe with the beat (quietly: it is a pulse, not a strobe).
     beatPulse(phase, calm) {
       if (!this.comet) return;
       const k = calm ? 0 : Pulse.Rhythm.pulse(phase, 3);
-      this.rails.setAlpha(0.78 + 0.22 * k);
-      this.grid.setAlpha(C.comet.backdropAlpha + 0.1 + 0.08 * k);
+      const od = this.scene.od ? this.scene.od.fx : 0; // Overdrive: the lane glows a little brighter, never flashes
+      this.rails.setAlpha(Math.min(1, 0.78 + 0.22 * k + 0.1 * od));
+      this.grid.setAlpha(C.comet.backdropAlpha + 0.1 + 0.08 * k + 0.1 * od);
     }
 
     // Draws the comet from the collision radius (`radius`, authoritative) and the springy visual
@@ -254,14 +291,15 @@
       const vr = Math.min(radius + Pulse.Rhythm.OrbFx.maxExtra, Math.max(radius, f.radius || radius)); // what is drawn: never smaller than what collides, at most a few px bigger
       this.drawnRadius = vr;
       const t = Math.min(1, Math.max(0, (C.orb.radius - radius) / (C.orb.radius - C.orb.minRadius)));
-      const col = this.cometColor(t, dead);
+      const od = dead || !sc.od ? 0 : sc.od.fx; // Overdrive intensity 0..1 (cosmetic only: never touches the radius)
+      const col = this.mixColor(this.cometColor(t, dead), 0xfff1b8, 0.55 * od);
       const speed = sc.speedNow || 200;
       const k = C.comet;
       // Tail: longer the faster you go, shorter while shrunk, stretched a little while shrinking
       // (streamlined) and eased in and out by a spring so it trails the orb instead of snapping.
       const target = (k.tailBase * vr + k.tailPerSpeed * speed * (0.4 + 0.6 * (vr / C.orb.radius))) * (1 + 0.22 * (f.shrink || 0));
       if (!this.tailLen) this.tailLen = Rh.createSpring(target);
-      const len = Math.max(8, Rh.springStep(this.tailLen, target, dt, 4.5, 0.75));
+      const len = Math.max(8, Rh.springStep(this.tailLen, target * (1 + 0.4 * od), dt, 4.5, 0.75));
       const beat = Rh.position(sc.clock).beat;
       // Steering: the tail leans away from the direction of travel (eased, so it swings rather
       // than snaps) and a little extra stretch shows while the orb is gliding sideways.
@@ -272,12 +310,12 @@
       const sway = (dead ? 0 : 0.03) * Math.sin(beat * Math.PI) + this.lean; // the tail also lilts once per two beats
       const wide = (2 * vr * 0.92) / 64;
       const show = !dead;
-      this.cometTail.setVisible(show).setPosition(x, y).setTint(col).setAlpha(0.8).setRotation(sway)
-        .setScale(wide * f.glow, len / 256);
-      this.cometStreak.setVisible(show).setPosition(x, y).setTint(this.skin.colors.core).setAlpha(0.7).setRotation(sway * 0.6)
-        .setScale(wide * 0.4, (len * 0.62) / 256);
-      this.cometGlow.setVisible(true).setPosition(x, y).setTint(col).setAlpha(dead ? 0.5 : 0.55 + 0.25 * (f.pop || 0))
-        .setScale((vr * 2.7 * f.glow) / 256);
+      this.cometTail.setVisible(show).setPosition(x, y).setTint(col).setAlpha(0.8 + 0.2 * od).setRotation(sway)
+        .setScale(wide * f.glow * (1 + 0.25 * od), len / 256);
+      this.cometStreak.setVisible(show).setPosition(x, y).setTint(this.skin.colors.core).setAlpha(0.7 + 0.3 * od).setRotation(sway * 0.6 + 0.05 * od * Math.sin(now / 1000 * 9))
+        .setScale(wide * (0.4 + 0.25 * od), (len * (0.62 + 0.18 * od)) / 256);
+      this.cometGlow.setVisible(true).setPosition(x, y).setTint(col).setAlpha(dead ? 0.5 : Math.min(1, 0.55 + 0.25 * (f.pop || 0) + 0.25 * od))
+        .setScale((vr * 2.7 * f.glow * (1 + 0.3 * od)) / 256);
       // The disc is at least the collision radius across the lane; stretch only adds.
       const d = (2 * vr) / 128;
       this.cometBody.setPosition(x, y).setTint(col).setScale(d * f.across, d * f.along);
@@ -285,7 +323,7 @@
       // Sparks: shed behind the orb more often the faster it goes, drifting back with the world,
       // spreading a little sideways and easing out as they fade.
       this.nodeClock += dtms;
-      const interval = k.nodeIntervalMs * Math.min(2, 260 / Math.max(120, speed));
+      const interval = (k.nodeIntervalMs * Math.min(2, 260 / Math.max(120, speed))) / (1 + 1.2 * od);
       if (show && this.nodeClock >= interval) {
         this.nodeClock = 0;
         const n = this.nodes[this.nodeNext++ % this.nodes.length];
@@ -351,8 +389,15 @@
     // `canSmash(seg)` says whether hitting a barrier now would smash it.
     render(level, scroll, dimmed, wallGraphics, canSmash) {
       const travel = scroll * 2; // distance travelled; the backdrop moves up the screen's opposite way: down
+      // Overdrive speeds up only the backdrop streaks (a look; the obstacles' speed is untouched).
+      // The offset accumulates per frame, so the streaks never jump when the intensity changes.
+      const od = this.scene.od ? this.scene.od.fx : 0;
+      const dTravel = this.lastTravel === undefined ? 0 : travel - this.lastTravel;
+      this.lastTravel = travel;
+      this.streakPos = (this.streakPos || 0) + dTravel * 1.15 * (1 + 0.6 * od);
+      if (dTravel < 0) this.streakPos = travel * 1.15; // a retry rewinds the track
       this.grid.tilePositionY = -travel * 0.55;
-      this.streaks.tilePositionY = -travel * 1.15;
+      this.streaks.tilePositionY = -this.streakPos;
       this.dimmed = dimmed;
 
       const H = this.scene.H;

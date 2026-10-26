@@ -7,6 +7,8 @@
 //     kind  'pickup' | 'bonus' | 'pass' | 'break' | 'chargedBreak'
 //     info  { combo (this hit's position in the streak, from 1), quality ('perfect' | 'good') }
 //   Pulse.Melody.lost(world, combo)   a short falling "lost it" phrase when a streak breaks
+//   Pulse.Melody.milestone(world, m, {step})   one-shot musical answer to reaching combo 4 / 8 / 16
+//   Pulse.Melody.overdriveStart(world) / overdriveEnd(world)   the Overdrive riser and its release
 //   Pulse.Melody.fail(world)          the failure sound (crash): dissonant, falling, always the same shape
 //
 // The note palettes. Gemini's world tracks were analysed (FFT chroma, first 60 s): their tempos are
@@ -54,6 +56,18 @@
   // noise (true = filtered noise instead of an oscillator).
   const spec = (freq, dur, wave, gain, extra) => Object.assign({ freq, dur, wave, gain }, extra);
 
+  // Keeps the sum of the notes' peak gains under a ceiling, so stacked layers get quieter instead of
+  // clipping. The lead is scaled with the rest, so loudness stays level as layers join.
+  const GAIN_CEILING = 0.62;
+  function budget(list) {
+    let sum = 0;
+    for (let i = 0; i < list.length; i++) sum += list[i].gain;
+    if (sum <= GAIN_CEILING) return list;
+    const k = GAIN_CEILING / sum;
+    for (let i = 0; i < list.length; i++) list[i].gain *= k;
+    return list;
+  }
+
   function hit(w, kind, info) {
     const o = info || {};
     const combo = Math.max(1, o.combo || 1);
@@ -66,7 +80,7 @@
       out.push(spec(f * 1.005, 0.2, 'triangle', 0.1, {}));
     } else if (kind === 'bonus') {
       out.push(spec(f * 2, 0.4, 'sine', 0.15, {}));
-      out.push(spec(f * 2 * 3.01, 0.22, 'sine', 0.05, {}));
+      out.push(spec(f * 4, 0.22, 'sine', 0.05, {}));
       out.push(spec(f, 0.2, 'square', 0.1, { cutoff: 3000 }));
     } else if (kind === 'pass') {
       out.push(spec(f, 0.15, 'triangle', 0.13, { cutoff: 2400 }));
@@ -75,21 +89,81 @@
       // and a crack of noise; the charged smash adds a sub-bass.
       const charged = kind === 'chargedBreak';
       out.push(spec(f / 2, charged ? 0.42 : 0.3, 'sawtooth', charged ? 0.17 : 0.13, { cutoff: charged ? 1700 : 1300 }));
-      out.push(spec((f / 2) * Math.pow(2, 7 / 12), 0.3, 'sawtooth', 0.09, { cutoff: 1500 }));
+      out.push(spec(hz(w, d - 2), 0.3, 'sawtooth', 0.09, { cutoff: 1500 })); // the scale's fifth-ish, below
       out.push(spec(f, 0.26, 'square', 0.09, { cutoff: 2600 }));
       out.push(spec(0, 0.12, 'noise', charged ? 0.2 : 0.14, { noise: true, cutoff: 5200 }));
       if (charged) out.push(spec(f / 4, 0.55, 'sine', 0.24, {}));
     }
     // Streak layers: more of the harmony joins as the combo grows (accompaniment: layer = true).
-    if (combo >= M.comboLayerA) out.push(spec(f * 2, 0.16, 'triangle', 0.07, { layer: true }));
-    if (combo >= M.comboLayerB) out.push(spec(f / 2 * Math.pow(2, 7 / 12), 0.4, 'sawtooth', 0.06, { cutoff: 900, layer: true }));
-    if (combo >= M.comboLayerB * 2) out.push(spec(f * 3, 0.12, 'sine', 0.05, { layer: true }));
+    // 4: a soft octave above. 8: a fifth under the note and an echo a 16th later, an octave up (the
+    // arrangement starts to run). 16: a high shimmer and a second echo. All of it stays in the scale.
+    const step = o.step > 0 ? o.step : 0.12;
+    const K = C.combo;
+    if (combo >= K.layerA) out.push(spec(f * 2, 0.16, 'triangle', 0.06, { layer: true }));
+    if (combo >= K.layerB) {
+      out.push(spec(hz(w, d - 2), 0.4, 'sawtooth', 0.05, { cutoff: 900, layer: true }));
+      out.push(spec(hz(w, d + 2), 0.14, 'triangle', 0.05, { layer: true, at: step }));
+    }
+    if (combo >= K.flourish) {
+      out.push(spec(hz(w, d + 3), 0.12, 'sine', 0.045, { layer: true }));
+      out.push(spec(hz(w, d + 4), 0.14, 'sine', 0.045, { layer: true, at: step * 2 }));
+    }
     // Perfect: a bright sparkle an octave and a fifth above.
     if (o.quality === 'perfect' && M.perfectLayer) {
-      out.push(spec(f * 3, 0.14, 'sine', 0.09, { glide: f * 3.02 }));
-      out.push(spec(f * 4, 0.1, 'sine', 0.05, {}));
+      out.push(spec(hz(w, d + 3), 0.14, 'sine', 0.08, { glide: hz(w, d + 3) * 1.006 }));
+      out.push(spec(f * 4, 0.1, 'sine', 0.045, {}));
     }
-    return out;
+    // Overdrive: a stacked chord on every contact (the melody note with the scale's third and fifth
+    // above it) and a bright octave, so each hit rings a little fuller. Accompaniment only.
+    if (o.overdrive) {
+      out.push(spec(hz(w, d + 2), 0.26, 'triangle', 0.06, { layer: true }));
+      out.push(spec(hz(w, d + 4), 0.26, 'sine', 0.05, { layer: true }));
+      out.push(spec(f * 2, 0.34, 'sine', 0.05, { layer: true, at: step }));
+    }
+    return budget(out);
+  }
+
+  // The musical answer to reaching combo 4 / 8 / 16 (played once, as accompaniment on top of the hit).
+  // 4: a quiet two-note chime. 8: a four-note arpeggio, one note per 16th. 16: a rising run up the
+  // scale with a shimmer chord. Every note is a scale degree of the world's palette.
+  function milestone(w, m, info) {
+    const step = info && info.step > 0 ? info.step : 0.12;
+    const K = C.combo;
+    const base = LEAD_OCTAVE + 2;
+    const out = [];
+    if (m === K.layerA) {
+      out.push(spec(hz(w, base + 2), 0.2, 'sine', 0.07, { layer: true }));
+      out.push(spec(hz(w, base + 4), 0.28, 'sine', 0.06, { layer: true, at: step }));
+    } else if (m === K.layerB) {
+      for (let i = 0; i < 4; i++) out.push(spec(hz(w, base + i), 0.16, 'triangle', 0.08, { layer: true, at: step * i, cutoff: 3000 }));
+      out.push(spec(hz(w, base - 5), 0.5, 'sawtooth', 0.06, { layer: true, cutoff: 800 }));
+    } else if (m === K.flourish) {
+      for (let i = 0; i < 6; i++) out.push(spec(hz(w, base + i), 0.2, 'square', 0.055, { layer: true, at: step * i * 0.75, cutoff: 3600 }));
+      out.push(spec(hz(w, base + 7), 0.7, 'sine', 0.09, { layer: true, at: step * 4.5 }));
+      out.push(spec(hz(w, base + 9), 0.7, 'sine', 0.06, { layer: true, at: step * 4.5 }));
+      out.push(spec(hz(w, base - 5), 0.8, 'sawtooth', 0.07, { layer: true, cutoff: 900 }));
+    }
+    return budget(out);
+  }
+
+  // Overdrive starts: a rising sweep and a bright chord of the world's scale. Ends: a falling release.
+  function overdriveStart(w) {
+    const f = hz(w, LEAD_OCTAVE - 5);
+    return budget([
+      spec(f, 0.5, 'sawtooth', 0.1, { glide: f * 4, cutoff: 2400 }),
+      spec(hz(w, LEAD_OCTAVE), 0.7, 'triangle', 0.08, { layer: true }),
+      spec(hz(w, LEAD_OCTAVE + 2), 0.7, 'triangle', 0.07, { layer: true }),
+      spec(hz(w, LEAD_OCTAVE + 4), 0.7, 'sine', 0.07, { layer: true }),
+      spec(hz(w, LEAD_OCTAVE + 5), 0.9, 'sine', 0.06, { layer: true }),
+    ]);
+  }
+
+  function overdriveEnd(w) {
+    const f = hz(w, LEAD_OCTAVE + 5);
+    return budget([
+      spec(f, 0.45, 'triangle', 0.08, { glide: f / 3, cutoff: 2200 }),
+      spec(hz(w, LEAD_OCTAVE), 0.5, 'sine', 0.06, { layer: true, glide: hz(w, LEAD_OCTAVE - 5) }),
+    ]);
   }
 
   // A streak broke (missed gold): two short falling notes, soft. Silent for streaks too short to matter.
@@ -111,5 +185,5 @@
     ];
   }
 
-  Pulse.Melody = { WORLDS, semitone, hz, degree, hit, lost, fail };
+  Pulse.Melody = { WORLDS, semitone, hz, degree, hit, lost, fail, milestone, overdriveStart, overdriveEnd, budget, GAIN_CEILING };
 })();

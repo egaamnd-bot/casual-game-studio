@@ -111,7 +111,15 @@
     state.ctx = new Ctx();
     state.sfxGain = state.ctx.createGain();
     state.sfxGain.gain.value = state.volumes.sfx * SFX_LEVEL;
-    state.sfxGain.connect(state.ctx.destination);
+    // A soft limiter after the effects bus: stacked layers (combo, Overdrive) can never clip.
+    state.limiter = state.ctx.createDynamicsCompressor();
+    state.limiter.threshold.value = -10;
+    state.limiter.knee.value = 12;
+    state.limiter.ratio.value = 8;
+    state.limiter.attack.value = 0.003;
+    state.limiter.release.value = 0.12;
+    state.sfxGain.connect(state.limiter);
+    state.limiter.connect(state.ctx.destination);
     return state.ctx;
   }
 
@@ -231,7 +239,7 @@
       let any = false;
       for (let i = 0; i < specs.length; i++) {
         const sp = specs[i];
-        if (playNote(sp, sp.layer ? layerDelay || 0 : 0)) any = true;
+        if (playNote(sp, (sp.layer ? layerDelay || 0 : 0) + (sp.at || 0))) any = true;
       }
       return any;
     },

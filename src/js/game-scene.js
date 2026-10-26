@@ -78,6 +78,7 @@
       // Rhythm: the run clock (stepped only while playing, so pause/retry need no special cases)
       // and the cosmetic orb stretch. The music follows the clock, never the other way round.
       this.clock = Pulse.Rhythm.createClock({ bpm: this.trackBpm() });
+      this.od = Pulse.Overdrive.create(); // the Overdrive meter and its eased visual intensity (feedback only)
       this.fx = Pulse.Rhythm.OrbFx.create(); // the springy drawn orb (cosmetic; the rules read orbState)
       this.syncIn = 0;
       this.seeks = 0;
@@ -206,6 +207,10 @@
       }
       // Combo readout under the score (consecutive hits: the melody keeps building while it grows).
       this.comboText = UI.text(this, SW / 2, 86, '', 20, T.textAccent, true).setDepth(10).setAlpha(0);
+      // Overdrive meter: a slim bar under the progress bar (campaign) so it never covers the lane.
+      this.odBar = this.add.graphics().setDepth(10);
+      this.odLabel = UI.text(this, 225, 68, '', 12, T.textAccent, true).setDepth(10).setAlpha(0);
+      this.odShown = 0;
       // World banner on the campaign's ready screen.
       const cx = this.overlayX();
       const top = Math.round(this.H * 0.2);
@@ -370,6 +375,8 @@
       this.ringT = 1;
       this.crashReason = null;
       this.combo = 0;
+      Pulse.Overdrive.reset(this.od);
+      this.odShown = 0;
       this.showCombo(0);
       this.lastCharge = this.orbState.charge;
       this.popupText.setAlpha(0);
@@ -523,6 +530,7 @@
         const tick = Pulse.Rhythm.step(this.clock, dt);
         if (tick.beats > 0 && this.view) this.view.beatEcho(this.radius, tick.bars > 0);
       }
+      if (this.state === 'complete') Pulse.Overdrive.tick(this.od, dt);
       if (this.ringT < 1) this.ringT = Math.min(1, this.ringT + dt * 3);
       this.updateOrbFx(dt);
       this.updateHintCard();
@@ -610,6 +618,7 @@
 
     step(dt) {
       this.elapsed += dt;
+      if (Pulse.Overdrive.tick(this.od, dt).ended) this.overdriveEnded();
       const campaign = this.mode === 'campaign';
       const track = this.musicTrack();
       if (track !== this.playingTrack) {
@@ -644,6 +653,7 @@
         }
         // Scoring rules live in Pulse.Scoring (level.js); the campaign ignores score and multiplier
         // but uses the same combo for the melody.
+        const prevCombo = this.scoring.combo;
         const fb = Pulse.Scoring.apply(this.scoring, event, s);
         if (!campaign) {
           this.score = this.scoring.score;
@@ -653,7 +663,7 @@
         if (event === 'collect') {
           this.ringT = 0;
           const bonus = s.variant === 'bonus';
-          this.hitFeedback(bonus ? 'bonus' : 'pickup', s);
+          this.contact(bonus ? 'bonus' : 'pickup', s, prevCombo);
           if (this.view) this.view.collect(s);
           const color = bonus ? T.textBonus : T.textAccent;
           if (campaign) {
@@ -673,6 +683,7 @@
         } else if (event === 'miss') {
           // Skipping gold resets the Endless multiplier and breaks the streak; skipping a mint bonus
           // does neither, so declining a risky bonus is always a safe choice.
+          Pulse.Overdrive.miss(this.od, s.variant === 'bonus');
           if (s.variant !== 'bonus') this.streakLost(fb);
           if (fb.reset) {
             this.popup('x1', T.textDim);
@@ -691,7 +702,7 @@
             Pulse.Sfx.play('streak');
           }
           if (event === 'break') {
-            this.hitFeedback(s.charged ? 'chargedBreak' : 'break', s);
+            this.contact(s.charged ? 'chargedBreak' : 'break', s, prevCombo);
             this.sfx(s.charged ? 'chargedSmash' : 'smash', C.groove.eventDelay);
             this.reward(s.charged ? 7 : 4.5);
             if (s.charged) {
@@ -700,7 +711,7 @@
             }
             if (this.view) this.view.smash(s);
           } else {
-            this.hitFeedback('pass', s);
+            this.contact('pass', s, prevCombo);
             this.checkNearMiss(s, r);
           }
         }
@@ -724,12 +735,83 @@
       if (campaign && this.level.finishY() >= this.orbY) this.completeStage();
     }
 
+    // Seconds in a 16th note at the current tempo (the spacing of the arpeggio layers).
+    stepSeconds() {
+      return Pulse.Rhythm.beatSeconds(this.clock.bpm || 125) / 4;
+    }
+
+    // A successful contact: charge the Overdrive meter, answer with the melody (the lead note plays
+    // at once), and mark combo milestones 4 / 8 / 16 with an extra musical phrase and a ring.
+    // Nothing here touches the rules: collision, score and stars were already resolved.
+    contact(kind, seg, prevCombo) {
+      const OD = Pulse.Overdrive;
+      const combo = this.scoring.combo;
+      const r = OD.charge(this.od, kind, { quality: seg.quality, combo });
+      this.hitFeedback(kind, seg);
+      const m = OD.milestone(prevCombo, combo);
+      if (m) this.comboMilestone(m);
+      if (r.started) this.overdriveStarted();
+    }
+
+    comboMilestone(m) {
+      const wait = this.aligned() ? Pulse.Rhythm.Groove.delay(this.clock, true, 0.08) : 0;
+      Pulse.Sfx.notes(Pulse.Melody.milestone(this.worldIndex(), m, { step: this.stepSeconds() }), wait);
+      if (this.view && this.view.comboMilestone) this.view.comboMilestone(m);
+      const K = C.combo;
+      const label = m === K.flourish ? 'FLOURISH!' : m === K.layerB ? 'ENERGY!' : 'LAYER';
+      this.quality(label, m === K.flourish ? T.textBonus : T.textAccent);
+    }
+
+    overdriveStarted() {
+      const wait = this.aligned() ? Pulse.Rhythm.Groove.delay(this.clock, true, 0.08) : 0;
+      Pulse.Sfx.notes(Pulse.Melody.overdriveStart(this.worldIndex()), wait);
+      if (this.view && this.view.overdriveBurst) this.view.overdriveBurst();
+      this.popup('OVERDRIVE!', T.textBonus);
+    }
+
+    overdriveEnded() {
+      Pulse.Sfx.notes(Pulse.Melody.overdriveEnd(this.worldIndex()), 0);
+    }
+
+    // The Overdrive bar: fills as you play, turns gold and drains while active, blinks in the last
+    // moments. Time-based (this.time.now), so it looks the same at any frame rate.
+    drawOverdrive() {
+      const g = this.odBar;
+      g.clear();
+      const od = this.od;
+      const show = this.state === 'playing' || this.state === 'paused';
+      if (!show) {
+        this.odLabel.setAlpha(0);
+        return;
+      }
+      const x = 100, y = 48, w = 250, h = 8;
+      const f = Pulse.Overdrive.fraction(od);
+      // The shown fill chases the real one a little, so a gain slides in instead of jumping.
+      const dtms = Math.min(50, Math.max(0, this.time.now - (this.odLast || this.time.now)));
+      this.odLast = this.time.now;
+      this.odShown += (f - this.odShown) * (1 - Math.exp(-dtms / 1000 * (f < this.odShown ? 30 : 14)));
+      if (Math.abs(f - this.odShown) < 0.002) this.odShown = f;
+      const blink = Pulse.Overdrive.warning(od) ? (Math.sin(this.time.now / 1000 * 18) > 0 ? 1 : 0.45) : 1;
+      g.fillStyle(0x07101f, 0.75).fillRoundedRect(x - 2, y - 2, w + 4, h + 4, 5);
+      const col = od.active ? 0xffd35a : (f > 0.85 ? 0x9ff3ff : 0x35c8ff);
+      if (this.odShown > 0.003) {
+        g.fillStyle(col, 0.9 * blink).fillRoundedRect(x, y, Math.max(h, w * this.odShown), h, 4);
+        g.fillStyle(0xffffff, 0.45 * blink).fillRect(x + 3, y + 1, Math.max(0, w * this.odShown - 6), 2);
+      }
+      g.lineStyle(1.5, od.active ? 0xffd35a : 0x1e6bff, od.active ? 0.9 : 0.6).strokeRoundedRect(x - 2, y - 2, w + 4, h + 4, 5);
+      if (od.active) {
+        this.odLabel.setText(`OVERDRIVE ${od.remaining.toFixed(1)}`).setAlpha(blink);
+      } else {
+        this.odLabel.setAlpha(0);
+      }
+    }
+
     // The musical answer to a contact, played the instant it happens: the next note of the world's
     // melody (Pulse.Melody) in a voice that fits the action, plus streak layers. Layers (accompaniment)
     // may wait for the next 16th note; the lead note never does.
     hitFeedback(kind, seg) {
       const combo = this.scoring.combo;
-      const specs = Pulse.Melody.hit(this.worldIndex(), kind, { combo, quality: seg.quality });
+      const specs = Pulse.Melody.hit(this.worldIndex(), kind, { combo, quality: seg.quality, overdrive: this.od.active, step: this.stepSeconds() });
       const wait = this.aligned() ? Pulse.Rhythm.Groove.delay(this.clock, true, 0.08) : 0;
       Pulse.Sfx.notes(specs, wait);
       this.lastHit = { kind, combo, quality: seg.quality, t: this.elapsed };
@@ -754,7 +836,10 @@
         this.comboText.setAlpha(0);
         return;
       }
-      this.comboText.setText(`${n} IN A ROW`).setAlpha(1).setScale(1.25);
+      const K = C.combo;
+      const big = n >= K.flourish ? 1.55 : n >= K.layerB ? 1.4 : 1.25;
+      this.comboText.setText(`${n} IN A ROW`).setAlpha(1).setScale(big)
+        .setColor(n >= K.flourish ? T.textBonus : T.textAccent).setFontSize(n >= K.flourish ? 24 : n >= K.layerB ? 22 : 20);
       this.tweens.add({ targets: this.comboText, scale: 1, duration: 160, ease: 'Back.easeOut' });
     }
 
@@ -788,6 +873,7 @@
       this.crashReason = GameScene.crashReason(seg, this.radius, this.orbState.charge);
       if (this.test && this.test.onCrash) this.test.onCrash(this.elapsed, this.score);
       this.endHold();
+      Pulse.Overdrive.crash(this.od);
       this.showCombo(0);
       Pulse.Sfx.notes(Pulse.Melody.fail(this.worldIndex()), 0);
       Pulse.Sfx.play(seg && seg.kind === 'barrier' && seg.charged ? 'chargedFail' : 'crash');
@@ -807,6 +893,8 @@
       this.result = { stars, record };
       if (this.test && this.test.onComplete) this.test.onComplete(this.elapsed, this.energy, this.bonus, stars);
       this.endHold();
+      this.od.active = false; // the meter is cleared; the glow eases out over the results screen
+      this.od.meter = 0;
       Pulse.Music.stop(200);
       Pulse.Sfx.play('finish');
       Pulse.Sfx.play('stageClear');
@@ -901,6 +989,8 @@
           else Pulse.Render.walls(g, s, this.W);
         }
       }
+
+      this.drawOverdrive();
 
       // The charge ring only appears while a charged barrier is on screen.
       this.chargeRingShown = active &&

@@ -120,6 +120,29 @@ Pulse.CONFIG = {
   // raise it only to experiment with quantising reward sounds to the 16th note.
   groove: { enabled: true, inputDelay: 0, eventDelay: 0, maxSeeks: 4 },
 
+  // Overdrive meter and combo milestones (src/js/overdrive.js, docs/OVERDRIVE.md). Feedback only:
+  // nothing here touches collision, orb size, obstacle layout, score or stars.
+  overdrive: {
+    threshold: 100, // meter units to fill; full = Overdrive starts by itself
+    duration: 6, // seconds of run time (frozen while paused)
+    // Charge per successful contact (before the multipliers below).
+    charge: { pickup: 4.5, bonus: 8, pass: 2.5, break: 6, chargedBreak: 10 },
+    perfectMult: 1.4, // a Perfect contact charges 40% more
+    comboStep: 4, // every 4 in a row adds comboBonus ...
+    comboBonus: 0.1, // ... +10% charge, up to comboMaxBonus
+    comboMaxBonus: 0.3,
+    // Repeating the same kind of contact earns less: weight = max(minRepeat, 1 - repeatDrop * (run - 1)).
+    repeatDrop: 0.12,
+    minRepeat: 0.5,
+    missPenalty: 20, // a missed gold note drains this much (never below 0); a missed mint costs nothing
+    // Eased 0..1 intensity that drives the visuals (rates per second; exponential, so frame-rate independent).
+    fxIn: 5, // ramp up when Overdrive starts
+    fxOut: 3, // ramp down when it ends
+    warn: 1.6, // seconds before the end when the HUD starts to warn
+  },
+  // Combo milestones: 4 adds a quiet layer, 8 an energetic arpeggio, 16 a flourish.
+  combo: { layerA: 4, layerB: 8, flourish: 16 },
+
   // Musical contact feedback (Pulse.Sfx.note, docs/PORTRAIT_REWORK.md).
   music: {
     comboLayerA: 4, // consecutive hits before notes gain an octave sparkle
