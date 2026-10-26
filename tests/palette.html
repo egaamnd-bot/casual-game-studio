@@ -68,12 +68,12 @@
       // ---- Theme: soft is the default, classic is exactly the earlier look ----
       check(C.palette && C.palette.soft === true, 'CONFIG.palette.soft is on by default');
       const old = await classicTheme();
-      check(old.wall === 0x2b111b && old.wallEdge === 0xff2a54 && old.hull === 0x16060f && old.glowAlpha === 0.14 && old.rimAlpha === 0.95 && old.chevronAlpha === 0.6, 'soft: false reproduces the earlier code-drawn values exactly (wall 2b111b, rim ff2a54, hull 16060f, alphas .14/.95/.6)');
+      check(old.wall === 0x2b111b && old.wallEdge === 0xff2a54 && old.hull === 0x16060f && old.glowAlpha === 0.14 && old.ringGlowAlpha === 0.12 && old.rimAlpha === 0.95 && old.chevronAlpha === 0.6, 'soft: false reproduces the earlier code-drawn values exactly (wall 2b111b, rim ff2a54, hull 16060f, alphas .14 / ring .12 / .95 / .6)');
       check(old.gapEdge === T.gapEdge && old.orb === T.orb && old.pickup === T.pickup && old.bonus === T.bonus && old.danger === T.danger && old.background === T.background, 'nothing else in the theme changed (gap edge, orb, pickups, danger, background)');
       const bg = T.background;
       // Softer: lower saturation and glow, lighter hull than the near-black one.
       check(sat(T.wallEdge) < sat(old.wallEdge) - 0.1, `rim is gentler: saturation ${sat(T.wallEdge).toFixed(2)} vs ${sat(old.wallEdge).toFixed(2)}`);
-      check(T.glowAlpha < old.glowAlpha && T.rimAlpha < old.rimAlpha && T.chevronAlpha < old.chevronAlpha, 'glow, rim and chevron alphas are lower');
+      check(T.glowAlpha < old.glowAlpha && T.ringGlowAlpha < old.ringGlowAlpha && T.rimAlpha < old.rimAlpha && T.chevronAlpha < old.chevronAlpha, 'glow, rim and chevron alphas are lower');
       check(lum(T.hull) > lum(old.hull) && hueDist(T.hull, 0xa03090) < hueDist(old.hull, 0xa03090) + 1, 'the hull is lighter and moves toward burgundy/plum');
       // Readability: the hazard keeps strong contrast against the field and its own hull.
       const rimBg = contrast(T.wallEdge, bg), rimHull = contrast(T.wallEdge, T.hull), hullBg = contrast(T.hull, bg);

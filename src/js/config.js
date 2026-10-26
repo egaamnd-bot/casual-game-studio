@@ -229,6 +229,7 @@ Pulse.THEME = {
   // Code-drawn hazard walls (render.js): hull fill and the alphas of glow / rim / chevrons.
   hull: Pulse.CONFIG.palette.soft ? 0x30182a : 0x16060f,
   glowAlpha: Pulse.CONFIG.palette.soft ? 0.07 : 0.14,
+  ringGlowAlpha: Pulse.CONFIG.palette.soft ? 0.06 : 0.12,
   rimAlpha: Pulse.CONFIG.palette.soft ? 0.88 : 0.95,
   chevronAlpha: Pulse.CONFIG.palette.soft ? 0.5 : 0.6,
   gapEdge: 0xff7a00,

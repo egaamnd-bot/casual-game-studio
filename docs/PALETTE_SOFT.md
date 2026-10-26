@@ -12,6 +12,7 @@ The Producer found the black-and-saturated-crimson hazards harsh. Goal: a softer
 | Wall / tunnel body fill (`T.wall`) | `0x2b111b` | `0x3a1d2f` |
 | Rim / chevron colour (`T.wallEdge`) | `0xff2a54` saturated crimson | `0xf25066` rose-red |
 | Glow stroke alpha / rim alpha / chevron alpha | 0.14 / 0.95 / 0.60 | 0.07 / 0.88 / 0.50 |
+| Ring glow alpha | 0.12 | 0.06 |
 | Barrier danger tiles, charged-barrier danger emblem, tunnel edge, wall body/cap/divider (Gemini atlas pixels) | crimson `(242,39,80)` on maroon `(42,9,19)` | rose `~(230,76,100)` on burgundy-plum (see `scripts/soften_hazard_palette.py`) |
 
 Unchanged: orange gap edges (they mark the exact collision edge), cyan ready barriers and orb, route colours, crash tint (`T.danger`) and every shape, size, hitbox, timing, score, star, stage, save and audio.

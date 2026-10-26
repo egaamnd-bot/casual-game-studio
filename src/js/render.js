@@ -244,7 +244,7 @@ Pulse.Render = (function () {
     const a0 = notch + r.alpha; // the solid arc runs the long way round from here ...
     const a1 = notch + 2 * Math.PI - r.alpha; // ... to here
     const half = r.t / 2;
-    g.lineStyle(r.t + 8, T.wallEdge, T.glowAlpha * 0.85); // glow
+    g.lineStyle(r.t + 8, T.wallEdge, T.ringGlowAlpha); // glow
     g.beginPath();
     g.arc(cx, cy, r.R, a0, a1);
     g.strokePath();
