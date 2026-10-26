@@ -148,6 +148,12 @@ Pulse.CONFIG = {
   // Feedback only: no score, stars or collision change. enabled=false (or an empty list) turns it off.
   graze: { enabled: true, stageIds: ['s10-precision'], margin: 8, charge: 3, runCap: 15 },
 
+  // Hazard palette comfort (docs/PALETTE_SOFT.md; Issue #29). `soft: true` swaps the harsh near-black + saturated crimson walls for a
+  // burgundy/plum hull with a rose-red rim and a gentler glow (code-drawn walls, forks, rings) and loads the recoloured
+  // gameplay atlas (barrier danger tiles, tunnel/wall pieces). Colours only: no collision, timing, score or layout change.
+  // `soft: false` is the earlier look, exactly.
+  palette: { soft: true },
+
   // Gemini audio pack (docs/ASSET_MANIFEST.md): short event samples and the per-world Overdrive stems.
   // Audio only; switch either off to hear the earlier mix.
   audioPack: { samples: true, stems: true },
@@ -218,8 +224,13 @@ Pulse.THEME = {
   background: 0x0b0f19,
   backgroundCss: '#0B0F19',
   speedLine: 0x162033,
-  wall: 0x2b111b,
-  wallEdge: 0xff2a54,
+  wall: Pulse.CONFIG.palette.soft ? 0x3a1d2f : 0x2b111b,
+  wallEdge: Pulse.CONFIG.palette.soft ? 0xf25066 : 0xff2a54,
+  // Code-drawn hazard walls (render.js): hull fill and the alphas of glow / rim / chevrons.
+  hull: Pulse.CONFIG.palette.soft ? 0x30182a : 0x16060f,
+  glowAlpha: Pulse.CONFIG.palette.soft ? 0.07 : 0.14,
+  rimAlpha: Pulse.CONFIG.palette.soft ? 0.88 : 0.95,
+  chevronAlpha: Pulse.CONFIG.palette.soft ? 0.5 : 0.6,
   gapEdge: 0xff7a00,
   orb: 0x00f0ff,
   orbShrunk: 0xe0ffff,

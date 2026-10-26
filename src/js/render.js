@@ -59,13 +59,13 @@ Pulse.Render = (function () {
     // Walls: dark hull, crimson rim, chevrons pointing at the nearest opening.
     const piece = (x0, x1, toward) => {
       if (x1 - x0 < 2) return;
-      g.fillStyle(0x16060f, 0.94);
+      g.fillStyle(T.hull, 0.94);
       g.fillRect(x0, y, x1 - x0, h);
-      g.lineStyle(6, T.wallEdge, 0.14);
+      g.lineStyle(6, T.wallEdge, T.glowAlpha);
       g.strokeRect(x0, y, x1 - x0, h);
-      g.lineStyle(2, T.wallEdge, 0.95);
+      g.lineStyle(2, T.wallEdge, T.rimAlpha);
       g.strokeRect(x0, y, x1 - x0, h);
-      g.lineStyle(2, T.wallEdge, 0.6);
+      g.lineStyle(2, T.wallEdge, T.chevronAlpha);
       g.beginPath();
       const cy = y + h / 2;
       const hh = h / 2 - 7;
@@ -166,13 +166,13 @@ Pulse.Render = (function () {
     const h = seg.h;
     const piece = (x0, x1, dir) => {
       if (x1 - x0 < 2) return;
-      g.fillStyle(0x16060f, 0.94);
+      g.fillStyle(T.hull, 0.94);
       g.fillRect(x0, y, x1 - x0, h);
-      g.lineStyle(6, T.wallEdge, 0.14); // soft glow
+      g.lineStyle(6, T.wallEdge, T.glowAlpha); // soft glow
       g.strokeRect(x0, y, x1 - x0, h);
-      g.lineStyle(2, T.wallEdge, 0.95);
+      g.lineStyle(2, T.wallEdge, T.rimAlpha);
       g.strokeRect(x0, y, x1 - x0, h);
-      g.lineStyle(2, T.wallEdge, 0.6);
+      g.lineStyle(2, T.wallEdge, T.chevronAlpha);
       g.beginPath();
       const cy = y + h / 2;
       const hh = h / 2 - 7;
@@ -244,22 +244,22 @@ Pulse.Render = (function () {
     const a0 = notch + r.alpha; // the solid arc runs the long way round from here ...
     const a1 = notch + 2 * Math.PI - r.alpha; // ... to here
     const half = r.t / 2;
-    g.lineStyle(r.t + 8, T.wallEdge, 0.12); // glow
+    g.lineStyle(r.t + 8, T.wallEdge, T.glowAlpha * 0.85); // glow
     g.beginPath();
     g.arc(cx, cy, r.R, a0, a1);
     g.strokePath();
-    g.lineStyle(r.t, 0x16060f, 0.94); // hull
+    g.lineStyle(r.t, T.hull, 0.94); // hull
     g.beginPath();
     g.arc(cx, cy, r.R, a0, a1);
     g.strokePath();
-    g.lineStyle(2, T.wallEdge, 0.95); // rims
+    g.lineStyle(2, T.wallEdge, T.rimAlpha); // rims
     for (const rad of [r.R - half, r.R + half]) {
       g.beginPath();
       g.arc(cx, cy, rad, a0, a1);
       g.strokePath();
     }
     // Chevrons along the ring, pointing the way it turns.
-    g.lineStyle(2, T.wallEdge, 0.6);
+    g.lineStyle(2, T.wallEdge, T.chevronAlpha);
     g.beginPath();
     const step = 15 / r.R;
     const arm = half - 5;
