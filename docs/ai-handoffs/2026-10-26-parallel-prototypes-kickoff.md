@@ -14,4 +14,4 @@
 `docs/DECISIONS.md` #23 updated with the phone result; #24 added (parallel prototypes, lab-only, serialized merges).
 
 ## Not done / unknown
-Nothing from the three prototypes has been merged or built yet; main `4b06814` build run: UNKNOWN when written; full-suite results for the Lab tree at 360×640 and 412×915: UNKNOWN when written.
+Nothing from the three prototypes or Batch 3 has been merged or built yet. Main `4b06814` is built by run #84 (success). Lab tree full suites after the merge: 360×640 and 412×915 both 17/18 PASS (`gameplay.html` known manual failure).
