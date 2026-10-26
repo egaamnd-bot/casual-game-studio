@@ -3,7 +3,7 @@
 - Date: 2026-10-26 (UTC)
 - Branch: `feature/pulse-mirror-break`
 - Base: `main` @ `ad9bd4c78ae4cf585455114537f44482ce5dbfc2` (PR #17 merged; integrated build run #57 success: https://github.com/egaamnd-bot/casual-game-studio/actions/runs/40298171923)
-- Code head SHA: `5732d423ebd1e2ec2557d113af297169150bc1c3` (the handoff commit after it is docs-only; no src/ or tests/ change)
+- Code head SHA: `b2264746511bbcab6400bd8b12251055d1fe4883` (earlier code commit `5732d42`; the handoff commit after `b226474` is docs-only)
 - Dependencies: none (branches from verified main; no other open PR required)
 
 ## Milestone 1 (done)
@@ -23,8 +23,11 @@ Command: `node run.mjs <repo> <w> <h> assets.html campaign.html logic.html melod
 - `tests/gameplay.html` is a manual bot page needing `?bot=1`: NOT RUN.
 
 ## Build
-- Run #58 (head `5732d42…`): success, https://github.com/egaamnd-bot/casual-game-studio/actions/runs/40300498397
-- APK artifact `pulse-debug-apk-run58` (artifact id 12639314534), source SHA `5732d423ebd1e2ec2557d113af297169150bc1c3`. The docs-only handoff commit triggers a further build with identical code. NOT DEVICE-TESTED.
+- Run #60 (head `b226474`): success, https://github.com/egaamnd-bot/casual-game-studio/actions/runs/40305560055; APK artifact `pulse-debug-apk-run60`, source SHA `b2264746511bbcab6400bd8b12251055d1fe4883`. NOT DEVICE-TESTED.
+- Earlier: run #58 (`5732d42`) success. The final docs-only handoff commit triggers one more build with identical code.
+
+## Self-review (permanent workflow, 2026-10-26)
+Claude reviewed the full diff. One fix: the echo's crash is now checked even on the frame the orb clears a row (`game-scene.js`), so it can never be skipped. Re-ran campaign, logic, mirror, overdrive, portrait, routes, scene (+noassets) at 540x960 and 360x640, and assets, melody, rhythm, portrait, scene at 412x915: all PASS. Diff touches nothing in controls, orb collision, scoring, stars, stage ids, unlocks or the save format; Endless is unchanged. Merge decision: Claude merges when this head's build succeeds; ChatGPT approval is no longer a gate (see AI_HANDOFF_PROTOCOL.md).
 
 ## Known issues and limitations
 - Feel, readability of the echo, violet colour contrast, cue loudness and timing: NOT DEVICE-TESTED. Durations (1.9 s warning, 0.6 s intro, 0.5 s outro) are reasoned from a 300 px/s pace, not tuned on a phone.
@@ -32,7 +35,7 @@ Command: `node run.mjs <repo> <w> <h> assets.html campaign.html logic.html melod
 - Prototype scope: stage 7 only. Endless, other stages untouched.
 
 ## Approval
-Producer approval: phone test requested (not a merge). ChatGPT: review of the exact head requested. No merge until explicit approval for the exact head.
+Producer approval: not required for the merge (routine technical step). Phone test requested for feel; it does not block other work.
 
 ## Next recommended task
 Phone-test the APK, tune durations/colours from feedback; only then consider a combined safe-route vs. paired-risk-route sequence. Backlog (not built): Near-Miss Rewards, Collectible Chains, World Finale Sequences.
