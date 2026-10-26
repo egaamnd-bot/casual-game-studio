@@ -290,6 +290,7 @@
     // Combo milestone (4 / 8 / 16): rings round the orb, one more and bigger each time, and a few
     // sparks at 16. Round, quick and well away from the lane ahead.
     comboMilestone(m) {
+      if (!this.milestoneRings) return; // sprite look (comet off) has no milestone rings
       const sc = this.scene;
       const K = C.combo;
       const rad = this.drawnRadius || C.orb.radius;
@@ -544,6 +545,7 @@
     }
 
     ringPulse(img, from, to, ms, alpha) {
+      if (!img) return; // comet-only ring objects do not exist in the sprite look
       const sc = this.scene;
       sc.tweens.killTweensOf(img);
       img.setVisible(true).setPosition(sc.orbX, sc.orbY).setTint(this.cometColor(0, false)).setAlpha(alpha).setScale(from);
@@ -564,7 +566,8 @@
       this.ring.setTexture(s.atlas, `${s.prefix}ring`);
       this.body.setTexture(s.atlas, `${s.prefix}normal`);
       this.core.setTexture(s.atlas, `${s.prefix}shrunk`);
-      this.arcs.play(`anim_arcs_${skin.id}`);
+      if (s.arcPrefix) this.arcs.play(`anim_arcs_${skin.id}`);
+      else this.arcs.stop();
     }
 
     // `scroll` is the scene's background scroll (half the distance travelled).
@@ -766,7 +769,7 @@
       this.body.setScale(bodyScale * f.across, bodyScale * f.along).setAlpha(1 - 0.85 * t);
       this.ring.setScale(bodyScale * f.glow).setAlpha(0.9);
       this.core.setScale(coreScale * f.across, coreScale * f.along).setAlpha(t);
-      this.arcs.setScale(coreScale * f.across, coreScale * f.along).setAlpha(0.9 * t);
+      this.arcs.setScale(coreScale * f.across, coreScale * f.along).setAlpha(this.skin.sprite.arcPrefix ? 0.9 * t : 0); // (skins without arc frames show none)
       for (const img of [this.body, this.ring, this.core, this.arcs]) {
         if (dead) img.setTint(T.danger);
         else img.clearTint();

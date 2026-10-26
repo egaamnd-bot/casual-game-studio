@@ -2,12 +2,14 @@
 // frame the game uses is present. If anything fails to load, the game falls back to code-drawn
 // shapes. Audio is loaded separately by src/js/sfx.js.
 // Texture memory (RGBA, uncompressed): gameplay 1024×2048 8 MB, skins 1024² 4 MB,
-// UI 2048² 16 MB, backgrounds and stage cards ≈ 4 MB → about 32 MB of GPU memory.
+// UI 2048² 16 MB, expansion 1024² 4 MB, backgrounds and stage cards ≈ 4 MB → about 36 MB of GPU memory
+// (plus the optional comet atlas, 4 MB, and the six portrait backdrops, ≈ 6 MB).
 Pulse.Assets = {
   ATLASES: {
     pulse_gameplay: 'assets/atlases/pulse_gameplay_atlas',
     pulse_skins: 'assets/atlases/pulse_skins_atlas',
     pulse_ui: 'assets/atlases/pulse_ui_atlas',
+    pulse_expansion: 'assets/atlases/pulse_expansion_30stage_atlas', // Gemini 30-stage expansion: the four newer skins (its wall/route frames are validated but unused, see docs/ASSET_MANIFEST.md)
   },
 
   // Optional cosmetic atlases (Gemini batch 1 comet kit). A failed load never blocks the game: the
@@ -72,6 +74,7 @@ Pulse.Assets = {
   // Every atlas frame the code references. Checked after loading and by tests/assets.html.
   requiredFrames() {
     const frames = {
+      pulse_expansion: [],
       pulse_gameplay: [
         'wall_body_tile', 'wall_cap_left', 'wall_cap_right', 'orb_lock_ring',
         'fx_near_miss_arc', 'fx_spark_diamond', 'fx_shockwave_ring',
@@ -109,7 +112,7 @@ Pulse.Assets = {
     for (const skin of Pulse.SKINS) {
       const s = skin.sprite;
       frames[s.atlas].push(`${s.prefix}normal`, `${s.prefix}ring`, `${s.prefix}shrunk`);
-      for (let i = 1; i <= 4; i++) frames[s.atlas].push(`${s.arcPrefix}0${i}`);
+      if (s.arcPrefix) for (let i = 1; i <= 4; i++) frames[s.atlas].push(`${s.arcPrefix}0${i}`); // (the expansion skins have no tension arcs)
     }
     return frames;
   },
@@ -166,7 +169,7 @@ Pulse.Assets = {
     };
     loop('anim_orb_gold', 'pulse_gameplay', 'orb_energy_gold_', 12);
     loop('anim_orb_mint', 'pulse_gameplay', 'orb_energy_mint_', 12);
-    for (const skin of Pulse.SKINS) loop(`anim_arcs_${skin.id}`, skin.sprite.atlas, skin.sprite.arcPrefix, 24);
+    for (const skin of Pulse.SKINS) if (skin.sprite.arcPrefix) loop(`anim_arcs_${skin.id}`, skin.sprite.atlas, skin.sprite.arcPrefix, 24);
   },
 };
 

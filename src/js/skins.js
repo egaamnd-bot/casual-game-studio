@@ -32,6 +32,29 @@ Pulse.SKINS = [
     colors: { orb: 0xf1f5f9, shrunk: 0xffffff, core: 0x0f172a },
     sprite: { atlas: 'pulse_skins', prefix: 'skin_whiteout_', arcPrefix: 'skin_whiteout_tension_arcs_' },
   },
+  // Gemini's 30-stage expansion skins (atlas `pulse_expansion`; no tension-arc frames, so arcPrefix is null).
+  // Thresholds follow Gemini's proposal for the 90-star campaign; the existing six keep theirs. Stars come from
+  // the campaign only, so 72 needs stages that are not built yet (18 stages = 54 stars today).
+  {
+    id: 'cyber-katana', name: 'Cyber Katana', unlockStars: 24,
+    colors: { orb: 0xff3b6b, shrunk: 0xffd1dc, core: 0x00f0ff },
+    sprite: { atlas: 'pulse_expansion', prefix: 'skin_cyber_katana_', arcPrefix: null },
+  },
+  {
+    id: 'chrono-shard', name: 'Chrono Shard', unlockStars: 36,
+    colors: { orb: 0x00f5a0, shrunk: 0xd1ffee, core: 0xffffff },
+    sprite: { atlas: 'pulse_expansion', prefix: 'skin_chrono_shard_', arcPrefix: null },
+  },
+  {
+    id: 'plasma-singularity', name: 'Plasma Singularity', unlockStars: 54,
+    colors: { orb: 0xffb800, shrunk: 0xfff1b8, core: 0xa855f7 },
+    sprite: { atlas: 'pulse_expansion', prefix: 'skin_plasma_singularity_', arcPrefix: null },
+  },
+  {
+    id: 'aether-crown', name: 'Aether Crown', unlockStars: 72,
+    colors: { orb: 0x38bdf8, shrunk: 0xe0f7ff, core: 0xffe08a },
+    sprite: { atlas: 'pulse_expansion', prefix: 'skin_aether_crown_', arcPrefix: null },
+  },
 ];
 
 Pulse.Skins = {
