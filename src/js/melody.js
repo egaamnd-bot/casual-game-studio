@@ -159,6 +159,38 @@
     return budget(out);
   }
 
+  // Mirror Pulse cues (accompaniment only, all in the world's scale). Telegraph: a soft two-note call, the
+  // second a fifth above the first. Start: the same two notes answered in reverse (a reflection) while a
+  // sine glides from the centre pitch out to both an octave above and below. End: the reflection folds
+  // back: a falling pair. Nothing here is a lead note and nothing delays play.
+  function mirrorTelegraph(w, info) {
+    const step = info && info.step > 0 ? info.step : 0.12;
+    const b = LEAD_OCTAVE + 1;
+    return budget([
+      spec(hz(w, b), 0.22, 'sine', 0.06, { layer: true }),
+      spec(hz(w, b + 4), 0.34, 'sine', 0.05, { layer: true, at: step * 2 }),
+    ]);
+  }
+  function mirrorStart(w, info) {
+    const step = info && info.step > 0 ? info.step : 0.12;
+    const b = LEAD_OCTAVE + 1;
+    const f = hz(w, b + 2);
+    return budget([
+      spec(hz(w, b + 4), 0.2, 'triangle', 0.06, { layer: true }),
+      spec(hz(w, b), 0.3, 'triangle', 0.06, { layer: true, at: step }),
+      spec(f, 0.45, 'sine', 0.05, { layer: true, glide: f * 2 }),
+      spec(f, 0.45, 'sine', 0.05, { layer: true, glide: f / 2 }),
+    ]);
+  }
+  function mirrorEnd(w, info) {
+    const step = info && info.step > 0 ? info.step : 0.12;
+    const b = LEAD_OCTAVE + 1;
+    return budget([
+      spec(hz(w, b + 4), 0.2, 'sine', 0.06, { layer: true }),
+      spec(hz(w, b), 0.34, 'sine', 0.055, { layer: true, at: step }),
+    ]);
+  }
+
   // Overdrive starts: a rising sweep and a bright chord of the world's scale. Ends: a falling release.
   function overdriveStart(w) {
     const f = hz(w, LEAD_OCTAVE - 5);
@@ -198,5 +230,5 @@
     ];
   }
 
-  Pulse.Melody = { WORLDS, semitone, hz, degree, hit, lost, fail, milestone, routeClear, overdriveStart, overdriveEnd, budget, GAIN_CEILING };
+  Pulse.Melody = { WORLDS, semitone, hz, degree, hit, lost, fail, milestone, routeClear, mirrorTelegraph, mirrorStart, mirrorEnd, overdriveStart, overdriveEnd, budget, GAIN_CEILING };
 })();

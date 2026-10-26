@@ -10,6 +10,7 @@
   <script src="../src/js/rhythm.js"></script>
   <script src="../src/js/storage.js"></script>
   <script src="../src/js/level.js"></script>
+  <script src="../src/js/mirror.js"></script>
   <script src="../src/js/stages.js"></script>
   <script src="../src/js/campaign.js"></script>
   <script src="../src/js/skins.js"></script>
@@ -150,10 +151,11 @@
       stage.items.forEach((it) => {
         if (it.type === 'barrier') m.add(it.charged ? 'charged' : 'barrier');
         if (it.type === 'gate' && it.length) m.add('tunnel');
-        // A mint inside a route fork is a lane reward (taught as part of the route choice), not the
+        // A mint inside a route fork or a mirror zone is taught as part of that mechanic, not the
         // stage-8 "greed is optional" mint.
-        if (it.type === 'bonus' && !it.route) m.add('mint');
-        if (it.fork) m.add('route');
+        if (it.type === 'bonus' && !it.route && !it.zone) m.add('mint');
+        if (it.fork && !it.mirror) m.add('route');
+        if (it.zone) m.add('mirror');
         if (it.slide && it.slide.kind !== 'breathe') m.add('slide');
         if (it.slide && it.slide.kind === 'breathe') m.add('breathe');
         if (it.type === 'gate' && it.need < R && !it.length && !it.slide) m.add('narrow');
@@ -161,7 +163,7 @@
       });
       return m;
     }
-    const INTRO = { narrow: 1, 'wide-steer': 1, barrier: 2, slide: 3, breathe: 4, charged: 5, tunnel: 6, mint: 8, route: 4 };
+    const INTRO = { narrow: 1, 'wide-steer': 1, barrier: 2, slide: 3, breathe: 4, charged: 5, tunnel: 6, mint: 8, route: 4, mirror: 7 };
     for (const [mech, stageNo] of Object.entries(INTRO)) {
       const first = STAGES.findIndex((s) => mechanics(s).has(mech)) + 1;
       check(first === stageNo, `${mech} is introduced in stage ${stageNo} (first used in stage ${first})`);

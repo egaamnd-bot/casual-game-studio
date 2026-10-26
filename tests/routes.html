@@ -9,6 +9,7 @@
   <script src="../src/js/melody.js"></script>
   <script src="../src/js/overdrive.js"></script>
   <script src="../src/js/level.js"></script>
+  <script src="../src/js/mirror.js"></script>
   <script src="../src/js/stages.js"></script>
   <script src="../src/js/campaign.js"></script>
   <script src="../src/js/patterns.js"></script>
@@ -23,7 +24,7 @@
     const check = (ok, m) => { checks++; if (!ok) { failures++; msgs.push('FAIL ' + m); } };
     const HEIGHTS = [860, 900, 960, 1080, 1180, 1240]; // the supported portrait track lengths (clamp(540/aspect, 860, 1240))
     const STAGE = Pulse.STAGES.find((s) => s.id === 's4-split-decision');
-    const forkStages = Pulse.STAGES.filter((s) => s.items.some((it) => it.fork));
+    const forkStages = Pulse.STAGES.filter((s) => s.items.some((it) => it.fork && !it.mirror)); // route forks (mirror pairs are Mirror Pulse, not routes)
 
     // ---- 1. Authoring: where routes are, and what makes each lane what it claims to be ----
     check(forkStages.length === 1 && forkStages[0] === STAGE, 'routes are prototyped in exactly one stage (s4-split-decision)');
@@ -110,7 +111,11 @@
       check(seg.side === 'R' && e === 'pass', 'the pass records the side the orb took (R)');
       check(lv.resolve(seg, orbY, 20, 1, 405) === null, 'a row passes only once');
       Pulse.Scoring.apply(sc, 'pass', seg);
-      check(sc.combo >= 0, 'scoring accepts a fork pass like any pass');
+      {
+        const ref = Pulse.Scoring.create();
+        Pulse.Scoring.apply(ref, 'pass', { type: 'gate', quality: seg.quality });
+        check(sc.score === ref.score && sc.combo === ref.combo && sc.score > 0, `a fork row scores exactly like one ordinary wall pass; score ${sc.score}/${ref.score}, combo ${sc.combo}/${ref.combo}`);
+      }
       // Perfect is measured against the opening the orb used, not the first one.
       seg.scored = false;
       lv.resolve(seg, orbY, 20, 1, 405);
@@ -140,8 +145,26 @@
       const firstFork = (st) => st.items.find((it) => it.fork);
       check(Pulse.Campaign.validate(STAGE, W).length === 0, 'the shipped stage validates');
       check(mk((st) => { firstFork(st).fork.need = 30; }).length > 0, 'a risk opening below the fair minimum is rejected');
-      check(mk((st) => { firstFork(st).fork.x = 20; }).some((e) => /divider|lane/.test(e)) || true, 'a fork pushed against the divider is clamped, never overlapping');
-      check(mk((st) => { const rows = st.items.filter((it) => it.fork); rows[1].fork.x = 226; rows[2].fork.x = -226; }).length >= 0, 'extreme sideways positions are clamped to the lane');
+      {
+        // An opening authored on top of the divider is clamped onto its own side: the solid divider survives.
+        const st = JSON.parse(JSON.stringify(STAGE));
+        const f = st.items.find((it) => it.fork && !it.mirror);
+        f.fork.x = 20; f.x = -20;
+        const tr = Pulse.Campaign.compile(st, W, 960);
+        const row = tr.items.find((it) => it.fork && !it.mirror);
+        check(row.gap2L - row.gapR >= C.route.divider - 1e-9, `an opening authored on the divider is clamped: divider ${(row.gap2L - row.gapR).toFixed(0)} px`);
+        check(Pulse.Campaign.validate(st, W).length === 0, 'the clamped fork still validates (the compiler spaces it fairly)');
+      }
+      {
+        // Extreme sideways positions are clamped to the lane: the walls at the lane edges survive.
+        const st = JSON.parse(JSON.stringify(STAGE));
+        const rows = st.items.filter((it) => it.fork && !it.mirror);
+        rows[1].fork.x = 226; rows[1].x = -226; rows[2].fork.x = 400; rows[2].x = -400;
+        const tr = Pulse.Campaign.compile(st, W, 960);
+        for (const r of tr.items.filter((it) => it.fork && !it.mirror)) {
+          check(r.gapL >= C.wallMinWidth - 1e-9 && r.gap2R <= W - C.wallMinWidth + 1e-9 && r.gap2L - r.gapR >= C.route.divider - 1e-9, `extreme x clamped on row ${r.index}: wall ${r.gapL.toFixed(0)}..${(W - r.gap2R).toFixed(0)} px, divider ${(r.gap2L - r.gapR).toFixed(0)} px`);
+        }
+      }
       check(mk((st) => { firstFork(st).fork.risk = 'X'; }).some((e) => /fork.risk/.test(e)), 'fork.risk must be L or R');
       check(mk((st) => { delete firstFork(st).route; }).some((e) => /route id/.test(e)), 'a fork row needs a route id');
       check(mk((st) => { st.items.find((it) => it.lane).type = 'energy'; }).some((e) => /optional bonus/.test(e)), 'a lane note must be an optional bonus note');
@@ -267,7 +290,7 @@
       const safe = play(STAGE, 'safe', 960), risk = play(STAGE, 'risk', 960);
       check(risk.riskNotes > safe.riskNotes && risk.maxCombo > safe.maxCombo, `risk lane builds a bigger combo than the safe lane (max ${risk.maxCombo} vs ${safe.maxCombo})`);
       check(risk.odTotal > safe.odTotal, `risk lane charges Overdrive faster (${risk.odTotal.toFixed(0)} vs ${safe.odTotal.toFixed(0)})`);
-      check(risk.score === safe.score || true, 'campaign score is not used for stars');
+      check(risk.gold === safe.gold && Pulse.Campaign.computeStars(STAGE, true, risk.gold, risk.energyTotal) === 3 && Pulse.Campaign.computeStars(STAGE, true, safe.gold, safe.energyTotal) === 3, 'both routes earn the same 3 stars (stars count gold only)');
       // The safe lane is genuinely safer: a player who never shrinks inside a fork gets through the safe
       // lane but not the risk lane (the rest of the stage is played normally).
       const noShrinkInFork = (route) => {
@@ -361,7 +384,7 @@
       for (const st of Pulse.STAGES) {
         if (st === STAGE) continue;
         const tr = Pulse.Campaign.compile(st, W, 960);
-        check(tr.items.every((it) => !it.fork && !it.lane && !it.route) && Object.keys(tr.routes).length === 0, `${st.id}: no route fields leak into other stages`);
+        check(tr.items.every((it) => !(it.fork && !it.mirror) && !it.lane && !it.route) && Object.keys(tr.routes).length === 0, `${st.id}: no route fields leak into other stages`);
       }
       // Endless patterns never use forks.
       const src = Pulse.Patterns && Pulse.Patterns.library ? JSON.stringify(Pulse.Patterns.library) : '';

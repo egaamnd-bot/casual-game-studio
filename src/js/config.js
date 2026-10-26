@@ -126,6 +126,13 @@ Pulse.CONFIG = {
   // Overdrive charge for taking the risk lane and collecting every note of it (once per fork).
   route: { divider: 64, preview: 180, minRisk: 3 },
 
+  // Mirror Pulse (src/js/mirror.js, docs/MIRROR.md). All distances are px of track travelled, so the event
+  // is the same at any frame rate and while paused. A zone: telegraph (banner + centreline) for
+  // `telegraphPx`, then the echo grows out of the centreline over `introPx` and is fully formed
+  // `leadPx` before the first paired row reaches the orb; after the last row it folds back over `outroPx`.
+  // At ~300 px/s that is about 1.9 s of warning, 0.6 s of intro, 1.4 s of lead and 0.5 s of outro.
+  mirror: { telegraphPx: 560, introPx: 170, leadPx: 420, outroPx: 140, minRows: 3, color: 0xb98bff, alpha: 0.72 },
+
   // Overdrive meter and combo milestones (src/js/overdrive.js, docs/OVERDRIVE.md). Feedback only:
   // nothing here touches collision, orb size, obstacle layout, score or stars.
   overdrive: {

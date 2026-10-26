@@ -50,6 +50,9 @@
       data = data && data.mode ? data : test;
       this.mode = data.mode === 'campaign' ? 'campaign' : 'endless';
       this.stageIndex = data.stageIndex || 0;
+      this.mirrorClears = 0;
+      this.crashedByEcho = false;
+      this.resetMirror(); // a new scene never inherits an echo
     }
 
     create() {
@@ -374,9 +377,12 @@
       this.bonus = 0;
       this.ringT = 1;
       this.crashReason = null;
+      this.crashedByEcho = false;
       this.combo = 0;
       Pulse.Overdrive.reset(this.od);
       this.routeClears = 0;
+      this.resetMirror();
+      this.mirrorClears = 0;
       this.routes = {}; // per route id: { notes: risk notes taken, side: lane chosen }
       this.odShown = 0;
       this.showCombo(0);
@@ -561,6 +567,11 @@
           }
         }
       }
+      const mh = this.mode === 'campaign' && this.stage.mirrorHints;
+      if (!h && mh && playing && this.mirror && (this.mirror.phase === 'telegraph' || this.mirror.phase === 'intro') && mh[this.mirror.zone.id]) {
+        h = mh[this.mirror.zone.id];
+        routeFade = this.mirror.phase === 'intro' ? Math.max(0, 1 - this.mirror.k) : Math.min(1, this.mirror.tele * 8);
+      }
       if (!h) {
         if (this.hintShown) {
           this.hintShown = null;
@@ -651,6 +662,7 @@
       this.speedNow = speed; // the comet tail grows with speed
       this.scroll += speed * dt * 0.5;
       this.level.update(dt, speed, this.elapsed);
+      this.updateMirror();
 
       // Pulse.Level.resolve applies the rules; this only turns its events into score and feedback.
       // Contact feedback (sound, burst, flash) happens in this same frame: nothing waits for a beat.
@@ -661,11 +673,17 @@
       for (let i = 0; i < segs.length; i++) {
         const s = segs[i];
         if (!s.active) continue;
-        const event = this.level.resolve(s, this.orbY, r, this.orbState.charge, ox);
+        let event = this.level.resolve(s, this.orbY, r, this.orbState.charge, ox);
+        let byEcho = false;
+        // Mirror Pulse: the echo is checked on its own against the paired obstacles of the zone.
+        if (!event && this.echoOn) {
+          event = this.level.resolveEcho(s, this.orbY, r, this.orbState.charge, this.echoX);
+          byEcho = !!event;
+        }
         if (!event) continue;
 
         if (event === 'crash') {
-          this.crash(s);
+          this.crash(s, byEcho);
           return;
         }
         // Scoring rules live in Pulse.Scoring (level.js); the campaign ignores score and multiplier
@@ -731,7 +749,7 @@
           } else {
             this.contact('pass', s, prevCombo);
             this.checkNearMiss(s, r);
-            if (s.fork) this.routePassed(s);
+            if (s.fork && s.route) this.routePassed(s);
           }
         }
       }
@@ -815,6 +833,46 @@
       const r = Pulse.Overdrive.award(this.od, C.overdrive.routeBonus);
       if (r.started) this.overdriveStarted();
       this.routeClears = (this.routeClears || 0) + 1;
+    }
+
+    // ---- Mirror Pulse (docs/MIRROR.md) ----
+    resetMirror() {
+      this.mirror = null; // { zone, phase, k, tele } while an event is on
+      this.echoOn = false; // the echo exists and can be hit
+      this.echoK = 0;
+      this.echoX = this.orbX;
+      this.mirrorSeen = {};
+    }
+
+    // Derives the event from the distance travelled (so pause, retry and frame rate cannot desync it) and
+    // plays its cues once each: the telegraph, the echo appearing, the echo dissolving. Feedback only.
+    updateMirror() {
+      const track = this.level.track;
+      if (!track || !track.mirrors || !track.mirrors.length) return;
+      const m = Pulse.Mirror.current(track.mirrors, this.level.travelled);
+      this.mirror = m;
+      this.echoK = m ? m.k : 0;
+      this.echoOn = !!m && m.k > 0;
+      this.echoX = m ? Pulse.Mirror.echoX(this.orbX, m.k, this.W) : this.orbX;
+      if (!m) return;
+      const seen = this.mirrorSeen[m.zone.id] || (this.mirrorSeen[m.zone.id] = {});
+      const w = this.worldIndex();
+      const wait = this.aligned() ? Pulse.Rhythm.Groove.delay(this.clock, true, 0.08) : 0;
+      if (m.phase === 'telegraph' && !seen.tele) {
+        seen.tele = true;
+        Pulse.Sfx.notes(Pulse.Melody.mirrorTelegraph(w, { step: this.stepSeconds() }), wait);
+      }
+      if ((m.phase === 'intro' || m.phase === 'active') && !seen.intro) {
+        seen.intro = true;
+        Pulse.Sfx.notes(Pulse.Melody.mirrorStart(w, { step: this.stepSeconds() }), wait);
+        if (this.view && this.view.mirrorBurst) this.view.mirrorBurst();
+      }
+      if (m.phase === 'outro' && !seen.outro) {
+        seen.outro = true;
+        this.mirrorClears++;
+        Pulse.Sfx.notes(Pulse.Melody.mirrorEnd(w, { step: this.stepSeconds() }), wait);
+        this.quality('IN SYNC', '#B98BFF');
+      }
     }
 
     overdriveStarted() {
@@ -909,8 +967,9 @@
     // Why a crash happened, in player terms. The rules make every cause unambiguous: a gap wall
     // means the orb was too big; a barrier means it was too small, or (charged barrier) the
     // charge ring wasn't full yet.
-    static crashReason(seg, radius, charge) {
+    static crashReason(seg, radius, charge, byEcho) {
       if (!seg) return null;
+      if (byEcho) return seg.kind === 'barrier' ? 'Your echo hit a barrier.' : 'Your echo hit a wall: find a gap for both orbs.';
       if (seg.kind !== 'barrier') return 'Hit a wall: shrink a little sooner.';
       if (!Pulse.isCharged(radius)) return 'Too small for the barrier: let go earlier.';
       if (seg.charged && charge < 1) return 'Charge ring not full: double-edged barriers need you big for longer.';
@@ -918,14 +977,16 @@
     }
 
     // `seg` is what the orb hit, so the effect can show why (e.g. a charged barrier too early).
-    crash(seg) {
+    crash(seg, byEcho) {
       if (this.mode === 'endless' && this.score > this.best) {
         this.best = this.score;
         this.save.endless.best = this.best;
         Pulse.Save.write(this.save);
       }
       this.crashedOn = seg ? (seg.kind === 'barrier' ? (seg.charged ? 'charged barrier' : 'barrier') : 'gap') : null;
-      this.crashReason = GameScene.crashReason(seg, this.radius, this.orbState.charge);
+      this.crashReason = GameScene.crashReason(seg, this.radius, this.orbState.charge, byEcho);
+      this.crashedByEcho = !!byEcho;
+      this.resetMirror();
       if (this.test && this.test.onCrash) this.test.onCrash(this.elapsed, this.score);
       this.endHold();
       Pulse.Overdrive.crash(this.od);
@@ -948,6 +1009,7 @@
       this.result = { stars, record };
       if (this.test && this.test.onComplete) this.test.onComplete(this.elapsed, this.energy, this.bonus, stars);
       this.endHold();
+      this.resetMirror();
       this.od.active = false; // the meter is cleared; the glow eases out over the results screen
       this.od.meter = 0;
       Pulse.Music.stop(200);
@@ -1031,6 +1093,13 @@
       const canSmash = (s) => this.level.canSmash(s, this.radius, this.orbState.charge);
       const active = this.state === 'playing' || this.state === 'paused';
 
+      // Mirror Pulse: the centreline sits behind everything; the echo is drawn after the hazards.
+      const mir = active ? this.mirror : null;
+      if (mir) {
+        const strength = mir.phase === 'telegraph' ? 0.35 + 0.65 * mir.tele : mir.phase === 'outro' ? mir.k : 1;
+        Pulse.Render.mirrorAxis(g, this.W, this.H, strength, this.scroll);
+      }
+
       if (this.view) {
         this.view.render(this.level, this.scroll, dimmed, g, canSmash);
       } else {
@@ -1046,6 +1115,8 @@
           else Pulse.Render.walls(g, s, this.W);
         }
       }
+
+      if (mir && this.echoK > 0) Pulse.Render.echo(g, this.echoX, this.orbY, this.radius, this.echoK, this.orbX, 60 + 0.2 * (this.speedNow || 200));
 
       this.drawOverdrive();
 
