@@ -84,9 +84,21 @@
       }
       check(Pulse.Assets.worldBackdrop(9) === 'bg_portrait_w1_finale_s10' && Pulse.Assets.worldBackdrop(10) === 'bg_portrait_w2_chromatic_overdrive', 'stage 10 is arc 1\'s finale backdrop; stage 11 opens arc 2');
       // World finales (stages 10 / 20 / 30): their own title; every other stage keeps "Stage clear".
-      for (const [idx, want] of [[0, 'Stage clear'], [8, 'Stage clear'], [9, 'World 1 complete'], [10, 'Stage clear'], [19, 'World 2 complete'], [20, 'Stage clear']]) {
+      for (const [idx, want] of [[0, 'Stage clear'], [8, 'Stage clear'], [9, 'World 1 complete'], [10, 'Stage clear'], [19, 'World 2 complete'], [20, 'Stage clear'], [28, 'Stage clear'], [29, 'Campaign complete']]) {
         q = await startStage(idx); q.completeStage();
         check(q.state === 'complete' && q.titleText.text === want, `stage ${idx + 1} clear title is "${want}" (got "${q.titleText.text}")`);
+        // The last stage has nothing after it: no Next button, and the finale sting (the existing max-multiplier sting) plays once after 0.9 s.
+        if (idx === Pulse.STAGES.length - 1) check(!q.nextBtn.visible && q.retryBtn.visible && q.backBtn.visible, 'the last stage shows Retry and Stages but no Next button');
+        else if (idx === 28) check(q.nextBtn.visible, 'stage 29 still offers Next stage');
+      }
+      {
+        // Campaign finale: the same existing sting as the world finales, 0.9 s after the clear panel opens (no new audio).
+        const plays = []; const realPlay = Pulse.Sfx.play; Pulse.Sfx.play = (name, ...a) => { plays.push(name); return realPlay.call(Pulse.Sfx, name, ...a); };
+        q = await startStage(Pulse.STAGES.length - 1); q.completeStage();
+        check(!plays.includes('milestone'), 'the finale sting waits for the clear panel (not at the moment of clearing)');
+        await wait(1100);
+        Pulse.Sfx.play = realPlay;
+        check(plays.filter((n) => n === 'milestone').length === 1 && q.state === 'complete', 'the campaign finale plays the existing sting exactly once');
       }
       // Endless keeps the plain backdrop.
       scene().scene.start('game', { mode: 'endless' }); await wait(350);
