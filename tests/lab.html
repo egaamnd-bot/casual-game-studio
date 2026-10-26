@@ -101,16 +101,18 @@
 
       // ---- Menu ----
       scene().scene.start('menu'); await wait(600);
-      const kids = () => scene().children.list.map((c) => c.list ? c.list.map((x) => x.text).filter(Boolean).join('') : c.text).filter(Boolean);
+      const G = window.__pulseGame;
+      const texts = (key) => { const out = []; const walk = (o) => { if (o.text !== undefined) out.push(String(o.text)); (o.list || []).forEach(walk); }; G.scene.getScene(key).children.list.forEach(walk); return out; };
+      const kids = () => texts('menu');
       check(kids().includes('LAB'), 'the menu shows LAB when there are prototypes');
-      C.lab.enabled = false; scene().scene.restart(); await wait(600);
+      C.lab.enabled = false; G.scene.getScene('menu').scene.restart(); await wait(600);
       check(!kids().includes('LAB'), 'CONFIG.lab.enabled = false hides it');
       C.lab.enabled = true;
-      L._remove('lab-test'); L._remove('lab-finale'); scene().scene.restart(); await wait(600);
+      L._remove('lab-test'); L._remove('lab-finale'); G.scene.getScene('menu').scene.restart(); await wait(600);
       check(!kids().includes('LAB'), 'and so does having no prototypes');
       L.register({ id: 'lab-test', title: 'Test prototype', desc: 'Used by the tests', base: Pulse.STAGES[2].id, stage: lab });
-      scene().scene.start('lab'); await wait(600);
-      check(scene().scene.key === 'lab' && kids().includes('Test prototype'), 'the LAB screen lists the prototype');
+      G.scene.getScene('menu').scene.start('lab'); await wait(600);
+      check(G.scene.isActive('lab') && texts('lab').includes('Test prototype'), 'the LAB screen lists the prototype');
       check(errors.length === 0, `page errors: ${errors.join(' | ')}`);
     }
     run().then(() => { document.title = fails.length ? `FAIL ${fails.length}: ${fails.join(' | ')}` : `PASS lab tests ${checks} checks`; })
