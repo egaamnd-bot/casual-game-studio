@@ -71,7 +71,7 @@
       if (this.mode === 'campaign') {
         this.stage = Pulse.STAGES[this.stageIndex];
         this.level = new Pulse.Campaign.CampaignLevel(this.W, this.H, this.stage);
-        visual = this.stage.world.visual;
+        visual = this.stage.look.visual;
       } else {
         this.level = new Pulse.EndlessLevel(this.W, this.H);
       }
@@ -178,7 +178,7 @@
     }
 
     worldOpener() {
-      return this.mode === 'campaign' && Pulse.STAGES.findIndex((s) => s.world === this.stage.world) === this.stageIndex;
+      return this.mode === 'campaign' && Pulse.isOpener(this.stageIndex);
     }
 
     startMusic() {
@@ -218,7 +218,7 @@
       const cx = this.overlayX();
       const top = Math.round(this.H * 0.2);
       if (this.mode === 'campaign') {
-        this.bannerParts = UI.worldBanner(this, cx, top - 70, this.stage.world, 340, 16);
+        this.bannerParts = UI.worldBanner(this, cx, top - 70, this.stage.arc, 340, 16);
       }
       this.titleText = UI.text(this, cx, top, '', 64, T.text, true).setDepth(16);
       this.subText = UI.text(this, cx, top + 66, '', 21, T.textDim).setDepth(16).setWordWrapWidth(440);

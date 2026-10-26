@@ -154,6 +154,7 @@
     if (typeof stage.name !== 'string' || !stage.name) err('missing name');
     if (!stage.sector || !stage.sector.id || !stage.sector.name) err('missing sector');
     if (!stage.world || !(stage.world.index >= 1) || !stage.world.music) err('missing world');
+    if (!stage.arc || !(stage.arc.index >= 1) || !stage.look || !stage.look.visual) err('missing arc or look');
     if (typeof stage.intro !== 'string') err('missing intro');
     if (!stage.speed || !(stage.speed.start > 0) || !(stage.speed.end > 0)) err('speed.start and speed.end must be > 0');
     if (stage.speed && Math.max(stage.speed.start, stage.speed.end) > C.speed.max) err('speed above the game maximum');
@@ -211,6 +212,14 @@
         if (cx - reach < 0 || cx + reach > width) err(`item ${n}: swing leaves the lane`);
         if (s && s.kind !== undefined && s.kind !== 'slide' && s.kind !== 'breathe') err(`item ${n}: unknown motion kind`);
       }
+    }
+    // A route's notes must come before its last row: the route clear is judged when that row is passed.
+    {
+      const ended = {};
+      stage.items.forEach((it, n) => {
+        if (it.route && it.lane && ended[it.route]) err(`item ${n}: a note of route "${it.route}" comes after its last row, so it could never count toward the route clear`);
+        if (it.route && it.fork && it.routeEnd) ended[it.route] = true;
+      });
     }
     // Mirror zones: contiguous, long enough, with at least one mirrored pair, and clear of each other.
     {

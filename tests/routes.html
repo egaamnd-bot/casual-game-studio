@@ -27,7 +27,9 @@
     const forkStages = Pulse.STAGES.filter((s) => s.items.some((it) => it.fork && !it.mirror)); // route forks (mirror pairs are Mirror Pulse, not routes)
 
     // ---- 1. Authoring: where routes are, and what makes each lane what it claims to be ----
-    check(forkStages.length === 1 && forkStages[0] === STAGE, 'routes are prototyped in exactly one stage (s4-split-decision)');
+    // Route stages are a deliberate list: add a stage here only together with its fairness and playthrough tests (section 8).
+    const ROUTE_STAGE_IDS = ['s4-split-decision', 's14-safe-or-sorry'];
+    check(forkStages.map((s) => s.id).join() === ROUTE_STAGE_IDS.join() && forkStages[0] === STAGE, `route forks appear in exactly these stages: ${ROUTE_STAGE_IDS.join(', ')} (found ${forkStages.map((s) => s.id).join(', ')})`);
     check(Pulse.STAGES.findIndex((s) => s === STAGE) === 3, 'the prototype stage keeps its place (stage 4) and id');
     const ids = [...new Set(STAGE.items.filter((it) => it.fork).map((it) => it.route))];
     check(ids.length === 2, 'stage 4 has two route forks (a forgiving one, then a demanding one)');
@@ -382,13 +384,33 @@
       }
       // Every other stage compiles to exactly what it did (no forks, no lane fields).
       for (const st of Pulse.STAGES) {
-        if (st === STAGE) continue;
+        if (forkStages.includes(st)) continue;
         const tr = Pulse.Campaign.compile(st, W, 960);
         check(tr.items.every((it) => !(it.fork && !it.mirror) && !it.lane && !it.route) && Object.keys(tr.routes).length === 0, `${st.id}: no route fields leak into other stages`);
       }
       // Endless patterns never use forks.
       const src = Pulse.Patterns && Pulse.Patterns.library ? JSON.stringify(Pulse.Patterns.library) : '';
       check(!/fork/.test(src), 'Endless patterns are unchanged (routes are campaign-only for now)');
+    }
+
+    // ---- 8. Later route stages: the same guarantees as stage 4 (both lanes completable at every size and frame rate) ----
+    for (const st of forkStages.filter((s) => s !== STAGE)) {
+      const tr = Pulse.Campaign.compile(st, W, 960);
+      check(Pulse.Campaign.validate(st, W).length === 0, `${st.id}: validates`);
+      const rids = Object.keys(tr.routes);
+      check(rids.length >= 2 && rids.every((id) => tr.routes[id].rows >= 4 && tr.routes[id].riskNotes >= 3), `${st.id}: every fork has at least 4 rows and 3 risk notes (${rids.map((id) => tr.routes[id].rows + 'r/' + tr.routes[id].riskNotes + 'n').join(', ')})`);
+      for (const h of HEIGHTS) {
+        for (const route of ['safe', 'risk']) {
+          const a = play(st, route, h);
+          const total = Pulse.Campaign.compile(st, W, h).energyTotal;
+          check(a.completed && !a.crashed && a.gold === total, `${st.id} ${route} @${h}px: completes with all ${total} gold (crashed on ${a.crashSeg})`);
+          if (route === 'risk') check(a.clears === rids.length, `${st.id} risk @${h}px: every fork cleared (${a.clears}/${rids.length})`);
+          else check(a.clears === 0 && a.riskNotes === 0, `${st.id} safe @${h}px: no risk notes, no clear`);
+          const c = play(st, route, h, { hold: 0.75 }), sl = play(st, route, h, { skill: 0.2 });
+          check(c.completed && sl.completed, `${st.id} ${route} @${h}px: a cautious and a sloppy player complete`);
+        }
+      }
+      for (const dt of [1 / 30, 1 / 144]) for (const route of ['safe', 'risk']) check(play(st, route, 960, { dt }).completed, `${st.id} ${route} @${Math.round(1 / dt)} fps: completes`);
     }
 
     document.title = (failures ? 'FAIL ' + failures + ' of ' : 'PASS ') + checks + ' checks';

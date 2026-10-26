@@ -197,7 +197,8 @@
     }
   }
 
-  // Stage select: one world per page (banner + its four stages), arrows to change world.
+  // Stage select: one world per page (banner + its ten stages in two columns of five), arrows to
+  // change world. Tiles are at least 88 px tall at the shortest supported screen (540x860).
   class StageSelectScene extends Phaser.Scene {
     constructor() {
       super('stages');
@@ -206,14 +207,14 @@
     init(data) {
       const save = Pulse.Save.load();
       const next = Pulse.STAGES[Pulse.Campaign.nextStageIndex(save)];
-      this.worldIndex = data && data.world ? data.world : next.world.index;
+      this.worldIndex = data && data.world ? data.world : next.arc.index;
     }
 
     create() {
       const UI = Pulse.UI;
       const W = this.scale.width;
       const save = Pulse.Save.load();
-      const world = Pulse.WORLDS[this.worldIndex - 1];
+      const arc = Pulse.ARCS[this.worldIndex - 1];
       Pulse.Music.play('MENU_THEME');
       this.input.on('pointerdown', () => Pulse.Sfx.unlock());
       backdrop(this);
@@ -221,25 +222,25 @@
       const H = this.scale.height;
       UI.text(this, W / 2, 56, 'Campaign', 34, T.text, true);
       UI.text(this, W / 2, 92, `${Pulse.Campaign.totalStars(save)} / ${Pulse.STAGES.length * 3} stars`, 16, T.textDim);
-      UI.worldBanner(this, W / 2, 168, world, 400);
+      UI.worldBanner(this, W / 2, 168, arc, 400);
 
-      // The world's four stages in a 2×2 grid, centred in the space below the banner.
-      const stages = Pulse.STAGES.map((s, i) => ({ s, i })).filter(({ s }) => s.world === world);
-      const top = 250;
-      const rowH = Math.min(240, (H - top - 150) / 2);
+      // The world's stages in two columns, filling the space between the banner and the arrows.
+      const stages = Pulse.arcStages(arc);
+      const rows = Math.ceil(stages.length / 2);
+      const top = 244;
+      const rowH = Math.min(112, (H - top - 120) / rows);
       stages.forEach(({ s, i }, k) => {
-        const x = W / 2 + (k % 2 ? 1 : -1) * 108;
+        const x = W / 2 + (k % 2 ? 1 : -1) * 128;
         const y = top + rowH / 2 + Math.floor(k / 2) * rowH;
-        if (Pulse.Assets.ok) this.card(save, s, i, x, y);
-        else this.box(save, s, i, x, y);
+        this.tile(save, s, i, x, y, 244, rowH - 10);
       });
 
       // World arrows (bottom) and back (top-left).
       const go = (d) => this.scene.restart({ world: this.worldIndex + d });
-      const ay = H - 70;
-      UI.text(this, W / 2, ay, `WORLD ${this.worldIndex} / ${Pulse.WORLDS.length}`, 18, T.textDim, true);
+      const ay = H - 56;
+      UI.text(this, W / 2, ay, `WORLD ${this.worldIndex} / ${Pulse.ARCS.length}`, 18, T.textDim, true);
       if (this.worldIndex > 1) this.arrow(70, ay, -1, () => go(-1));
-      if (this.worldIndex < Pulse.WORLDS.length) this.arrow(W - 70, ay, 1, () => go(1));
+      if (this.worldIndex < Pulse.ARCS.length) this.arrow(W - 70, ay, 1, () => go(1));
       if (Pulse.Assets.ok) UI.iconButton(this, 56, 52, 52, 'ui_btn_icon_back_up', '<', () => this.back());
       else UI.button(this, 90, 52, 120, 56, 'Back', () => this.back(), { size: 22 });
     }
@@ -267,44 +268,31 @@
       this.scene.start('game', { mode: 'campaign', stageIndex: i });
     }
 
-    // Gemini's world-themed stage plates (280×320) at 0.6 scale; locked stages use the locked card.
-    card(save, stage, i, x, y) {
+    // One stage: number, name and stars (or a lock). The whole tile is the tap target.
+    tile(save, stage, i, x, y, w, h) {
       const UI = Pulse.UI;
-      const s = 0.6;
       const unlocked = Pulse.Campaign.isUnlocked(save, i);
       const rec = Pulse.Campaign.stageRecord(save, stage.id);
-      const card = unlocked ? this.add.image(0, 0, Pulse.Assets.stageCardKey(i)).setScale(s)
-        : this.add.image(0, 0, 'pulse_ui', 'ui_stage_card_locked').setScale(s);
-      const parts = [card];
-      parts.push(UI.text(this, 0, -112 * s, String(i + 1).padStart(2, '0'), 22, unlocked ? T.text : T.textDim, true));
-      const name = UI.text(this, 0, -14 * s, stage.name, 17, unlocked ? T.text : T.textDim, true);
-      name.setWordWrapWidth(280 * s - 24);
+      const bg = this.add.rectangle(0, 0, w, h, unlocked ? T.panel : 0x141a2b).setStrokeStyle(2, unlocked ? T.wallEdge : T.panelEdge);
+      const parts = [bg];
+      parts.push(UI.text(this, -w / 2 + 28, 0, String(i + 1).padStart(2, '0'), 24, unlocked ? T.text : T.textDim, true));
+      const name = UI.text(this, 14, unlocked ? -12 : 0, stage.name, 16, unlocked ? T.text : T.textDim, true);
+      name.setWordWrapWidth(w - 90);
       parts.push(name);
-      const box = this.add.container(x, y, parts);
+      const box = this.add.container(x, y, parts).setDepth(20);
       if (unlocked) {
+        const g = this.add.graphics();
         const imgs = [];
-        UI.stars(this, null, 0, 112 * s, 11, rec.bestStars, 3, imgs);
-        imgs.forEach((img) => box.add(img));
-        if (rec.completed) box.add(this.add.image(280 * s / 2 - 16, -320 * s / 2 + 16, 'pulse_ui', 'ui_icon_status_check').setScale(0.4));
-        UI.wire(box, card, () => this.start(i));
-      } else {
-        box.add(this.add.image(0, 46 * s, 'pulse_ui', 'ui_icon_status_lock').setScale(0.5));
+        UI.stars(this, g, 14, 18, 9, rec.bestStars, 3, imgs, 21);
+        box.add(g);
+        g.setPosition(0, 0);
+        imgs.forEach((img) => { box.add(img); });
+        if (rec.completed && Pulse.Assets.ok) box.add(this.add.image(w / 2 - 14, -h / 2 + 14, 'pulse_ui', 'ui_icon_status_check').setScale(0.32));
+        UI.wire(box, bg, () => this.start(i));
+      } else if (Pulse.Assets.ok) {
+        box.add(this.add.image(w / 2 - 22, 0, 'pulse_ui', 'ui_icon_status_lock').setScale(0.4));
       }
-    }
-
-    // Shape fallback with the same layout.
-    box(save, stage, i, x, y) {
-      const UI = Pulse.UI;
-      const unlocked = Pulse.Campaign.isUnlocked(save, i);
-      const rec = Pulse.Campaign.stageRecord(save, stage.id);
-      const card = UI.button(this, x, y, 190, 210, '', () => {
-        if (unlocked) this.start(i);
-      }, { edge: unlocked ? T.wallEdge : T.panelEdge });
-      card.label.setVisible(false);
-      UI.text(this, x, y - 66, `${i + 1}`, 28, unlocked ? T.text : T.textDim, true).setDepth(21);
-      UI.text(this, x, y - 10, stage.name, 18, unlocked ? T.text : T.textDim, true).setDepth(21).setWordWrapWidth(150);
-      if (unlocked) Pulse.Render.stars(this.add.graphics().setDepth(21), x, y + 60, 13, rec.bestStars, 3);
-      else UI.text(this, x, y + 60, 'Locked', 16, T.textDim).setDepth(21);
+      return box;
     }
   }
 
