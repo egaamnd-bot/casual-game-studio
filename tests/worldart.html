@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse world art tests</title>
+  <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
+</head>
+<body>
+  <script>
+    // Gemini's portrait world backdrops (docs/ASSET_MANIFEST.md): files, mapping to stages, layering, and no effect on play.
+    // ?noart=1 re-runs the scene checks with the optional backdrops missing (the existing look).
+    try { localStorage.clear(); } catch (e) {}
+    window.PULSE_ASSET_BASE = '../src/';
+    const NOART = new URLSearchParams(location.search).get('noart') === '1';
+    window.PULSE_TEST = { autoStart: true, holdReady: true, bot: false, mode: 'campaign', stageIndex: 0, noArt: NOART };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/melody.js"></script>
+  <script src="../src/js/overdrive.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/mirror.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/patterns.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script src="../src/js/render.js"></script>
+  <script src="../src/js/ui.js"></script>
+  <script src="../src/js/assets.js"></script>
+  <script src="../src/js/trail.js"></script>
+  <script src="../src/js/sprite-view.js"></script>
+  <script src="../src/js/game-scene.js"></script>
+  <script src="../src/js/menu-scenes.js"></script>
+  <script src="../src/js/main.js"></script>
+  <script>
+    const C = Pulse.CONFIG;
+    const fails = [];
+    const notes = [];
+    let checks = 0;
+    const check = (ok, msg) => { checks++; if (!ok) fails.push(msg); };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const scene = () => window.__pulseScene;
+    const fake = new WeakMap();
+    const clockOf = (sc) => { let c = fake.get(sc); if (!c) { c = { now: sc.time.now }; fake.set(sc, c); Object.defineProperty(sc.time, 'now', { get: () => c.now, set: () => {}, configurable: true }); } return c; };
+    const frames = (sc, n, until) => { const c = clockOf(sc); for (let i = 0; i < n; i++) { c.now += 16.667; sc.update(c.now, 16.667); sc.draw && sc.draw(); if (until && until()) return true; } return !until; };
+    const errors = [];
+    window.addEventListener('error', (e) => errors.push(e.message));
+    async function startStage(idx) { scene().scene.start('game', { mode: 'campaign', stageIndex: idx }); await wait(350); const q = scene(); q.test.holdReady = true; return q; }
+    const pixels = (img) => { const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height; const cx = cv.getContext('2d'); cx.drawImage(img, 0, 0); return cx.getImageData(0, 0, img.width, img.height); };
+    const lum = (d, i) => 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+
+    async function run() {
+      for (let i = 0; i < 200 && !(scene() && scene().state); i++) await wait(100);
+      await wait(300);
+      let q = await startStage(0);
+
+      if (!NOART) {
+        // ---- Backdrops ----
+        for (const key of Pulse.Assets.ART_IMAGES) {
+          check(q.textures.exists(key), `${key} loaded`);
+          const img = q.textures.get(key).getSourceImage();
+          check(img.width === 540 && img.height === 960, `${key}: 540x960 (${img.width}x${img.height})`);
+          const px = pixels(img); const d = px.data; let sum = 0, bright = 0, n = img.width * img.height;
+          for (let i = 0; i < d.length; i += 4) { const l = lum(d, i) * d[i + 3] / 255; sum += l; if (l > 100) bright++; }
+          check(sum / n < 30, `${key}: dark enough not to compete with the lane (mean luminance ${(sum / n).toFixed(1)})`);
+          check(bright / n < 0.02, `${key}: only fine lines are bright (${(100 * bright / n).toFixed(2)}% of pixels over 100)`);
+          // Repeats every 192 px, so a 960 px tile wraps with no seam (and any screen height works).
+          let diff = 0; for (let y = 0; y < 960 - 192; y++) for (let x = 0; x < 540; x += 3) { const i = (y * 540 + x) * 4, j = ((y + 192) * 540 + x) * 4; diff = Math.max(diff, Math.abs(d[i] - d[j]), Math.abs(d[i + 1] - d[j + 1]), Math.abs(d[i + 2] - d[j + 2]), Math.abs(d[i + 3] - d[j + 3])); }
+          check(diff <= 2, `${key}: repeats every 192 px, so it wraps seamlessly (max difference ${diff})`);
+        }
+      }
+
+      // ---- Which backdrop each stage uses ----
+      const exp = (i) => (NOART ? null : (i === 9 ? 'bg_portrait_w1_finale_s10' : i < 10 ? 'bg_portrait_w1_neon_circuit' : 'bg_portrait_w2_chromatic_overdrive'));
+      for (let i = 0; i < Pulse.STAGES.length; i++) {
+        q = await startStage(i);
+        const want = exp(i);
+        check((q.view.worldBgKey || null) === want, `stage ${i + 1} (${Pulse.STAGES[i].id}): backdrop ${q.view.worldBgKey} (want ${want})`);
+        if (q.view.worldBg) check(q.view.worldBg.depth < q.view.grid.depth && q.view.worldBg.width === q.SW && q.view.worldBg.height === q.SH, `stage ${i + 1}: backdrop sits under the grid and covers the screen`);
+      }
+      check(Pulse.Assets.worldBackdrop(9) === 'bg_portrait_w1_finale_s10' && Pulse.Assets.worldBackdrop(10) === 'bg_portrait_w2_chromatic_overdrive', 'stage 10 is arc 1\'s finale backdrop; stage 11 opens arc 2');
+      // Endless keeps the plain backdrop.
+      scene().scene.start('game', { mode: 'endless' }); await wait(350);
+      q = scene(); check(q.mode === 'endless' && !q.view.worldBg, 'Endless keeps its plain backdrop');
+      // The backdrop scrolls with the world, slower than the grid.
+      q = await startStage(0);
+      if (!NOART) {
+        q.test.bot = true; q.startRun(); frames(q, 60);
+        const t0 = q.view.worldBg.tilePositionY; const g0 = q.view.grid.tilePositionY; frames(q, 60);
+        check(q.view.worldBg.tilePositionY < t0 && q.view.worldBg.tilePositionY > q.view.grid.tilePositionY - 1e9 && Math.abs(q.view.worldBg.tilePositionY - t0) < Math.abs(q.view.grid.tilePositionY - g0), 'the backdrop scrolls with the world, slower than the grid');
+      }
+
+      // ---- Collision, score and stars do not depend on the art ----
+      {
+        const play = async (idx, art) => {
+          const s = await startStage(idx);
+          if (!art && s.view.worldBg) s.view.worldBg.setVisible(false);
+          s.test.bot = true; s.test.route = 'safe'; s.startRun();
+          frames(s, 40000, () => s.state !== 'playing');
+          return { state: s.state, score: s.score, energy: s.energy, t: +s.elapsed.toFixed(3), trav: +s.level.travelled.toFixed(2), stars: s.result && s.result.stars };
+        };
+        for (const idx of [6, 15]) {
+          const a = await play(idx, true); const b = await play(idx, false);
+          check(a.state === 'complete' && JSON.stringify(a) === JSON.stringify(b), `stage ${idx + 1} plays identically with and without the new art (${JSON.stringify(a)})`);
+        }
+      }
+      check(errors.length === 0, `page errors: ${errors.join(' | ')}`);
+    }
+    run().then(() => { document.title = (fails.length ? `FAIL ${fails.length}: ${fails.join(' | ')}` : `PASS world art tests ${checks} checks`) + ' | ' + notes.join(' | '); })
+      .catch((e) => { document.title = 'FAIL error ' + e.message + ' ' + (e.stack || '').split('\n')[1]; });
+  </script>
+</body>
+</html>

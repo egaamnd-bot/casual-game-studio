@@ -40,6 +40,10 @@
       // ---- Procedural portrait backdrop (below the gameplay layer) ----
       this.makeBackdropTextures();
       this.bg = scene.add.rectangle(0, 0, SW, SH, T.background).setOrigin(0).setDepth(0);
+      // World backdrop (Gemini, 540x960, repeats every 192 px so it tiles without a seam): the arc's look.
+      const bdKey = scene.mode === 'campaign' ? Pulse.Assets.worldBackdrop(scene.stageIndex) : null;
+      this.worldBg = bdKey && scene.textures.exists(bdKey) ? scene.add.tileSprite(0, 0, SW, SH, bdKey).setOrigin(0).setDepth(0.3) : null;
+      this.worldBgKey = this.worldBg ? bdKey : null;
       this.grid = scene.add.tileSprite(0, 0, SW, SH, 'pulse_grid').setOrigin(0).setDepth(0.5).setAlpha(C.comet.backdropAlpha + 0.1);
       this.streaks = scene.add.tileSprite(0, 0, SW, SH, 'pulse_streaks').setOrigin(0).setDepth(0.6).setAlpha(0.5);
 
@@ -575,6 +579,7 @@
       this.streakPos = (this.streakPos || 0) + dTravel * 1.15 * (1 + 0.6 * od);
       if (dTravel < 0) this.streakPos = travel * 1.15; // a retry rewinds the track
       this.grid.tilePositionY = -travel * 0.55;
+      if (this.worldBg) this.worldBg.tilePositionY = -travel * 0.3;
       this.streaks.tilePositionY = -this.streakPos;
       this.dimmed = dimmed;
 
