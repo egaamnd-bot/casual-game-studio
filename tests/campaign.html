@@ -150,7 +150,10 @@
       stage.items.forEach((it) => {
         if (it.type === 'barrier') m.add(it.charged ? 'charged' : 'barrier');
         if (it.type === 'gate' && it.length) m.add('tunnel');
-        if (it.type === 'bonus') m.add('mint');
+        // A mint inside a route fork is a lane reward (taught as part of the route choice), not the
+        // stage-8 "greed is optional" mint.
+        if (it.type === 'bonus' && !it.route) m.add('mint');
+        if (it.fork) m.add('route');
         if (it.slide && it.slide.kind !== 'breathe') m.add('slide');
         if (it.slide && it.slide.kind === 'breathe') m.add('breathe');
         if (it.type === 'gate' && it.need < R && !it.length && !it.slide) m.add('narrow');
@@ -158,7 +161,7 @@
       });
       return m;
     }
-    const INTRO = { narrow: 1, 'wide-steer': 1, barrier: 2, slide: 3, breathe: 4, charged: 5, tunnel: 6, mint: 8 };
+    const INTRO = { narrow: 1, 'wide-steer': 1, barrier: 2, slide: 3, breathe: 4, charged: 5, tunnel: 6, mint: 8, route: 4 };
     for (const [mech, stageNo] of Object.entries(INTRO)) {
       const first = STAGES.findIndex((s) => mechanics(s).has(mech)) + 1;
       check(first === stageNo, `${mech} is introduced in stage ${stageNo} (first used in stage ${first})`);
@@ -187,8 +190,10 @@
     check(f.it.need >= 46 && f.it.t >= 0.7, 'first tunnel: roomy and well announced');
     f = firstItem(STAGES[2], (it) => it.slide);
     check(f.it.slide.amp <= 40, 'first moving gap: a gentle swing');
-    f = firstItem(STAGES[7], (it) => it.type === 'bonus');
+    f = firstItem(STAGES[7], (it) => it.type === 'bonus' && !it.route);
     check(f.it.t >= 0.3, 'first mint: a roomy dare');
+    f = firstItem(STAGES[3], (it) => !!it.fork);
+    check(f.it.t >= 0.9 && f.prev.type === 'gate' && f.prev.need >= 80 && f.it.need >= 70 && f.it.fork.need >= 44, 'first route fork: a wide decision point before it, a long lead, a roomy safe route and a roomy risk route');
 
     // ---- Density: closer together than the landscape stages (measured on the same speeds) ----
     // Median clear time (s) between neighbouring items in the 12 landscape stages this replaces.

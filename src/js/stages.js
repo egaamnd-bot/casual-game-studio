@@ -49,6 +49,14 @@
   const slide = (need, t, x, amp, beats, phase) => ({ type: 'gate', need, t, x: x || 0, slide: { amp, beats, phase: phase || 0 } });
   // Breathing gap: opens and closes every `beats` beats between half-width `need` and `need + amp`.
   const breathe = (need, t, x, amp, beats, phase) => ({ type: 'gate', need, t, x: x || 0, slide: { kind: 'breathe', amp, beats, phase: phase || 0 } });
+  // Route fork (docs/ROUTES.md): one wall with TWO openings kept apart by a divider pillar, so the
+  // player must choose a side before the rows arrive. `L` / `R` = [need, x] of the left / right
+  // opening; `risk` says which side is the demanding route. `end` marks the fork's last row.
+  const forkRow = (route, risk, t, L, R, end) => ({
+    type: 'gate', need: L[0], x: L[1], t, route, routeEnd: !!end, fork: { need: R[0], x: R[1], risk },
+  });
+  // An optional mint note that belongs to one lane of a fork ('risk' = on the demanding route).
+  const routeNote = (route, role, t, x) => ({ type: 'bonus', t, x, route, role, lane: x < 0 ? 'L' : 'R' });
   // Beat-aligns an item to a coarser grid than the stage's (`sub` beats). Only ever delays an item.
   const on = (item, sub) => Object.assign(item, { beat: sub || 1 });
   // n gates alternating left and right of the lane centre by `amp` (first one on side `s`).
@@ -142,18 +150,36 @@
     },
     {
       id: 's4-split-decision', name: 'Split Decision', world: W1,
-      intro: 'Slalom! Sweep from side to side. Breathing gaps open on the beat.',
-      teaches: 'Side-to-side slalom gaps, gold trails across the lane and the first breathing gaps.',
+      intro: 'Slalom! Sweep from side to side. When the lane splits, pick a route: safe, or risky with more notes.',
+      teaches: 'Side-to-side slalom gaps, gold trails across the lane, the first breathing gaps and the first route forks (safe or risky).',
       profile: 'Wide, flowing slalom. The lane is used edge to edge; breathing gaps pulse with the beat.',
       speed: { start: 260, end: 290 }, exit: RUNOUT,
       pace: 0.58, grid: 0.25,
       hints: [{ from: 0.4, to: 4.5, title: 'EVERY SECOND COUNTS.', sub: 'SWEEP FROM SIDE TO SIDE' }],
+      routeHints: { 's4-a': { title: 'THE LANE SPLITS', sub: 'LEFT SAFE · RIGHT RISKY (MORE NOTES)' }, 's4-b': { title: 'CHOOSE YOUR ROUTE', sub: 'LEFT RISKY (MORE NOTES) · RIGHT SAFE' } },
       items: [
-        gap(46, 0.9, -110), gold(0.4, -90), ...snake(4, 46, 0.5, -90, 100), gold(0.4, 100),
+        gap(46, 0.9, -110), gold(0.4, -90),
+        // ROUTE A: the first fork, forgiving. Left = safe (wide, steady, one note); right = risk
+        // (narrow gaps you must shrink for, three extra notes).
+        wide(0.7, 0),
+        forkRow('s4-a', 'R', 0.9, [72, -135], [46, 135]), routeNote('s4-a', 'risk', 0.35, 150),
+        forkRow('s4-a', 'R', 0.5, [72, -135], [46, 175]), routeNote('s4-a', 'risk', 0.35, 150), routeNote('s4-a', 'safe', 0.1, -135),
+        forkRow('s4-a', 'R', 0.5, [72, -135], [46, 120]), routeNote('s4-a', 'risk', 0.35, 135),
+        forkRow('s4-a', 'R', 0.5, [72, -135], [46, 150], true),
+        gold(0.4, 100),
         bar(0.55), ...snake(4, 44, 0.5, 100, -100), gold(0.4, -100), gold(0.35, -40),
         on(breathe(40, 0.55, 0, 26, 4, 0), 0.5), bar(0.5), ...zig(3, 44, 0.5, 100, -1), gold(0.4, 90),
         bar(0.5), ...trail(3, 0.35, 60, -110), gap(44, 0.5, -110), on(breathe(40, 0.55, -40, 26, 4, 0.5), 0.5),
-        gold(0.4, 0), bar(0.45), ...snake(5, 44, 0.5, -60, 120), bar(0.5), gold(0.4, 100), gold(0.35, 20),
+        gold(0.4, 0), bar(0.45),
+        // ROUTE B: the second fork, demanding. Left = risk (tighter gaps that zig-zag, four extra
+        // notes); right = safe (wide, easy to read, one note).
+        wide(0.7, 0),
+        forkRow('s4-b', 'L', 0.9, [40, -150], [70, 130]), routeNote('s4-b', 'risk', 0.35, -130),
+        forkRow('s4-b', 'L', 0.5, [40, -110], [70, 150]), routeNote('s4-b', 'risk', 0.35, -135),
+        forkRow('s4-b', 'L', 0.5, [40, -160], [70, 120]), routeNote('s4-b', 'risk', 0.35, -137), routeNote('s4-b', 'safe', 0.1, 135),
+        forkRow('s4-b', 'L', 0.5, [40, -115], [70, 150]), routeNote('s4-b', 'risk', 0.35, -127),
+        forkRow('s4-b', 'L', 0.5, [40, -140], [70, 130], true),
+        bar(0.5), gold(0.4, 100), gold(0.35, 20),
         gap(44, 0.5, -50), on(breathe(40, 0.55, 70, 26, 4, 0), 0.5), gold(0.4, 60), bar(0.45),
       ],
     },

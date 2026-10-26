@@ -59,6 +59,24 @@
     return { added, started: false };
   }
 
+  // A one-off reward (a fully collected risk route): adds `units` to the meter without touching the
+  // repeat memory of ordinary contacts. Nothing is added while Overdrive is active. Bounded: the
+  // campaign places each route once, so it cannot be repeated for charge.
+  function award(od, units) {
+    if (od.active) return { added: 0, started: false };
+    const O = C.overdrive;
+    od.meter = Math.min(O.threshold, od.meter + units);
+    od.chargedTotal += units;
+    if (od.meter >= O.threshold) {
+      od.active = true;
+      od.remaining = O.duration;
+      od.activations++;
+      od.meter = O.threshold;
+      return { added: units, started: true };
+    }
+    return { added: units, started: false };
+  }
+
   function miss(od, bonus) {
     if (bonus || od.active) return 0;
     const lost = Math.min(od.meter, C.overdrive.missPenalty);
@@ -115,5 +133,5 @@
     return 0;
   }
 
-  Pulse.Overdrive = { create, reset, amount, charge, miss, tick, crash, fraction, warning, milestone };
+  Pulse.Overdrive = { create, reset, amount, charge, award, miss, tick, crash, fraction, warning, milestone };
 })();

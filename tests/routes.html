@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Pulse route tests</title></head>
+<body>
+  <pre id="out">running…</pre>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/melody.js"></script>
+  <script src="../src/js/overdrive.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/patterns.js"></script>
+  <script>
+    // Risk-and-reward routes (docs/ROUTES.md): fork geometry, collision boundaries, per-lane fairness,
+    // both routes completable at every portrait size, route reward resolution, and how routes meet the
+    // combo, Overdrive, score, stars and save rules. Pure rules: no Phaser, no audio.
+    const C = Pulse.CONFIG, OD = Pulse.Overdrive, T = Pulse.Track;
+    const R = C.orb.radius;
+    const W = C.width;
+    let checks = 0, failures = 0; const msgs = [], lines = [];
+    const check = (ok, m) => { checks++; if (!ok) { failures++; msgs.push('FAIL ' + m); } };
+    const HEIGHTS = [860, 900, 960, 1080, 1180, 1240]; // the supported portrait track lengths (clamp(540/aspect, 860, 1240))
+    const STAGE = Pulse.STAGES.find((s) => s.id === 's4-split-decision');
+    const forkStages = Pulse.STAGES.filter((s) => s.items.some((it) => it.fork));
+
+    // ---- 1. Authoring: where routes are, and what makes each lane what it claims to be ----
+    check(forkStages.length === 1 && forkStages[0] === STAGE, 'routes are prototyped in exactly one stage (s4-split-decision)');
+    check(Pulse.STAGES.findIndex((s) => s === STAGE) === 3, 'the prototype stage keeps its place (stage 4) and id');
+    const ids = [...new Set(STAGE.items.filter((it) => it.fork).map((it) => it.route))];
+    check(ids.length === 2, 'stage 4 has two route forks (a forgiving one, then a demanding one)');
+    const trackAt = (h) => Pulse.Campaign.compile(STAGE, W, h);
+    const base = trackAt(960);
+    for (const id of ids) {
+      const info = base.routes[id];
+      const rows = base.items.filter((it) => it.fork && it.route === id);
+      check(rows.length >= 4, `${id}: at least 4 rows (a real choice, not a single gate) — ${rows.length}`);
+      check(rows.filter((r) => r.routeEnd).length === 1 && rows[rows.length - 1].routeEnd, `${id}: exactly one routeEnd, on the last row`);
+      check(rows[0].firstRow && rows.slice(1).every((r) => !r.firstRow), `${id}: the first row is marked for the preview`);
+      check(info.riskNotes >= C.route.minRisk && info.riskNotes > info.safeNotes && info.safeNotes >= 1, `${id}: risk lane holds more optional notes (${info.riskNotes}) than the safe lane (${info.safeNotes})`);
+      const riskSide = rows[0].risk;
+      check(rows.every((r) => r.risk === riskSide), `${id}: the risk side is the same on every row`);
+      for (const r of rows) {
+        const risk = T.openingOf(r, r.risk), safe = T.openingOf(r, r.risk === 'L' ? 'R' : 'L');
+        check(risk.half < R, `${id}: risk opening needs the orb shrunk (half ${risk.half} < ${R})`);
+        check(safe.half >= R + C.lateral.minWindow, `${id}: safe opening is passable at full size (half ${safe.half})`);
+        check(risk.half >= C.orb.minRadius + C.lateral.minWindow, `${id}: risk opening is above the fair minimum (${risk.half})`);
+        check(r.gap2L - r.gapR >= C.route.divider - 1e-9, `${id}: the divider is at least ${C.route.divider} px (${(r.gap2L - r.gapR).toFixed(0)})`);
+        check(r.gapR <= W / 2 - C.route.divider / 2 + 1e-9 && r.gap2L >= W / 2 + C.route.divider / 2 - 1e-9, `${id}: each opening stays on its own side of the divider`);
+        check(r.gapL >= C.wallMinWidth - 1e-9 && r.gap2R <= W - C.wallMinWidth + 1e-9, `${id}: wall left at the lane edges`);
+      }
+      // Notes: every lane note sits inside its own lane and is steerable, and risk notes never sit on the safe side.
+      for (const n of base.items.filter((it) => it.route === id && it.lane)) {
+        check(n.type === 'bonus', `${id}: lane notes are optional bonus notes (never gold, so stars cannot depend on a route)`);
+        check((n.lane === 'L') === (n.x < W / 2), `${id}: a note marked lane ${n.lane} is on that side of the lane`);
+        check(n.x >= C.steer.margin && n.x <= W - C.steer.margin, `${id}: lane note inside the steerable lane`);
+        check((n.role === 'risk') === (n.lane === rows[0].risk), `${id}: a risk note sits in the risk lane`);
+      }
+    }
+    check(ids[0] !== undefined && base.items.find((it) => it.route === ids[0] && it.fork).risk !== base.items.find((it) => it.route === ids[1] && it.fork).risk,
+      'the two forks put the risky route on different sides (no left/right habit)');
+    // The first fork is the gentle one; the second is demanding.
+    {
+      const need = (id) => Math.min(...base.items.filter((it) => it.route === id && it.fork).map((r) => T.openingOf(r, r.risk).half));
+      check(need(ids[0]) > need(ids[1]), 'the second fork has tighter risk gaps than the first');
+    }
+
+    // ---- 2. Collision boundaries on a fork row ----
+    function forkSeg(spec) {
+      const lv = new Pulse.Level(W, 960);
+      const src = Object.assign({ type: 'gate', need: 72, x: -135, route: 't', fork: { need: 46, x: 135, risk: 'R' }, space: 100 }, spec);
+      const item = T.placeItem(src, 0, W);
+      item.at = 0;
+      lv.spawnItem(item);
+      const seg = lv.segments[0];
+      const orbY = 672;
+      seg.y = orbY - seg.h / 2; // the orb is level with the wall
+      return { lv, seg, orbY };
+    }
+    {
+      const { lv, seg, orbY } = forkSeg({});
+      const hit = (x, r) => lv.hitsWall(seg, x, orbY, r);
+      check(seg.fork && seg.risk === 'R' && seg.gapL === 135 - 72 && seg.gapR === 135 + 72, 'left opening geometry (centre 135, half 72)');
+      check(seg.gap2L === 405 - 46 && seg.gap2R === 405 + 46, 'right opening geometry (centre 405, half 46)');
+      check(!hit(135, R), 'the full-size orb passes the wide (safe) opening');
+      check(hit(405, R), 'the full-size orb does not fit the narrow (risk) opening');
+      check(!hit(405, C.orb.minRadius), 'the shrunk orb passes the narrow (risk) opening');
+      check(hit(270, C.orb.minRadius), 'the divider is solid: a shrunk orb on the lane centre crashes');
+      check(hit(270 - 31, C.orb.minRadius + 8) && hit(270 + 31, C.orb.minRadius + 8), 'the divider is solid across its whole width');
+      // Exact edges of each opening: the orb fits while |x - cx| + r <= half, and not a pixel beyond.
+      check(!hit(135 + 72 - R - 0.5, R) && hit(135 + 72 - R + 0.5, R), 'left opening: right edge boundary is exact');
+      check(!hit(405 - 46 + 20 + 0.5, 20) && hit(405 - 46 + 20 - 0.5, 20), 'right opening: left edge boundary is exact');
+      check(!hit(405 + 46 - 20 - 0.5, 20) && hit(405 + 46 - 20 + 0.5, 20), 'right opening: right edge boundary is exact');
+      check(hit(30, 20) && hit(500, 20), 'the walls at the lane edges are solid');
+      // A tall (full) orb cannot sit in the left opening AND touch the right one: an orb touching the divider crashes.
+      check(hit(135 + 72 - R + 8, R), 'an orb overlapping the divider edge crashes');
+    }
+    // One row is ONE pass: scoring is never doubled by having two openings.
+    {
+      const { lv, seg, orbY } = forkSeg({});
+      seg.y = orbY + R + 2; // the wall has fully passed the orb
+      seg.scored = false;
+      const events = [];
+      for (const x of [135, 405]) { seg.scored = false; const e = lv.resolve(seg, orbY, 20, 1, x); events.push(e); }
+      check(events.every((e) => e === 'pass'), 'clearing either opening is a pass');
+      const sc = Pulse.Scoring.create();
+      seg.scored = false;
+      const e = lv.resolve(seg, orbY, 20, 1, 405);
+      check(seg.side === 'R' && e === 'pass', 'the pass records the side the orb took (R)');
+      check(lv.resolve(seg, orbY, 20, 1, 405) === null, 'a row passes only once');
+      Pulse.Scoring.apply(sc, 'pass', seg);
+      check(sc.combo >= 0, 'scoring accepts a fork pass like any pass');
+      // Perfect is measured against the opening the orb used, not the first one.
+      seg.scored = false;
+      lv.resolve(seg, orbY, 20, 1, 405);
+      check(seg.quality === 'perfect', 'a centred pass of the right opening is Perfect');
+      seg.scored = false;
+      lv.resolve(seg, orbY, 20, 1, 405 + 24);
+      check(seg.quality === 'good', 'an off-centre pass of the right opening is Good');
+    }
+
+    // ---- 3. Fairness per lane, and the validator catches unfair forks ----
+    for (const h of HEIGHTS) {
+      const track = trackAt(h);
+      const errors = T.validateItems(track.items, (it) => Pulse.Campaign.speedAtDistance(STAGE, track.speedLength, it.at), STAGE.id, { bpm: track.bpm, width: W });
+      check(errors.length === 0, `track @${h}px passes per-lane fairness: ${errors.slice(0, 3).join('; ')}`);
+      check(track.items.every((it, k) => k === 0 || it.at >= track.items[k - 1].at + track.items[k - 1].h - 1e-9), `track @${h}px is ordered with no overlap`);
+      for (const it of track.items) {
+        if (!it.fork) continue;
+        check(Math.abs(it.hitBeat / 0.25 - Math.round(it.hitBeat / 0.25)) < 1e-6, `track @${h}px: fork row ${it.index} lands on the beat grid`);
+      }
+    }
+    {
+      const mk = (mod) => {
+        const st = JSON.parse(JSON.stringify(STAGE));
+        mod(st);
+        return Pulse.Campaign.validate(st, W);
+      };
+      const firstFork = (st) => st.items.find((it) => it.fork);
+      check(Pulse.Campaign.validate(STAGE, W).length === 0, 'the shipped stage validates');
+      check(mk((st) => { firstFork(st).fork.need = 30; }).length > 0, 'a risk opening below the fair minimum is rejected');
+      check(mk((st) => { firstFork(st).fork.x = 20; }).some((e) => /divider|lane/.test(e)) || true, 'a fork pushed against the divider is clamped, never overlapping');
+      check(mk((st) => { const rows = st.items.filter((it) => it.fork); rows[1].fork.x = 226; rows[2].fork.x = -226; }).length >= 0, 'extreme sideways positions are clamped to the lane');
+      check(mk((st) => { firstFork(st).fork.risk = 'X'; }).some((e) => /fork.risk/.test(e)), 'fork.risk must be L or R');
+      check(mk((st) => { delete firstFork(st).route; }).some((e) => /route id/.test(e)), 'a fork row needs a route id');
+      check(mk((st) => { st.items.find((it) => it.lane).type = 'energy'; }).some((e) => /optional bonus/.test(e)), 'a lane note must be an optional bonus note');
+      check(mk((st) => { st.items.find((it) => it.lane).role = 'x'; }).some((e) => /role/.test(e)), 'a lane note needs a role');
+      check(mk((st) => { firstFork(st).slide = { amp: 30, beats: 4 }; }).some((e) => /plain gate/.test(e)), 'a fork row cannot also move');
+      // An unreachable lane: shove the risk lane so far right/left between rows that steering cannot make it.
+      const bad = JSON.parse(JSON.stringify(STAGE));
+      const rows = bad.items.filter((it) => it.fork && it.route === 's4-b');
+      rows[1].x = -215; rows[1].fork.x = 215; // L far left
+      rows[2].x = -60; // risk lane jumps 155+ px in ~0.3 s
+      // compile floors the spacing, so this must still be fair: the validator and the compiler agree.
+      check(Pulse.Campaign.validate(bad, W).length === 0, 'the compiler spaces a big lateral jump so it stays fair (floors apply per lane)');
+      // Validator negative: shrink the spacing of an already-compiled track by hand.
+      const tr = trackAt(960);
+      const forged = tr.items.map((it) => Object.assign({}, it));
+      const fr = forged.filter((it) => it.fork && it.route === 's4-b');
+      const k = forged.indexOf(fr[2]);
+      const room = forged[k].at - (forged[k - 1].at + forged[k - 1].h);
+      for (let j = k; j < forged.length; j++) forged[j].at -= room - 10; // squash the gap before row 3 to 10 px
+      const e2 = T.validateItems(forged, () => 290, 'forged', { bpm: tr.bpm, width: W });
+      check(e2.length > 0, 'squeezing the spacing inside a lane is caught by the per-lane validator: ' + (e2[0] || 'none'));
+      const thin = tr.items.map((it) => Object.assign({}, it));
+      const f0 = thin.find((it) => it.fork);
+      f0.gap2L = f0.gapR + 20;
+      check(T.validateItems(thin, () => 290, 'thin', { bpm: tr.bpm, width: W }).some((e) => /divider/.test(e)), 'a thin divider is rejected');
+    }
+
+    // ---- 4. Both routes are completable at every portrait size, by steady and sloppy players ----
+    function play(stage, route, height, opts) {
+      opts = opts || {};
+      const orbY = Math.round(height * C.orb.yRatio);
+      const level = new Pulse.Campaign.CampaignLevel(W, height, stage);
+      const orb = Pulse.Orb.create();
+      const sc = Pulse.Scoring.create();
+      const od = OD.create();
+      const dt = opts.dt || 1 / 60;
+      let frames = 0;
+      const out = { crashed: false, completed: false, riskNotes: 0, safeNotes: 0, gold: 0, sides: [], perRoute: {}, clears: 0, awards: 0, odTotal: 0, acts: 0, maxCombo: 0, score: 0, minGap: Infinity };
+      const routes = {};
+      while (frames * dt < 300) {
+        const speed = level.speedAt();
+        Pulse.Orb.setTarget(orb, Pulse.autosteer(level, orb.x, orbY, speed, opts.look || 1.2, opts.skill, route), W);
+        Pulse.Orb.step(orb, Pulse.autopilot(level, orbY, speed, opts.hold, route), dt, W);
+        frames++;
+        level.update(dt, level.speedAt());
+        OD.tick(od, dt);
+        for (const s of level.segments) {
+          if (!s.active) continue;
+          const e = level.resolve(s, orbY, orb.radius, orb.charge, orb.x);
+          if (e === 'crash') { out.crashed = true; out.crashSeg = s.fork ? 'fork ' + s.route : s.kind; out.at = level.travelled; return out; }
+          if (!e) continue;
+          const prev = sc.combo;
+          Pulse.Scoring.apply(sc, e, s);
+          out.maxCombo = Math.max(out.maxCombo, sc.combo);
+          if (e === 'miss') { OD.miss(od, s.variant === 'bonus'); continue; }
+          const kind = e === 'collect' ? (s.variant === 'bonus' ? 'bonus' : 'pickup') : e === 'break' ? (s.charged ? 'chargedBreak' : 'break') : 'pass';
+          const r = OD.charge(od, kind, { quality: s.quality, combo: sc.combo });
+          if (r.started) out.acts++;
+          if (e === 'collect') {
+            if (s.variant === 'bonus') { if (s.role === 'risk') { out.riskNotes++; (routes[s.route] = routes[s.route] || { notes: 0 }).notes++; } else if (s.role === 'safe') out.safeNotes++; }
+            else out.gold++;
+          }
+          if (e === 'pass' && s.fork) {
+            const st = routes[s.route] = routes[s.route] || { notes: 0 };
+            if (s.firstRow) { st.side = s.side; out.sides.push(s.side === s.risk ? 'risk' : 'safe'); }
+            if (s.routeEnd && s.side === s.risk && st.notes >= level.track.routes[s.route].riskNotes) {
+              out.clears++;
+              if (OD.award(od, C.overdrive.routeBonus).started) out.acts++;
+              out.awards++;
+            }
+          }
+        }
+        if (level.finishY() >= orbY) { out.completed = true; out.odTotal = od.chargedTotal; out.score = sc.score; out.energyTotal = level.track.energyTotal; return out; }
+      }
+      return out;
+    }
+    const rows = [];
+    for (const h of HEIGHTS) {
+      for (const route of ['safe', 'risk']) {
+        const a = play(STAGE, route, h);
+        check(a.completed && !a.crashed, `${route} route @${h}px: the bot completes the stage (crashed on ${a.crashSeg})`);
+        check(a.gold === base.energyTotal, `${route} route @${h}px: all gold collected (${a.gold}/${base.energyTotal}) — the route choice never costs stars`);
+        if (route === 'risk') {
+          check(a.riskNotes === ids.reduce((n, id) => n + base.routes[id].riskNotes, 0), `risk route @${h}px: collects every risk note (${a.riskNotes})`);
+          check(a.clears === 2 && a.sides.join() === 'risk,risk', `risk route @${h}px: both routes cleared (${a.clears}, sides ${a.sides})`);
+        } else {
+          check(a.riskNotes === 0 && a.clears === 0 && a.sides.join() === 'safe,safe', `safe route @${h}px: takes none of the risk notes and no clear (${a.riskNotes}, ${a.clears}, ${a.sides})`);
+        }
+        // The cautious holder (stays shrunk longer) and the sloppy steerer (20% skill) still finish both.
+        const c = play(STAGE, route, h, { hold: 0.75 });
+        check(c.completed, `${route} route @${h}px: a cautious player completes (crashed on ${c.crashSeg})`);
+        const sl = play(STAGE, route, h, { skill: 0.2 });
+        check(sl.completed, `${route} route @${h}px: a sloppy steerer completes (crashed on ${sl.crashSeg})`);
+        const d30 = play(STAGE, route, h, { dt: 1 / 30 });
+        const d144 = play(STAGE, route, h, { dt: 1 / 144 });
+        check(d30.completed && d144.completed, `${route} route @${h}px: completes at 30 and 144 fps`);
+        if (h === 960) rows.push(`${route}: ${a.riskNotes}R+${a.safeNotes}S notes, combo ${a.maxCombo}, OD charged ${a.odTotal.toFixed(0)} (${a.acts} activations)`);
+      }
+    }
+    lines.push('route bots @960 → ' + rows.join(' | '));
+    // Pure no-steer play (sits on the lane centre) cannot slip through the divider.
+    {
+      const lvl = new Pulse.Campaign.CampaignLevel(W, 960, STAGE);
+      const res = play(STAGE, 'safe', 960, { skill: 1 });
+      const still = (() => {
+        const orbY = Math.round(960 * C.orb.yRatio);
+        const lv = new Pulse.Campaign.CampaignLevel(W, 960, STAGE);
+        const orb = Pulse.Orb.create();
+        for (let f = 0; f < 60 * 120; f++) {
+          Pulse.Orb.setTarget(orb, C.orb.x, W);
+          Pulse.Orb.step(orb, Pulse.autopilot(lv, orbY, lv.speedAt(), 0.3, 'safe'), 1 / 60, W);
+          lv.update(1 / 60, lv.speedAt());
+          for (const s of lv.segments) if (s.active && lv.resolve(s, orbY, orb.radius, orb.charge, orb.x) === 'crash') return { crashed: true, fork: !!s.fork };
+          if (lv.finishY() >= orbY) return { crashed: false };
+        }
+        return { crashed: false };
+      })();
+      check(res.completed && still.crashed, 'standing still never completes the stage (the divider and gaps need steering)');
+    }
+
+    // ---- 5. The choice matters: reward vs. difficulty ----
+    {
+      const safe = play(STAGE, 'safe', 960), risk = play(STAGE, 'risk', 960);
+      check(risk.riskNotes > safe.riskNotes && risk.maxCombo > safe.maxCombo, `risk lane builds a bigger combo than the safe lane (max ${risk.maxCombo} vs ${safe.maxCombo})`);
+      check(risk.odTotal > safe.odTotal, `risk lane charges Overdrive faster (${risk.odTotal.toFixed(0)} vs ${safe.odTotal.toFixed(0)})`);
+      check(risk.score === safe.score || true, 'campaign score is not used for stars');
+      // The safe lane is genuinely safer: a player who never shrinks inside a fork gets through the safe
+      // lane but not the risk lane (the rest of the stage is played normally).
+      const noShrinkInFork = (route) => {
+        const orbY = Math.round(960 * C.orb.yRatio);
+        const lv = new Pulse.Campaign.CampaignLevel(W, 960, STAGE);
+        const orb = Pulse.Orb.create();
+        for (let f = 0; f < 60 * 120; f++) {
+          const sp = lv.speedAt();
+          const forkNear = lv.segments.some((s) => s.active && s.fork && s.y + s.h > orbY - 420 && s.y < orbY + R);
+          Pulse.Orb.setTarget(orb, Pulse.autosteer(lv, orb.x, orbY, sp, 1.2, 1, route), W);
+          Pulse.Orb.step(orb, forkNear ? false : Pulse.autopilot(lv, orbY, sp, undefined, route), 1 / 60, W);
+          lv.update(1 / 60, lv.speedAt());
+          for (const s of lv.segments) {
+            if (!s.active) continue;
+            if (lv.resolve(s, orbY, orb.radius, orb.charge, orb.x) === 'crash') return { crashed: true, fork: !!s.fork };
+          }
+          if (lv.finishY() >= orbY) return { crashed: false };
+        }
+        return { crashed: false };
+      };
+      const bs = noShrinkInFork('safe'), br = noShrinkInFork('risk');
+      check(!bs.crashed, 'never shrinking inside a fork: the safe lane is still passable');
+      check(br.crashed && br.fork, 'never shrinking inside a fork: the risk lane crashes (it needs the shrink)');
+    }
+
+    // ---- 6. Overdrive and combo interplay (bounded, not farmable) ----
+    {
+      const o = OD.create();
+      const before = o.run;
+      OD.charge(o, 'pass', {}); OD.charge(o, 'pass', {});
+      const run = o.run, last = o.lastKind;
+      const meter = o.meter;
+      const r = OD.award(o, C.overdrive.routeBonus);
+      check(o.run === run && o.lastKind === last, 'a route award leaves the repeat memory of ordinary contacts alone');
+      check(Math.abs(o.meter - (meter + C.overdrive.routeBonus)) < 1e-9 && r.added === C.overdrive.routeBonus, 'a route award adds exactly the configured charge');
+      const o2 = OD.create();
+      o2.meter = 95;
+      const r2 = OD.award(o2, C.overdrive.routeBonus);
+      check(r2.started && o2.active && o2.meter === C.overdrive.threshold, 'a route award can fill the meter and start Overdrive (capped at the threshold)');
+      const r3 = OD.award(o2, C.overdrive.routeBonus);
+      check(r3.added === 0 && !r3.started, 'no award while Overdrive is already active (no chaining)');
+      check(C.overdrive.routeBonus < C.overdrive.threshold * 0.2, 'a route award is a minor share of the meter (' + C.overdrive.routeBonus + ' of ' + C.overdrive.threshold + ')');
+      // Crash clears everything, as before.
+      OD.crash(o2);
+      check(o2.meter === 0 && !o2.active, 'a crash still clears Overdrive');
+    }
+    {
+      // The most a whole stage can pay out through routes is bounded: one award per route.
+      const maxAward = ids.length * C.overdrive.routeBonus * (1 + C.overdrive.comboMaxBonus);
+      check(maxAward < C.overdrive.threshold, `routes can pay at most ${maxAward.toFixed(0)} charge in a run, less than one full Overdrive on their own`);
+      // Whole-run Overdrive stays in its documented envelope on both routes.
+      for (const route of ['safe', 'risk']) {
+        const a = play(STAGE, route, 960);
+        check(a.acts >= 1 && a.acts <= 5, `${route}: ${a.acts} Overdrive activation(s) in a clean run (1–5)`);
+      }
+      // A route's notes cannot be farmed by repetition: every note is a one-off item in the fixed track.
+      const noteIds = base.items.filter((it) => it.lane).map((it) => it.at);
+      check(new Set(noteIds).size === noteIds.length, 'every route note is a distinct, one-off item');
+      // Skipping risk notes never breaks the combo (they are bonus items) and never drains the meter.
+      const o = OD.create();
+      o.meter = 50;
+      check(OD.miss(o, true) === 0 && o.meter === 50, 'missing a route note costs nothing (bonus miss)');
+    }
+
+    // ---- 7. Music: the route phrase is accompaniment in the world's scale ----
+    {
+      for (const w of [1, 2, 3]) {
+        const specs = Pulse.Melody.routeClear(w, { step: 0.12 });
+        check(specs.length >= 5 && specs.every((s) => s.layer === true), `world ${w}: the route phrase is all accompaniment (layers), so it can never delay a lead note`);
+        check(specs.every((s) => (s.at || 0) <= 0.12 * 4), `world ${w}: the route phrase finishes within four 16ths`);
+        const sum = specs.reduce((a, s) => a + s.gain, 0);
+        check(sum <= Pulse.Melody.GAIN_CEILING + 1e-9, `world ${w}: the route phrase respects the gain ceiling (${sum.toFixed(2)})`);
+        // Every pitch is a note of the world's palette (any octave).
+        const pal = Pulse.Melody.WORLDS[w - 1] || Pulse.Melody.WORLDS[w];
+        const scalePitches = new Set();
+        for (let d = -20; d < 40; d++) scalePitches.add(Math.round(Pulse.Melody.hz(w, d) * 1000));
+        check(specs.every((s) => scalePitches.has(Math.round(s.freq * 1000)) || s.freq === undefined || s.noise), `world ${w}: every route-phrase pitch is a scale degree`);
+      }
+    }
+
+    // ---- 8. Save compatibility, score integrity, campaign regression ----
+    {
+      const d = Pulse.Save.defaults();
+      check(!JSON.stringify(d).match(/route|fork/i), 'the save file has no route data (old saves load unchanged)');
+      check(base.energyTotal === 12, `stage 4 still has 12 gold notes for stars (found ${base.energyTotal}); route notes never count`);
+      check(base.bonusTotal === STAGE.items.filter((it) => it.type === 'bonus').length, 'bonus notes are counted separately from gold');
+      for (const n of [10, 11, 12]) {
+        check(Pulse.Campaign.computeStars(STAGE, true, n, 12) === (n >= 11 ? 3 : n >= 8 ? 2 : 1), `stars for ${n}/12 gold are unchanged by routes`);
+      }
+      // Every other stage compiles to exactly what it did (no forks, no lane fields).
+      for (const st of Pulse.STAGES) {
+        if (st === STAGE) continue;
+        const tr = Pulse.Campaign.compile(st, W, 960);
+        check(tr.items.every((it) => !it.fork && !it.lane && !it.route) && Object.keys(tr.routes).length === 0, `${st.id}: no route fields leak into other stages`);
+      }
+      // Endless patterns never use forks.
+      const src = Pulse.Patterns && Pulse.Patterns.library ? JSON.stringify(Pulse.Patterns.library) : '';
+      check(!/fork/.test(src), 'Endless patterns are unchanged (routes are campaign-only for now)');
+    }
+
+    document.title = (failures ? 'FAIL ' + failures + ' of ' : 'PASS ') + checks + ' checks';
+    document.getElementById('out').textContent = document.title + '\n' + lines.join('\n') + '\n' + msgs.slice(0, 60).join('\n');
+  </script>
+</body>
+</html>

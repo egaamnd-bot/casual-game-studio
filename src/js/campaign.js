@@ -56,18 +56,25 @@
     const beatSec = Pulse.Rhythm.beatSeconds(bpm);
     let prevTop = 0;
     let prevType = 'start';
-    const fair = Pulse.Track.fairState();
+    // Two fairness trackers, one per lane of a route fork. Items outside any fork feed both.
+    const fairs = { L: Pulse.Track.fairState(), R: Pulse.Track.fairState() };
     for (let i = 0; i < stage.items.length; i++) {
       const src = stage.items[i];
       const space = src.space !== undefined ? src.space
         : Pulse.Track.spaceFor(prevType, src.type, src.t * (stage.pace || 1), stage.speed.end);
       const sp = stage.spread === undefined ? 1 : stage.spread;
       const placed = Object.assign({}, src, { space, x: (src.x || 0) * sp });
+      if (src.fork) placed.fork = Object.assign({}, src.fork, { x: (src.fork.x || 0) * sp });
       if (src.slide && sp !== 1) placed.slide = Object.assign({}, src.slide, { amp: src.slide.amp * sp });
       const item = Pulse.Track.placeItem(placed, prevTop, width);
       // Fairness floor: the authored `t` is a request, never less than a fair spacing (level.js).
       const topSpeed = stage.speed.end;
-      const need = Pulse.Track.floorSpace(fair, item, topSpeed, bpm, false);
+      const view = (side) => Pulse.Track.laneView([item], side)[0];
+      let need = 0;
+      for (const side of ['L', 'R']) {
+        const v = view(side);
+        if (v) need = Math.max(need, Pulse.Track.floorSpace(fairs[side], v, topSpeed, bpm, false));
+      }
       if (need > item.space) {
         item.at += need - item.space;
         item.space = need;
@@ -89,15 +96,46 @@
         if (item.ring) buildRing(item, src.need, prof, orbY, beatSec);
       }
       item.index = i;
-      Pulse.Track.commitFair(fair, item, stage.speed.end, bpm, false);
+      for (const side of ['L', 'R']) {
+        const v = view(side);
+        if (v) Pulse.Track.commitFair(fairs[side], v, stage.speed.end, bpm, false);
+        else Pulse.Track.advanceFair(fairs[side], item);
+      }
       items.push(item);
       prevTop = item.at + item.h;
       prevType = src.type;
     }
+    // Fork bookkeeping for drawing: the corridor below each row (back to the previous row of its
+    // route) that gets the route tint, and the first row's note counts (the preview glyphs show how
+    // many notes each route holds).
+    const lastRow = {};
+    const firstRow = {};
+    for (const it of items) {
+      if (!it.fork) continue;
+      const prev = lastRow[it.route];
+      if (prev) it.laneSpan = Math.max(0, it.at - (prev.at + prev.h));
+      else firstRow[it.route] = it;
+      lastRow[it.route] = it;
+    }
+    for (const it of items) {
+      if (!it.route || it.fork || !it.lane) continue;
+      const f = firstRow[it.route];
+      const key = it.role === 'risk' ? 'riskNotes' : 'safeNotes';
+      if (f) f[key] = (f[key] || 0) + 1;
+    }
+    for (const id in firstRow) firstRow[id].firstRow = true;
     const finishAt = prevTop + stage.exit.runout;
     const energyTotal = items.filter((it) => it.type === 'energy').length;
     const bonusTotal = items.filter((it) => it.type === 'bonus').length;
-    return { stage, items, finishAt, speedLength: speedLength || finishAt, bpm, orbY, energyTotal, bonusTotal };
+    // Route summary: for each route id, how many fork rows and how many notes each lane holds. The
+    // scene uses it to tell when a risk route has been taken in full; the tests use it for fairness.
+    const routes = {};
+    for (const it of items) {
+      if (!it.route) continue;
+      const r = routes[it.route] || (routes[it.route] = { id: it.route, rows: 0, riskNotes: 0, safeNotes: 0, risk: null });
+      if (it.fork) { r.rows++; r.risk = it.risk; } else if (it.role === 'risk') r.riskNotes++; else if (it.role === 'safe') r.safeNotes++;
+    }
+    return { stage, items, finishAt, speedLength: speedLength || finishAt, bpm, orbY, energyTotal, bonusTotal, routes };
   }
 
   function speedAtDistance(stage, finishAt, travelled) {
@@ -128,6 +166,21 @@
       if (!(it.space > 0) && !(it.t >= 0)) err(`item ${stage.items.indexOf(it)} needs space > 0 or t >= 0`);
       if (it.x !== undefined && !(Math.abs(it.x) <= C.orb.x - C.steer.margin)) err(`item ${stage.items.indexOf(it)} x is outside the lane`);
       if (it.type === 'gate' && !(typeof it.need === 'number')) err(`gate ${stage.items.indexOf(it)} needs a numeric need`);
+      if (it.fork || it.lane || it.route) {
+        const n = stage.items.indexOf(it);
+        if (!it.route) err(`item ${n}: a fork row or lane note needs a route id`);
+        if (it.fork) {
+          if (it.type !== 'gate' || it.length || it.slide || it.ring) err(`item ${n}: a fork row is a plain gate`);
+          if (it.fork.risk !== 'L' && it.fork.risk !== 'R') err(`item ${n}: fork.risk must be 'L' or 'R'`);
+          if (!(typeof it.fork.need === 'number')) err(`item ${n}: fork needs a numeric second opening`);
+          if (!it.beat && !(stage.grid)) err(`item ${n}: a fork row must be beat-aligned`);
+        }
+        if (it.lane) {
+          if (it.type !== 'bonus') err(`item ${n}: a lane note must be an optional bonus note`);
+          if (it.lane !== 'L' && it.lane !== 'R') err(`item ${n}: lane must be 'L' or 'R'`);
+          if (it.role !== 'risk' && it.role !== 'safe') err(`item ${n}: lane note role must be 'risk' or 'safe'`);
+        }
+      }
       if (it.ring) {
         const n = stage.items.indexOf(it);
         if (it.type !== 'gate' || it.length || it.slide) err(`item ${n}: a ring is a plain gate`);

@@ -28,6 +28,87 @@ Pulse.Render = (function () {
     g.fillRect(seg.gapR, seg.y, 4, seg.h);
   }
 
+
+  // Route fork (docs/ROUTES.md): one wall with two openings split by a divider pillar. Each route has
+  // its own colour (cyan = safe, pink = risk) in three places, so it reads without any text: the
+  // corridor tint that runs up to the next row, the opening's edge strips, and, ahead of the first
+  // row, a preview of chevrons (more of them = more demanding) and one dot per optional note. Reads
+  // the live gap numbers, so what is drawn is what collides.
+  const SAFE_COLOR = 0x35c8ff;
+  const RISK_COLOR = 0xff5ac8;
+  function forkGate(g, seg, width) {
+    const y = seg.y;
+    const h = seg.h;
+    const mid = width / 2;
+    const D = C.route.divider / 2;
+    const wm = C.wallMinWidth;
+    const colorOf = (side) => (seg.risk === side ? RISK_COLOR : SAFE_COLOR);
+    // Corridor tint under each opening's lane (below the row, toward the orb).
+    const top = y + h; // the corridor runs from this row's near edge back toward the previous row
+    const bottom = top + (seg.firstRow ? C.route.preview : (seg.laneSpan || 0));
+    for (const side of ['L', 'R']) {
+      const x0 = side === 'L' ? wm : mid + D;
+      const x1 = side === 'L' ? mid - D : width - wm;
+      g.fillStyle(colorOf(side), 0.07);
+      g.fillRect(x0, top, x1 - x0, bottom - top);
+      g.fillStyle(colorOf(side), 0.22);
+      g.fillRect(x0, top, 2, bottom - top);
+      g.fillRect(x1 - 2, top, 2, bottom - top);
+    }
+    // Walls: dark hull, crimson rim, chevrons pointing at the nearest opening.
+    const piece = (x0, x1, toward) => {
+      if (x1 - x0 < 2) return;
+      g.fillStyle(0x16060f, 0.94);
+      g.fillRect(x0, y, x1 - x0, h);
+      g.lineStyle(6, T.wallEdge, 0.14);
+      g.strokeRect(x0, y, x1 - x0, h);
+      g.lineStyle(2, T.wallEdge, 0.95);
+      g.strokeRect(x0, y, x1 - x0, h);
+      g.lineStyle(2, T.wallEdge, 0.6);
+      g.beginPath();
+      const cy = y + h / 2;
+      const hh = h / 2 - 7;
+      const dir = toward;
+      const edge = dir > 0 ? x1 : x0;
+      for (let x = edge - dir * 12; dir > 0 ? x > x0 + 6 : x < x1 - 6; x -= dir * 15) {
+        g.moveTo(x - dir * 6, cy - hh);
+        g.lineTo(x, cy);
+        g.lineTo(x - dir * 6, cy + hh);
+      }
+      g.strokePath();
+    };
+    piece(0, seg.gapL, 1);
+    piece(seg.gapR, mid, -1); // the divider: chevrons point away from its centre, to both openings
+    piece(mid, seg.gap2L, 1);
+    piece(seg.gap2R, width, -1);
+    // Opening edges in the route's colour.
+    for (const [l, r, side] of [[seg.gapL, seg.gapR, 'L'], [seg.gap2L, seg.gap2R, 'R']]) {
+      g.fillStyle(colorOf(side), 1);
+      g.fillRect(l - 3, y, 3, h);
+      g.fillRect(r, y, 3, h);
+    }
+    // Preview glyphs ahead of the first row: chevrons over each opening (3 = risky, 1 = safe) and one
+    // dot per optional note of that route, so "more notes, tighter gap" is visible before committing.
+    if (seg.firstRow) {
+      for (const [cx, side] of [[seg.cx, 'L'], [seg.cx2, 'R']]) {
+        const risk = seg.risk === side;
+        g.lineStyle(3, colorOf(side), 0.85);
+        g.beginPath();
+        const n = risk ? 3 : 1;
+        for (let k = 0; k < n; k++) {
+          const py = y + h + 44 + k * 22;
+          g.moveTo(cx - 14, py + 8);
+          g.lineTo(cx, py - 6);
+          g.lineTo(cx + 14, py + 8);
+        }
+        g.strokePath();
+        const dots = risk ? seg.riskNotes : seg.safeNotes;
+        g.fillStyle(T.bonus, 0.95);
+        for (let k = 0; k < dots; k++) g.fillCircle(cx + (k - (dots - 1) / 2) * 18, y + h + 44 + n * 22 + 14, 5);
+      }
+    }
+  }
+
   // Trailer-style gap wall (comet look): dark hull, crimson rim and chevrons pointing at the gap,
   // amber lines on the gap-facing edges (they mark exactly where the collision edge is). A moving
   // gap also gets a dotted rail through it and small arrows showing which way it is swinging.
@@ -310,5 +391,5 @@ Pulse.Render = (function () {
     for (let i = 0; i < max; i++) star(g, x0 + i * step, y, r, i < count);
   }
 
-  return { background, walls, cometGate, ring, tunnelBody, barrier, chargeRing, pickup, finishLine, orb, collectRing, progressBar, star, stars };
+  return { background, walls, forkGate, cometGate, ring, tunnelBody, barrier, chargeRing, pickup, finishLine, orb, collectRing, progressBar, star, stars };
 })();
