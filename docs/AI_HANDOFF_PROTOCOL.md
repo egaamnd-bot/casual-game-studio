@@ -94,6 +94,27 @@ Report actual counts, failures, skipped tests, warnings, environment caveats, an
 - If a real product/gameplay decision is pending, set status to `NEEDS PRODUCER DECISION` or `READY FOR REVIEW`, list the exact decision, and stop at that checkpoint.
 - If no approval is needed, explicitly state why the task can continue safely.
 
+## Usage efficiency (permanent, 2026-10-27, Issue #28)
+
+Spend Claude usage on PULSE development and debugging, never at the cost of correctness. Full text: Issue #28, rule of 2026-10-27.
+
+- **Context:** start unrelated tasks in a fresh session (`/clear`); `/compact` a long task that must continue. Read `docs/AI_HANDOFF.md` and the relevant issue first, then only the files and tests the task needs. No whole-repo re-scans.
+- **Model:** Sonnet by default; heavier reasoning only for hard architecture or debugging Sonnet cannot resolve; a light model for docs, lookups and mechanical edits. Choose before starting.
+- **Task shape:** one bounded deliverable with goal, files, constraints, acceptance criteria and exact tests. A brief file-level plan when more than 2-3 files change.
+- **Output:** targeted diffs, changed-file lists and failure excerpts instead of whole files or full logs; no repeated status summaries or agent chatter.
+- **Tests:** respect the shared `pulse-test` lock. One browser-suite run per branch + exact SHA; queued means pending, not passed or failed. No overlapping debug or screenshot jobs unless they answer a specific open question. Rerun only after a code fix or a diagnosed transient failure. While tests queue, continue review, implementation and docs.
+- **Agents:** separate branches/worktrees with explicit file ownership; do not start agents that edit shared files or just wait on the lock.
+- **Records:** keep the tracker, `docs/AI_HANDOFF.md` and dated notes accurate at meaningful checkpoints; link instead of re-explaining history.
+- **Never** save usage by skipping required validation. Report actual test results separately from APK build success and device testing.
+
+## Developer Campaign / QA Gauntlet (permanent, 2026-10-27)
+
+The Producer requires a dedicated, isolated developer mode (inside the Prototype Lab) that exercises every approved mechanic in one short curated session. Spec, seam and acceptance evidence: [DEV_GAUNTLET.md](DEV_GAUNTLET.md).
+
+- Every newly approved mechanic or prototype must add its Gauntlet section, with its test and checklist row, or state in its handoff why it cannot.
+- The Gauntlet never changes campaign stage IDs, rules, saves, stars, unlocks, scores or Endless, and prototype flags must not leak out of it. It supplements the individual feature tests and never replaces them.
+- Its handoff must include the mechanic-to-section checklist with observed results and an APK built from the exact tested commit SHA; real-device validation is NOT DEVICE-TESTED until the Producer plays it.
+
 ## End-of-iteration checklist
 
 1. Verify branch name, PR URL, base/head commit SHAs, and PR dependencies from GitHub.
