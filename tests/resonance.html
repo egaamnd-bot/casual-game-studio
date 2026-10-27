@@ -121,7 +121,10 @@
       check(!!entry && Pulse.Lab.list().length === 1, 'the prototype registered itself even though lab.js loads after resonance.js');
       const stage = entry.stage;
       check(entry.base === 's3-controlled-overload' && stage.world.index === 1 && entry.baseIndex === 2, 'based on a world-1 stage');
-      check(!Pulse.STAGES.some((s) => s.id === stage.id) && Pulse.STAGES.length === 24 && Pulse.STAGES[0].id === 's1-first-pulse', 'not part of the campaign list (24 stages, same order)');
+      {
+        const ids = Pulse.STAGES.map((s) => s.id), nums = ids.map((id) => parseInt(id.slice(1), 10));
+        check(!ids.includes(stage.id) && Pulse.STAGES.length === 30 && ids[0] === 's1-first-pulse' && ids[29] === 's30-pulse-zero' && new Set(ids).size === 30 && nums.every((n, i) => n === i + 1), 'not part of the campaign list (30 stages, unique ids, in order 1..30)');
+      }
       check(Pulse.Campaign.validate(stage, W).length === 0, 'the lab stage passes the campaign validator');
       check(Math.max(stage.speed.start, stage.speed.end) < 430, `calm pacing: top speed ${Math.max(stage.speed.start, stage.speed.end)} px/s < 430`);
       const gates = entry.flags.resonance.gates;
