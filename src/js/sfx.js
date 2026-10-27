@@ -22,6 +22,7 @@
   const HOLD_LEVEL = 0.25;
   const ACCENT_MIN_MS = 380;
   const STEM_LEVEL = 0.5; // the Overdrive stem sits well under the music it layers on
+  const MAX_LAYER_NOTES = 6; // Shatter Symphony arpeggio notes sounding at once (docs/SHATTER_SYMPHONY.md)
 
   // Gameplay name → file (assets/audio/sfx/ unless `music`) and relative volume.
   const SFX = {
@@ -117,6 +118,9 @@
     volumes: { music: 0.8, sfx: 1 },
     unlocked: false,
     hidden: false,
+    hook: null, // Shatter Symphony: sees effect calls first (null = every call plays as it always did)
+    stemShaped: false, // Shatter Symphony: equal-power stem fades
+    layer: [], // Shatter Symphony arpeggio notes in flight
   };
 
   const base = () => window.PULSE_ASSET_BASE || '';
@@ -148,6 +152,32 @@
     }
     state.stemGain.gain.value = state.volumes.music * MUSIC_LEVEL * STEM_LEVEL;
     return state.stemGain;
+  }
+
+  // Shatter Symphony's arpeggio notes share a bus into the same limiter, scaled by the music volume.
+  const layerLevel = () => state.volumes.music * SFX_LEVEL;
+  function layerBus() {
+    if (!state.layerGain) {
+      state.layerGain = state.ctx.createGain();
+      state.layerGain.connect(state.limiter);
+    }
+    state.layerGain.gain.value = layerLevel();
+    return state.layerGain;
+  }
+
+  // Equal-power fade (a quarter turn of sin when rising, of cos when falling) as 16 short linear pieces,
+  // so the summed power of a crossfade stays level and neither end has a corner that clicks. Built from
+  // ramps rather than setValueCurveAtTime because a curve throws if it overlaps an earlier automation.
+  // Every value lies between `from` and `to`: the fade can never overshoot the level it ends at.
+  function equalPower(param, t0, dur, from, to) {
+    const n = 16;
+    const rising = to > from;
+    param.setValueAtTime(from, t0);
+    for (let i = 1; i <= n; i++) {
+      const p = i / n;
+      const v = rising ? from + (to - from) * Math.sin(p * Math.PI / 2) : to + (from - to) * Math.cos(p * Math.PI / 2);
+      param.linearRampToValueAtTime(v, t0 + dur * p);
+    }
   }
 
   // Fetch and decode every effect and sting once. Decoding works before the first tap.
@@ -263,6 +293,7 @@
     // Plays note specs from Pulse.Melody. Leads start at once; `layer` specs (accompaniment) may be
     // given a short `layerDelay` by the scene so they land on the next 16th note.
     notes(specs, layerDelay) {
+      if (state.hook && state.hook.notes(specs, layerDelay)) return false;
       let any = false;
       for (let i = 0; i < specs.length; i++) {
         const sp = specs[i];
@@ -278,6 +309,7 @@
     // opts (all optional): rate = pitch factor, delay = seconds to wait (used to land a sound on
     // the beat: see Pulse.Rhythm.Groove), gain = extra volume factor.
     play(name, opts) {
+      if (state.hook && state.hook.play(name, opts)) return false;
       const ctx = state.ctx;
       if (!ctx || ctx.state !== 'running' || state.volumes.sfx <= 0) return false;
       const now = performance.now();
@@ -328,6 +360,69 @@
       Audio.unlock();
     },
 
+    // ---- Shatter Symphony seams (src/js/symphony.js, docs/SHATTER_SYMPHONY.md) ----
+    // A hook ({ play(name, opts), notes(specs, layerDelay) }) sees every effect call first; returning true
+    // means "taken" (the director plays it itself, later in the same frame, or not at all). With no hook,
+    // which is the case unless the director is attached, nothing here runs.
+    setHook(h) { state.hook = h || null; },
+    getHook() { return state.hook; },
+    // Equal-power stem fades (director only; the default linear ramps are untouched).
+    stemShape(on) { state.stemShaped = !!on; },
+
+    // One accompaniment note on the AudioContext clock, `delay` seconds from now, on its own bus. False
+    // (nothing queued, nothing retained) when audio is not running, the app is hidden, music is muted
+    // or MAX_LAYER_NOTES are already in flight.
+    layerNote(spec, delay) {
+      const ctx = state.ctx;
+      if (!ctx || ctx.state !== 'running' || state.hidden || state.volumes.music <= 0) return false;
+      if (state.layer.length >= MAX_LAYER_NOTES) return false;
+      const t0 = ctx.currentTime + (delay > 0 ? delay : 0);
+      const dur = spec.dur || 0.14;
+      const peak = spec.gain === undefined ? 0.04 : spec.gain;
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0.0001, t0);
+      env.gain.linearRampToValueAtTime(peak, t0 + (spec.attack || 0.006));
+      env.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      const osc = ctx.createOscillator();
+      osc.type = spec.wave || 'triangle';
+      osc.frequency.setValueAtTime(spec.freq, t0);
+      let node = osc;
+      if (spec.cutoff) {
+        const f = ctx.createBiquadFilter();
+        f.type = 'lowpass';
+        f.frequency.setValueAtTime(spec.cutoff, t0);
+        osc.connect(f);
+        node = f;
+      }
+      node.connect(env).connect(layerBus());
+      const rec = { osc, env, peak };
+      state.layer.push(rec);
+      osc.onended = () => { const i = state.layer.indexOf(rec); if (i >= 0) state.layer.splice(i, 1); };
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.05);
+      return true;
+    },
+
+    // Fades out and stops every arpeggio note (pause, crash, retry, mute, background).
+    layerStop(ms) {
+      const ctx = state.ctx;
+      const list = state.layer;
+      state.layer = [];
+      if (!ctx) return;
+      const t = Math.max(0.005, (ms === undefined ? 60 : ms) / 1000);
+      for (const rec of list) {
+        try {
+          const now = ctx.currentTime;
+          rec.env.gain.cancelScheduledValues(now);
+          rec.env.gain.setValueAtTime(Math.max(0.0001, rec.env.gain.value), now);
+          rec.env.gain.linearRampToValueAtTime(0.0001, now + t);
+          rec.osc.stop(now + t + 0.02);
+        } catch (e) { /* already stopped */ }
+      }
+    },
+
+    layerCount() { return state.layer.length; },
+
     // ---- Overdrive stems (docs/ASSET_MANIFEST.md) ----
     // A 16-beat loop per world, played over the music while Overdrive is on. Decoded only when a
     // run in that world asks for it (stemPrepare), started at the same phase as the run clock
@@ -364,12 +459,18 @@
       src.loop = true;
       const g = ctx.createGain();
       const now = ctx.currentTime;
-      g.gain.setValueAtTime(0, now);
-      g.gain.linearRampToValueAtTime(1, now + 0.12);
+      let fadeIn = 0.12;
+      if (state.stemShaped) {
+        fadeIn = 0.4; // equal-power entry, ending exactly at the level the linear ramp reaches
+        equalPower(g.gain, now, fadeIn, 0, 1);
+      } else {
+        g.gain.setValueAtTime(0, now);
+        g.gain.linearRampToValueAtTime(1, now + fadeIn);
+      }
       src.connect(g).connect(stemBus());
       const off = ((clockTime % buf.duration) + buf.duration) % buf.duration;
       src.start(0, off);
-      state.stem = { src, g, world };
+      state.stem = { src, g, world, t0: now, fadeIn, shaped: state.stemShaped };
       return true;
     },
 
@@ -382,8 +483,14 @@
       try {
         const now = ctx.currentTime;
         st.g.gain.cancelScheduledValues(now);
-        st.g.gain.setValueAtTime(st.g.gain.value, now);
-        st.g.gain.linearRampToValueAtTime(0, now + t);
+        if (st.shaped && t >= 0.1) {
+          // Equal-power exit from wherever the entry curve had got to (no jump, never above 1).
+          const p = Math.min(1, Math.max(0, (now - st.t0) / st.fadeIn));
+          equalPower(st.g.gain, now, t, Math.sin(p * Math.PI / 2), 0);
+        } else {
+          st.g.gain.setValueAtTime(st.g.gain.value, now);
+          st.g.gain.linearRampToValueAtTime(0, now + t);
+        }
         st.src.stop(now + t + 0.02);
       } catch (e) { /* already stopped */ }
     },
@@ -558,6 +665,7 @@
       state.hidden = true;
       Sfx.stopHold();
       Sfx.stemStop(0);
+      Sfx.layerStop(0);
       if (Music.el && !Music.el.paused) Music.el.pause();
       if (state.ctx && state.ctx.state === 'running') state.ctx.suspend();
     },
@@ -573,8 +681,9 @@
       if (kind === 'sfx' && state.sfxGain) state.sfxGain.gain.value = state.volumes.sfx * SFX_LEVEL;
       if (kind === 'sfx' && state.volumes.sfx <= 0) Sfx.stopHold();
       if (kind === 'music') {
-        if (state.volumes.music <= 0) Sfx.stemStop(60);
+        if (state.volumes.music <= 0) { Sfx.stemStop(60); Sfx.layerStop(40); }
         else if (state.stemGain) state.stemGain.gain.value = state.volumes.music * MUSIC_LEVEL * STEM_LEVEL;
+        if (state.layerGain) state.layerGain.gain.value = layerLevel();
         if (state.volumes.music <= 0 && Music.el) Music.el.pause();
         else Music.sync();
       }
