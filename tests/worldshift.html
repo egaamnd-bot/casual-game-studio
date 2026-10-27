@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse World Shift tests</title>
+  <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
+</head>
+<body>
+  <script>
+    // World Shift prototype (docs/WORLD_SHIFT.md): movement table, telegraph before shift, backdrop crossfade and its
+    // hazard contrast, recovery sections, pause / retry / crash / finish / scene-switch cleanup, real stages untouched,
+    // enabled-vs-disabled equivalence.
+    try { localStorage.clear(); } catch (e) {}
+    window.PULSE_ASSET_BASE = '../src/';
+    window.PULSE_TEST = { autoStart: true, holdReady: true, bot: false, mode: 'campaign', stageIndex: 0 };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/melody.js"></script>
+  <script src="../src/js/overdrive.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/graze.js"></script>
+  <script src="../src/js/mirror.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/patterns.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script src="../src/js/render.js"></script>
+  <script src="../src/js/ui.js"></script>
+  <script src="../src/js/assets.js"></script>
+  <script src="../src/js/trail.js"></script>
+  <script src="../src/js/worldshift.js"></script>
+  <script src="../src/js/sprite-view.js"></script>
+  <script src="../src/js/game-scene.js"></script>
+  <script src="../src/js/menu-scenes.js"></script>
+  <script src="../src/js/lab.js"></script>
+  <script src="../src/js/lab-scene.js"></script>
+  <script src="../src/js/main.js"></script>
+  <script>
+    const C = Pulse.CONFIG;
+    const T = Pulse.THEME;
+    const WS = Pulse.WorldShift;
+    const fails = [];
+    let checks = 0;
+    const check = (ok, msg) => { checks++; if (!ok) fails.push(msg); };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const scene = () => window.__pulseScene;
+    const fake = new WeakMap();
+    const clockOf = (sc) => { let c = fake.get(sc); if (!c) { c = { now: sc.time.now }; fake.set(sc, c); Object.defineProperty(sc.time, 'now', { get: () => c.now, set: () => {}, configurable: true }); } return c; };
+    const frames = (sc, n, until, ms) => { const c = clockOf(sc); const dt = ms || 16.667; for (let i = 0; i < n; i++) { c.now += dt; sc.update(c.now, dt); sc.draw && sc.draw(); if (until && until()) return true; } return !until; };
+    const errors = [];
+    window.addEventListener('error', (e) => errors.push(e.message));
+    const saveText = () => localStorage.getItem(Pulse.Save.KEY);
+    const FPS = { 30: 33.3, 60: 16.7, 144: 6.9 };
+    const BOT = () => ({ holdReady: true, bot: true, route: 'safe' });
+    const startLab = async (id) => { scene().scene.start('game', { mode: 'campaign', lab: id || 'world-shift' }); await wait(500); const q = scene(); q.test = BOT(); return q; };
+    const startStage = async (idx) => { scene().scene.start('game', { mode: 'campaign', stageIndex: idx }); await wait(500); const q = scene(); q.test = BOT(); return q; };
+    const counts = (q) => ({ kids: q.children.list.length, tweens: q.tweens.getTweens().length, timers: q.time._active.length + q.time._pendingInsertion.length, textures: q.textures.getTextureKeys().length });
+    // A fingerprint of everything the rules produce, frame by frame.
+    const trace = (q, ms, limit) => {
+      let h = 0; const mix = (v) => { const s = String(v); for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0; };
+      q.startRun();
+      frames(q, limit || 60000, () => {
+        mix(q.level.travelled.toFixed(3)); mix(q.orbX.toFixed(3)); mix(q.radius.toFixed(3)); mix(q.score); mix(q.energy); mix(q.state); mix(q.combo);
+        return q.state !== 'playing';
+      }, ms);
+      return { state: q.state, score: q.score, energy: q.energy, bonus: q.bonus, elapsed: +q.elapsed.toFixed(3), stars: q.result ? q.result.stars : -1, travelled: +q.level.travelled.toFixed(3), hash: h };
+    };
+
+    // Luminance (WCAG) of an sRGB 0..255 triple, and the contrast ratio of two luminances.
+    const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    const lum = (r, g, b) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+    const lumHex = (h) => lum((h >> 16) & 255, (h >> 8) & 255, h & 255);
+    const ratio = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    const pixels = (q, key) => { const img = q.textures.get(key).getSourceImage(); const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height; const g = cv.getContext('2d'); g.drawImage(img, 0, 0); return g.getImageData(0, 0, cv.width, cv.height).data; };
+
+    async function run() {
+      for (let i = 0; i < 200 && !(scene() && scene().state); i++) await wait(100);
+      await Pulse.Audio.loading; await wait(300);
+      const L = Pulse.Lab;
+      const entry = L.find('world-shift');
+      const idsBefore = Pulse.STAGES.map((s) => s.id).join();
+
+      // ---- The Lab entry ----
+      check(!!entry && entry.flags.worldShift === true && entry.title === 'World Shift', 'the Lab lists World Shift with the worldShift flag');
+      check(!Pulse.STAGES.some((s) => s.id === entry.stage.id) && entry.stage.id === 'lab-world-shift', 'its stage is not in the campaign list');
+      check(Pulse.Campaign.validate(entry.stage, C.width).length === 0, 'the lab stage passes the campaign validator');
+      check(C.worldShift.enabled === true, 'CONFIG.worldShift.enabled defaults to true');
+      check(entry.baseIndex === Pulse.STAGES.findIndex((s) => s.id === 's3-controlled-overload') && entry.stage.world.index === 1, 'it inherits world 1 (125 BPM) from a real stage');
+      check(entry.stage.items.every((it) => !it.fork && !it.ring && !it.zone && !it.mirror), 'no fork, ring or mirror zone: the shift is the only new idea');
+
+      // ---- Movement table: ordered, inside the stage, recovery after every shift (at three screen lengths) ----
+      for (const H of [860, 960, 1200]) {
+        const orbY = Math.round(H * C.orb.yRatio);
+        const tr = Pulse.Campaign.compile(entry.stage, C.width, H);
+        const prof = Pulse.Rhythm.profile(entry.stage.speed.start, entry.stage.speed.end, tr.speedLength);
+        const res = WS.resolve(tr, orbY);
+        const secs = prof.time(tr.finishAt);
+        check(res.length === 3 && res[0].progress === 0, `H${H}: three movements, the first at progress 0`);
+        check(res.every((m, i) => i === 0 || (m.progress > res[i - 1].progress && m.progress < 1 && m.travelled < tr.finishAt)), `H${H}: shifts strictly increase and lie inside the stage`);
+        check(res.slice(1).every((m, i) => m.tele.travelled < m.travelled && m.tele.travelled > (i ? res[i].recovery.toTravelled : 0)), `H${H}: every telegraph starts before its shift and after the previous recovery ended`);
+        check(res.slice(1).every((m) => m.recovery.to > m.recovery.from && m.recovery.to < 1 && m.recovery.lastItem > m.recovery.firstItem), `H${H}: a recovery window follows every shift`);
+        check(res.slice(1).every((m, i) => i === 0 || m.tele.travelled > res[i].recovery.toTravelled + 500), `H${H}: a movement body of at least 500 px separates one recovery from the next telegraph`);
+        const lead = res.slice(1).map((m) => (prof.time(m.travelled) - prof.time(m.tele.travelled)));
+        check(lead.every((s) => s > 1.7 && s < 2.1), `H${H}: telegraph lead is ${lead.map((s) => s.toFixed(2)).join(' / ')} s (4 beats at 125 BPM = 1.92 s)`);
+        check(secs >= 60 && secs <= 75, `H${H}: the stage lasts ${secs.toFixed(1)} s (60 to 75)`);
+        check(new Set(res.map((m) => m.backdrop)).size === 3 && new Set(res.map((m) => m.rail)).size === 3, `H${H}: three distinct backdrops and rail colours`);
+      }
+      const hazardColours = [T.wallEdge, T.gapEdge, T.pickup, T.bonus, T.orb, T.danger];
+      const cdist = (a, b) => Math.hypot(((a >> 16) & 255) - ((b >> 16) & 255), ((a >> 8) & 255) - ((b >> 8) & 255), (a & 255) - (b & 255));
+      check(WS.MOVEMENTS.slice(1).every((m) => hazardColours.every((h) => cdist(m.rail, h) > 70)), 'the new rail colours are not hazard / pickup / orb colours');
+      check(WS.MOVEMENTS.every((m) => /^bg_portrait_/.test(m.backdrop) && Pulse.Assets.ART_IMAGES.includes(m.backdrop)), 'only the six existing Gemini portrait backdrops are used');
+      check(WS.MOVEMENTS.every((m) => !/^bg_world|^bg_grid/.test(m.backdrop)), 'no new art files are referenced');
+
+      // ---- Recovery sections are calmer (from the compiled item data) ----
+      {
+        const tr = Pulse.Campaign.compile(entry.stage, C.width, 960);
+        const orbY = Math.round(960 * C.orb.yRatio);
+        const res = WS.resolve(tr, orbY);
+        const hazard = (it) => it.type === 'gate' || it.type === 'barrier';
+        const wideGate = (it) => it.type === 'gate' && it.need >= 70 && !it.slide && !it.length && !it.ring && !it.fork;
+        const body = (a, b) => tr.items.slice(a, b);
+        const density = (list) => { const h = list.filter(hazard); return h.length / Math.max(1, list[list.length - 1].arrive - list[0].arrive); };
+        const space = (list) => { const h = list.filter(hazard); const d = []; for (let i = 1; i < h.length; i++) d.push(h[i].arrive - h[i - 1].arrive); return d.length ? d.reduce((a, b) => a + b, 0) / d.length : Infinity; };
+        const bodies = [body(0, WS.MOVEMENTS[1].anchor - 3), body(WS.MOVEMENTS[1].recoveryEnd + 1, WS.MOVEMENTS[2].anchor - 3), body(WS.MOVEMENTS[2].recoveryEnd + 1, tr.items.length)];
+        for (const k of [1, 2]) {
+          const m = WS.MOVEMENTS[k];
+          const lead = body(m.anchor - 3, m.anchor + 1); // the telegraph lead-in and the shift note
+          const rec = body(m.anchor + 1, m.recoveryEnd + 1);
+          const recWin = body(m.anchor, m.recoveryEnd + 1); // from the shift moment to the last recovery item
+          check(lead.every((it) => it.type === 'energy' || wideGate(it)), `shift ${k}: the telegraph lead-in holds only wide gaps and notes`);
+          check(rec.every((it) => it.type === 'energy' || wideGate(it)), `shift ${k}: the recovery holds only wide gaps (need >= 70, not moving) and notes, no barrier`);
+          check(rec.filter(hazard).length >= 2, `shift ${k}: the recovery still has visible hazards (${rec.filter(hazard).length} wide gaps)`);
+          const prev = bodies[k - 1];
+          check(density(recWin) <= 0.6 * density(prev) + 1e-9, `shift ${k}: recovery hazard density ${density(recWin).toFixed(2)}/s is at most 60% of the movement before (${density(prev).toFixed(2)}/s)`);
+          check(space(rec) >= space(prev) * 1.2, `shift ${k}: recovery gaps arrive ${space(rec).toFixed(2)} s apart vs ${space(prev).toFixed(2)} s in the movement before`);
+          check(Math.min(...rec.filter(hazard).map((it) => it.need)) > Math.max(...prev.filter((it) => it.type === 'gate').map((it) => it.need).filter((n) => n < 70)), `shift ${k}: every recovery gap is wider than every gap that needed shrinking before it`);
+        }
+        const fam = (list) => ({ bar: list.some((it) => it.type === 'barrier'), moving: list.some((it) => it.slide), charged: list.some((it) => it.charged) });
+        check(fam(bodies[0]).bar && !fam(bodies[0]).moving, 'movement I is the drum family: barriers, no moving gaps');
+        check(fam(bodies[1]).moving && !fam(bodies[1]).bar, 'movement II is a different family: moving gaps and slalom, no barriers');
+        check(fam(bodies[2]).charged && !fam(bodies[2]).moving, 'movement III is a brief finale phrase with a charged flourish and no moving gaps');
+        check(bodies[2].filter(hazard).length <= 6 && bodies[2][bodies[2].length - 1].arrive - bodies[2][0].arrive < 14, 'the finale phrase is short and gentle (<= 6 hazards, < 14 s)');
+      }
+
+      // ---- Backdrop contrast: no crossfade step makes hazards harder to read ----
+      {
+        const q = await startLab();
+        const keys = WS.MOVEMENTS.map((m) => m.backdrop);
+        check(keys.every((k) => q.textures.exists(k)), 'the three backdrop textures are loaded');
+        const rim = lumHex(T.wallEdge);
+        const px = {};
+        for (const k of Pulse.Assets.ART_IMAGES) px[k] = pixels(q, k);
+        const stat = (get, n) => {
+          const l = new Float32Array(n); let bright = 0;
+          for (let i = 0; i < n; i++) { const v = get(i); l[i] = v; if (v > rim) bright++; }
+          l.sort(); return { p95: l[Math.floor(n * 0.95)], bright: bright / n };
+        };
+        const N = 540 * 960;
+        const worstExisting = Math.max(...Pulse.Assets.ART_IMAGES.map((k) => stat((i) => lum(px[k][i * 4], px[k][i * 4 + 1], px[k][i * 4 + 2]), N).bright));
+        let worstRatio = Infinity, worstBright = 0;
+        for (const [a, b] of [[0, 1], [1, 2]]) {
+          for (let s = 0; s <= 10; s++) {
+            const u = s / 10; const A = px[keys[a]], B = px[keys[b]];
+            const st = stat((i) => lum(A[i * 4] * (1 - u) + B[i * 4] * u, A[i * 4 + 1] * (1 - u) + B[i * 4 + 1] * u, A[i * 4 + 2] * (1 - u) + B[i * 4 + 2] * u), N);
+            worstRatio = Math.min(worstRatio, ratio(rim, st.p95)); worstBright = Math.max(worstBright, st.bright);
+          }
+        }
+        check(worstRatio >= C.worldShift.minContrast, `wall rim vs the 95th-percentile backdrop pixel, worst over every crossfade step: ${worstRatio.toFixed(2)}:1 (threshold ${C.worldShift.minContrast}:1)`);
+        check(worstBright <= worstExisting + 1e-9, `share of backdrop pixels brighter than the wall rim, worst over every step: ${(worstBright * 100).toFixed(2)}% (no more than the worst existing backdrop, ${(worstExisting * 100).toFixed(2)}%)`);
+        // The amber gap strips are brighter than the rim, so they pass whenever the rim does.
+        check(lumHex(T.gapEdge) > rim, 'the gap-facing strips are brighter than the rim');
+        // Layers: everything the shift adds sits behind the world graphics.
+        q.startRun(); frames(q, 3);
+        const ws = q.ws;
+        check(!!ws && ws.title.depth < q.layer.depth && ws.numeral.depth < q.layer.depth && ws.sweep.depth < q.layer.depth && ws.fadeBg.depth < q.layer.depth, 'banner, rail sweep and crossfade layer are all behind the gameplay layer (they can never cover a gate, barrier or note)');
+        check(ws.fadeBg.depth > q.view.worldBg.depth && ws.fadeBg.depth < q.view.grid.depth, 'the crossfade layer sits between the world backdrop and the grid');
+        check(ws.title.depth > q.view.streaks.depth && ws.sweep.depth > q.view.rails.depth, 'the banner is above the backdrop and the sweep above the rails');
+      }
+
+      // ---- Transitions at 30 / 60 / 144 fps: once each, at the right progress, telegraph first ----
+      const sfxLog = [];
+      const realPlay = Pulse.Sfx.play;
+      Pulse.Sfx.play = function (name, o) { const w = scene() && scene().ws; sfxLog.push({ name, o, tele: !!(w && w.tele) }); return realPlay.call(this, name, o); };
+      const evByFps = {};
+      for (const fps of [30, 60, 144]) {
+        const q = await startLab();
+        q.startRun(); q.test.bot = true;
+        const res = q.ws.res;
+        sfxLog.length = 0;
+        const speedNow = [];
+        frames(q, 400000, () => { speedNow.push(q.level.speedAt()); return q.state !== 'playing'; }, FPS[fps]);
+        const ev = q.ws.events;
+        evByFps[fps] = ev.map((e) => e.type + e.k);
+        check(q.state === 'complete', `${fps} fps: the bot completes the lab stage (state ${q.state})`);
+        check(ev.map((e) => e.type + e.k).join() === 'telegraph1,shift1,faded1,telegraph2,shift2,faded2', `${fps} fps: telegraph, shift, faded fire once each, in order (${ev.map((e) => e.type + e.k).join(',')})`);
+        for (const k of [1, 2]) {
+          const tel = ev.find((e) => e.type === 'telegraph' && e.k === k), sh = ev.find((e) => e.type === 'shift' && e.k === k), fd = ev.find((e) => e.type === 'faded' && e.k === k);
+          const stepPx = 440 * (FPS[fps] / 1000) + 1;
+          check(sh.travelled >= res[k].travelled && sh.travelled - res[k].travelled <= stepPx, `${fps} fps: shift ${k} fired at travelled ${sh.travelled.toFixed(1)} (target ${res[k].travelled.toFixed(1)}, within one frame)`);
+          check(Math.abs(sh.progress - res[k].progress) < 0.002, `${fps} fps: shift ${k} at progress ${sh.progress.toFixed(4)} (target ${res[k].progress.toFixed(4)})`);
+          check(tel.travelled >= res[k].tele.travelled && tel.travelled - res[k].tele.travelled <= stepPx, `${fps} fps: telegraph ${k} began at its resolved distance`);
+          const lead = sh.elapsed - tel.elapsed;
+          check(lead > 1.8 && lead < 2.05, `${fps} fps: the telegraph precedes the shift by ${lead.toFixed(2)} s (4 beats = ${(res[k].leadSec).toFixed(2)} s)`);
+          check(fd.elapsed - sh.elapsed >= res[k].fadeSec - FPS[fps] / 1000 - 0.001 && fd.elapsed - sh.elapsed <= res[k].fadeSec + FPS[fps] / 1000 + 0.001, `${fps} fps: the crossfade completes ${(fd.elapsed - sh.elapsed).toFixed(2)} s after the shift (${res[k].fadeSec.toFixed(2)} s)`);
+        }
+        // Audio: pings in the lead, the sting at the shift, the finale sting after it. Never before the telegraph.
+        const names = sfxLog.map((s) => s.name);
+        check(sfxLog.filter((s) => s.name === 'telegraphPing' && s.tele).length === 6 && names.filter((n) => n === 'worldIntro').length === 2 && names.filter((n) => n === 'milestone').length >= 1, `${fps} fps: 3 pings per telegraph, one sting per shift, the finale sting once more (${sfxLog.filter((s) => (s.name === 'telegraphPing' && s.tele) || s.name === 'worldIntro' || s.name === 'milestone').map((s) => s.name).join(',')})`);
+        const tp = sfxLog.map((s) => (s.name === 'telegraphPing' && s.tele ? 'P' : s.name === 'worldIntro' ? 'W' : s.name === 'milestone' ? 'M' : '')).join('');
+        check(tp === 'PPPWPPPWM', `${fps} fps: a telegraph ping always comes before its shift sting`);
+        check(sfxLog.filter((s) => (s.name === 'telegraphPing' && s.tele) || s.name === 'worldIntro').every((s) => (s.o.gain || 1) <= 0.8), `${fps} fps: the cues are quiet (gain <= 0.8)`);
+      }
+      check(evByFps[30].join() === evByFps[60].join() && evByFps[60].join() === evByFps[144].join(), 'the same events fire at every frame rate');
+
+      // ---- Visual state through a run: crossfade smooth and complete, rails recoloured, banner text, stem layer ----
+      {
+        const q = await startLab();
+        q.startRun();
+        const ws = q.ws;
+        const res = ws.res;
+        const rec = { alphas: [], railsAt: {}, bannerSeen: [], texAt: {} };
+        let last = -1;
+        frames(q, 400000, () => {
+          if (ws.fade) { rec.alphas.push(ws.fadeBg.alpha); }
+          if (ws.tele) rec.bannerSeen.push(ws.numeral.text + '|' + ws.title.text);
+          if (ws.i !== last) { last = ws.i; rec.railsAt[ws.i] = ws.railColor; }
+          return q.state !== 'playing';
+        });
+        check(rec.alphas.length > 100 && rec.alphas.every((a, i) => i === 0 || a >= rec.alphas[i - 1] - 1e-9), 'the crossfade alpha only ever rises');
+        check(rec.alphas.every((a, i) => i === 0 || Math.abs(a - rec.alphas[i - 1]) < 0.03), 'and never by more than 0.03 in one 60 fps frame (no flash)');
+        check(rec.railsAt[1] === res[1].rail && rec.railsAt[2] === res[2].rail && rec.railsAt[0] === res[0].rail, 'rail colour is the movement colour after each shift');
+        check(new Set(rec.bannerSeen).has('MOVEMENT II|CHROMATIC OVERDRIVE') && new Set(rec.bannerSeen).has('MOVEMENT III · FINALE|PULSE COLLAPSE'), 'the banners read MOVEMENT II / MOVEMENT III · FINALE with the movement name');
+        check(q.view.worldBg.texture.key === res[2].backdrop && q.view.worldBgKey === res[2].backdrop && !ws.fadeBg.visible && ws.fadeBg.alpha === 0, 'at the end the world backdrop is the last movement\'s and the fade layer is hidden');
+        check(!ws.numeral.visible || ws.numeral.alpha === 0 || q.state === 'complete', 'the banner has faded by the end');
+        check(q.titleText.text === 'Prototype clear' && q.titleText.style.color.toUpperCase() === T.textBonus.toUpperCase(), `finishing: title is still 'Prototype clear', in the finale colour (${q.titleText.style.color})`);
+        check(q.result && q.result.stars >= 1 && q.result.record.unlockedNext === null && q.result.record.newSkins.length === 0 && q.backBtn.label.text === 'Lab', 'finishing shows stars, unlocks nothing and offers Lab');
+      }
+
+      // ---- The stem layer follows the movement, stops with pause, and a plain Overdrive stem is unaffected ----
+      {
+        const q = await startLab();
+        q.startRun();
+        const stems = []; const stops = [];
+        const realStart = Pulse.Sfx.stemStart, realFits = Pulse.Sfx.stemFits, realStop = Pulse.Sfx.stemStop, realActive = Pulse.Sfx.stemActive;
+        let on = 0;
+        Pulse.Sfx.stemStart = (w) => { stems.push(w); on = w; return true; };
+        Pulse.Sfx.stemFits = () => true;
+        Pulse.Sfx.stemStop = () => { stops.push(q.state); on = 0; };
+        Pulse.Sfx.stemActive = () => on;
+        q.aligned = () => true;
+        frames(q, 400000, () => q.ws.i === 1 && q.ws.events.some((e) => e.type === 'faded'));
+        check(stems.length === 1, 'layer: the stem is running once movement II has faded in');
+        q.pause(); frames(q, 3);
+        check(on === 0 && stops.includes('paused'), 'layer: pausing stops the stem (same as Overdrive)');
+        q.setState('playing'); frames(q, 3);
+        check(on === 1 && stems.length === 2, 'layer: resuming restarts it');
+        q.startRun(); frames(q, 3);
+        check(on === 0 && !WS.wantsStem(q) && stems.length === 2, 'layer: a retry drops it (movement I has no layer)');
+        Pulse.Sfx.stemStart = realStart; Pulse.Sfx.stemFits = realFits; Pulse.Sfx.stemStop = realStop; Pulse.Sfx.stemActive = realActive; delete q.aligned;
+      }
+
+      // ---- Pause mid-transition, resume ----
+      {
+        const q = await startLab();
+        q.startRun();
+        const ws = q.ws;
+        frames(q, 400000, () => ws.fade && ws.fade.t > 0.5);
+        const snap = () => ({ a: ws.fadeBg.alpha, t: ws.fade.t, trav: q.level.travelled, rail: ws.railColor, bn: ws.title.alpha });
+        const before = snap();
+        q.pause(); frames(q, 90);
+        const during = snap();
+        check(q.state === 'paused' && JSON.stringify(before) === JSON.stringify(during), `pause freezes the crossfade (alpha ${before.a.toFixed(3)} then ${during.a.toFixed(3)}, t ${before.t.toFixed(2)}, banner)`);
+        q.setState('playing');
+        frames(q, 400000, () => !ws.fade);
+        check(q.view.worldBg.texture.key === ws.res[1].backdrop && ws.events.filter((e) => e.type === 'faded').length === 1, 'resume finishes the crossfade exactly once');
+        // pause during the telegraph
+        q.startRun();
+        frames(q, 400000, () => ws.tele && ws.teleT > 0.5);
+        const s1 = { x: ws.teleT, h: ws.sweep.commandBuffer.length };
+        q.pause(); frames(q, 60);
+        check(ws.teleT === s1.x && ws.sweep.commandBuffer.length === s1.h, 'pause freezes the telegraph and its rail sweep');
+        q.setState('playing'); frames(q, 400000, () => ws.i === 1);
+        check(ws.events.filter((e) => e.type === 'shift').length === 1, 'resume completes the telegraph into one shift');
+      }
+
+      // ---- Retry / crash: state fully reset, nothing leaks ----
+      {
+        const q = await startLab();
+        q.startRun(); frames(q, 3);
+        const base = counts(q);
+        const ws = q.ws;
+        const objs = [ws.numeral, ws.title, ws.sweep, ws.fadeBg];
+        for (let n = 0; n < 6; n++) {
+          q.test.bot = true; q.startRun();
+          // play into the middle of a different phase each time: telegraph, fade, banner hold, movement 3, finish
+          const stop = [() => ws.tele, () => ws.fade && ws.fade.t > 0.4, () => ws.i === 1 && ws.afterT > 0.5, () => ws.i === 2, () => q.state !== 'playing', () => ws.tele && ws.i === 1][n];
+          frames(q, 400000, stop);
+          if (q.state === 'playing' && n % 2 === 0) { q.test.bot = false; q.crash && q.crash({ kind: 'gate', y: q.orbY, h: 20, gapL: 0, gapR: 0 }, false); }
+          q.startRun(); frames(q, 2);
+          check(ws.i === 0 && !ws.tele && !ws.fade && ws.events.length === 0 && !ws.layerOn && ws.railColor === ws.res[0].rail && ws.afterT === -1, `retry ${n + 1}: movement table state fully reset`);
+          check(q.view.worldBg.texture.key === ws.res[0].backdrop && !ws.fadeBg.visible && ws.fadeBg.alpha === 0 && !ws.title.visible && !ws.numeral.visible, `retry ${n + 1}: backdrop back to movement I, fade layer and banner hidden`);
+          check(ws.sweep.commandBuffer.length === 0, `retry ${n + 1}: no rail sweep left drawn`);
+        }
+        const after = counts(q);
+        check(JSON.stringify(after) === JSON.stringify(base), `no growth in display objects / tweens / timers / textures after 6 retries (${JSON.stringify(base)} vs ${JSON.stringify(after)})`);
+        check(q.ws === ws && objs.every((o) => o.scene), 'the same four objects are reused (none recreated, none destroyed)');
+        // finish, then retry from the end screen
+        q.test.bot = true; q.startRun(); frames(q, 400000, () => q.state !== 'playing');
+        check(q.state === 'complete', 'a full run still finishes after the retries');
+        q.startRun(); frames(q, 2);
+        check(JSON.stringify(counts(q)) === JSON.stringify(base) && q.ws.i === 0, 'and retrying from the finish screen is clean too');
+        // leaving the scene destroys everything the shift added
+        const l = Pulse.Lab; void l;
+        scene().scene.start('menu'); await wait(500);
+        check(q.ws === null && objs.every((o) => !o.scene), 'leaving the scene destroys the banner, sweep and fade layer and clears the state');
+        check(errors.length === 0, 'no page errors so far: ' + errors.join(' | '));
+      }
+
+      // ---- Save: a lab run never writes it ----
+      {
+        const before = saveText();
+        const q = await startLab();
+        q.startRun(); frames(q, 400000, () => q.state !== 'playing');
+        q.startRun(); frames(q, 100); q.test.bot = false; q.crash && q.crash({ kind: 'gate', y: q.orbY, h: 20, gapL: 0, gapR: 0 }, false);
+        check(saveText() === before, 'the save is byte-identical after a completed, a crashed and a retried lab run');
+        check(Pulse.Campaign.totalStars(Pulse.Save.load()) === 0, 'no campaign stars were recorded');
+      }
+
+      // ---- Real campaign stages: untouched, and play identically with and without the module ----
+      {
+        const pinned = ['s1-first-pulse', 's2-find-the-rhythm', 's3-controlled-overload', 's4-split-decision', 's5-charged-energy', 's6-the-long-hold', 's7-double-trouble', 's8-greed-is-optional', 's9-overload', 's10-precision', 's11-final-circuit', 's12-the-final-pulse'];
+        check(pinned.every((id, i) => Pulse.STAGES[i] && Pulse.STAGES[i].id === id) && Pulse.STAGES.length >= 24 && Pulse.STAGES.map((s) => s.id).join() === idsBefore, 'the campaign list keeps its ids and order (the first 12 pinned) and is unchanged by this module');
+        check(!Pulse.STAGES.some((s) => /world-shift/.test(s.id)) && Pulse.STAGES.every((s) => s.arc && s.look && s.world), 'no campaign stage carries World Shift data');
+        const real = {};
+        for (const idx of [0, 9, 11]) {
+          const out = {};
+          for (const mode of ['module', 'off']) {
+            const hold = Pulse.WorldShift;
+            if (mode === 'off') Pulse.WorldShift = undefined;
+            const q = await startStage(idx);
+            check(!q.ws, `stage ${idx + 1} (${mode}): no World Shift state on a real stage`);
+            const kids = q.children.list.length;
+            out[mode] = Object.assign(trace(q, 16.7), { kids });
+            Pulse.WorldShift = hold;
+          }
+          check(JSON.stringify(out.module) === JSON.stringify(out.off) && out.module.state === 'complete', `stage ${idx + 1}: with and without the module: identical state, score, energy, time, stars, scene objects and frame-by-frame hash (${out.module.state}, score ${out.module.score}, ${out.module.stars} stars)`);
+          real[idx] = out.module;
+        }
+      }
+
+      // ---- Enabled vs disabled equivalence on the lab stage itself ----
+      {
+        const out = {};
+        const modes = {
+          enabled: () => {},
+          'config off': () => { C.worldShift.enabled = false; },
+          'module absent': () => { window.__ws = Pulse.WorldShift; Pulse.WorldShift = undefined; },
+        };
+        const restore = () => { C.worldShift.enabled = true; if (window.__ws) { Pulse.WorldShift = window.__ws; window.__ws = null; } };
+        for (const mode of Object.keys(modes)) {
+          for (const fps of [30, 60, 144]) {
+            modes[mode]();
+            const q = await startLab();
+            const present = !!q.ws;
+            const t = trace(q, FPS[fps]);
+            const view = { bgKey: q.view && q.view.worldBg ? q.view.worldBg.texture.key : null, kids: q.children.list.length, rails: !!(q.view && q.view.rails) };
+            out[mode + fps] = Object.assign(t, { present, view });
+            restore();
+          }
+        }
+        for (const fps of [30, 60, 144]) {
+          const a = out['enabled' + fps], b = out['config off' + fps], c = out['module absent' + fps];
+          const strip = (o) => { const x = Object.assign({}, o); delete x.present; delete x.view; return JSON.stringify(x); };
+          check(strip(a) === strip(b) && strip(b) === strip(c) && a.state === 'complete', `${fps} fps: enabled / config off / module absent give identical state, score, energy, time, stars and frame-by-frame hash (score ${a.score}, energy ${a.energy}, ${a.stars} stars, t ${a.elapsed})`);
+          check(a.present && !b.present && !c.present, `${fps} fps: only the enabled run has World Shift state`);
+          check(JSON.stringify(b.view) === JSON.stringify(c.view) && b.view.kids === c.view.kids - 0 && a.view.kids === b.view.kids + 4 && b.view.bgKey === 'bg_portrait_w1_neon_circuit', `${fps} fps: disabled adds no display objects (enabled adds 4: banner x2, sweep, fade layer) and keeps the movement I backdrop`);
+        }
+        // Retry from a disabled run and a second enabled run give the same result again (no hidden state).
+        const q = await startLab(); const r1 = trace(q, 16.7); const r2 = trace(q, 16.7);
+        check(JSON.stringify(r1) === JSON.stringify(r2), 'two consecutive enabled runs in one scene are identical');
+        // A lab entry without the flag behaves like the old game.
+        const e2 = L.register({ id: 'ws-noflag', title: 'n', desc: 'n', base: 's3-controlled-overload', stage: L.derive('s3-controlled-overload', { id: 'lab-ws-noflag', items: entry.stage.items }), flags: {} });
+        const q2 = await startLab('ws-noflag');
+        check(!q2.ws && e2.flags.worldShift === undefined, 'the same stage as a Lab entry without the flag has no World Shift state');
+        L._remove('ws-noflag');
+        // An Endless scene and the menu are unaffected.
+        scene().scene.start('game', { mode: 'endless' }); await wait(500);
+        check(!scene().ws && scene().mode === 'endless', 'Endless has no World Shift state');
+      }
+
+      // ---- Menu: the LAB screen lists it ----
+      {
+        const G = window.__pulseGame;
+        scene().scene.start('menu'); await wait(500);
+        G.scene.getScene('menu').scene.start('lab'); await wait(600);
+        const out = []; const walk = (o) => { if (o.text !== undefined) out.push(String(o.text)); (o.list || []).forEach(walk); };
+        G.scene.getScene('lab').children.list.forEach(walk);
+        check(out.includes('World Shift'), 'the LAB screen lists World Shift');
+      }
+      check(errors.length === 0, `page errors: ${errors.join(' | ')}`);
+      Pulse.Sfx.play = realPlay;
+    }
+    run().then(() => { document.title = fails.length ? `FAIL ${fails.length}: ${fails.join(' | ')}` : `PASS world shift tests ${checks} checks`; })
+      .catch((e) => { document.title = 'FAIL error ' + e.message + ' ' + (e.stack || '').split('\n')[1]; });
+  </script>
+</body>
+</html>
