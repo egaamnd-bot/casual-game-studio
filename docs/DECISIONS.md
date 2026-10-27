@@ -6,6 +6,7 @@ Add new entries at the top.
 
 | # | Date | Decision | Approved by | Link |
 |---|------|----------|-------------|------|
+| 30 | 2026-10-27 | **Developer Gauntlet merged** (PR #48, tested head 84fd3a32, merge 2147b2c7): Lab-only QA mode, nine sections, guarded by CONFIG.gauntlet.enabled, no save/stage changes. Browser-tested only; NOT DEVICE-TESTED. A new approved mechanic must add its section. | Producer rule #25 |
 | 29 | 2026-10-27 | **Parallel prototypes integrated**: World Shift (#44), Resonance Gates (#40, keep) and Shatter Symphony (#46) merged, Lab only, under the permanent merge rule with one combined regression per merge. Keep / tune / drop for World Shift and Symphony is requested after the Producer's phone test of run #122. | Human Producer | [LAB.md](LAB.md) |
 | 28 | 2026-10-27 | **Resonance Gates: KEEP as a Lab-only prototype** (Producer, after phone-testing run #105 "went good no issue"; explicit decision on PR #40). Not approved for campaign integration. World Shift and Resonance merged under the permanent merge rule; Gauntlet sequencing updated so it does not wait for Symphony. | Human Producer | [RESONANCE_GATES.md](RESONANCE_GATES.md) |
 | 27 | 2026-10-27 | **Campaign Batch 3 merged** (stages 25-30, campaign now 30 stages, PR #41); Producer phone-tested integrated run #107 and confirmed it went as intended. One deliberate test change: a Mirror Pulse stage is capped at 430 px/s by the fixed 560 px telegraph. | Human Producer | [CAMPAIGN_30.md](CAMPAIGN_30.md) |
