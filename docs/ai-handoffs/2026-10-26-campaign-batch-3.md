@@ -26,7 +26,7 @@ Each of 25-30: `Campaign.validate` clean; compiled at track lengths 860, 900, 96
 | 30 | 400-430 | 102 | 36 | 9 | 83.5 s | 36 | 0.72 s | 0.68 |
 
 ## Full-suite results
-RESULTS_PLACEHOLDER
+Command, once per viewport: `/home/claude/bin/pulse-test /home/claude/wt/batch3 <w> <h>` (all pages, shared lock). Run on commit `bdf0d8328bde1c42d02bfa701440356fe039e256` (the pushed head before this docs-only results commit; the only later change is this file). Result at 540x960, 360x640 and 412x915: **18 of 18 pages PASS at each viewport (54 PASS, 0 FAIL)**, including campaign.html 5745/5745, mirror.html 1435, routes.html 558, worldart.html 109, scene.html, skins.html 213. `gameplay.html` is the known manual page that fails identically on main: skipped by the runner, NOT counted. An earlier run (before the final worldart fix) failed only the new finale-sting check at 412x915; fixed as described above and not counted.
 
 ## Known issues / limits
 - NOT DEVICE-TESTED. All feel is bot-tuned. Mirror stages 27/30 rely on Mirror Pulse, which has not been played on a phone.
