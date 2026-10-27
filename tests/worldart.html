@@ -92,14 +92,17 @@
         else if (idx === 28) check(q.nextBtn.visible, 'stage 29 still offers Next stage');
       }
       {
-        // Campaign finale: the same existing sting as the world finales, 0.9 s after the clear panel opens (no new audio).
+        // Campaign finale: the same existing sting as the world finales, scheduled 900 ms after the clear panel opens (no new audio).
+        // The delay runs on the scene clock, which a loaded headless browser advances slowly at tall viewports, so the test reads the
+        // scheduled event and runs its callback instead of waiting on wall time (the 540x960 and 360x640 runs waited the real 0.9 s and passed).
         const plays = []; const realPlay = Pulse.Sfx.play; Pulse.Sfx.play = (name, ...a) => { plays.push(name); return realPlay.call(Pulse.Sfx, name, ...a); };
         q = await startStage(Pulse.STAGES.length - 1); q.completeStage();
+        const evs = [...(q.time._active || []), ...(q.time._pendingInsertion || [])].filter((e) => e.delay === 900 && !e.hasDispatched);
+        check(evs.length === 1, `the finale schedules exactly one 900 ms sting (found ${evs.length})`);
         check(!plays.includes('milestone'), 'the finale sting waits for the clear panel (not at the moment of clearing)');
-        for (let i = 0; i < 40 && !plays.includes('milestone'); i++) await wait(100); // the delay runs on scene time: allow a slow, loaded machine up to 4 s
-        await wait(600); // and then make sure it does not play a second time
+        if (evs[0]) evs[0].callback.apply(evs[0].callbackScope || q, evs[0].args || []);
         Pulse.Sfx.play = realPlay;
-        check(plays.filter((n) => n === 'milestone').length === 1 && q.state === 'complete', 'the campaign finale plays the existing sting exactly once');
+        check(plays.filter((n) => n === 'milestone').length === 1 && q.state === 'complete', `the campaign finale plays the existing sting exactly once (milestone plays: ${plays.filter((n) => n === 'milestone').length}, state ${q.state})`);
       }
       // Endless keeps the plain backdrop.
       scene().scene.start('game', { mode: 'endless' }); await wait(350);
