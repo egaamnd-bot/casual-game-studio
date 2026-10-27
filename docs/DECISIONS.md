@@ -6,6 +6,7 @@ Add new entries at the top.
 
 | # | Date | Decision | Approved by | Link |
 |---|------|----------|-------------|------|
+| 31 | 2026-10-27 | **Producer approved the current merged state** after phone-testing runs #126 and #127: Gauntlet, World Shift, Resonance and Symphony stay as merged (Lab-only prototypes); orb redesign accepted; near-miss graze stays at stage 10; the loosened Mirror Pulse speed rule stays. Interpreted from "all approved ... everything is good"; no widening of scope was requested. | Producer |
 | 30 | 2026-10-27 | **Developer Gauntlet merged** (PR #48, tested head 84fd3a32, merge 2147b2c7): Lab-only QA mode, nine sections, guarded by CONFIG.gauntlet.enabled, no save/stage changes. Browser-tested only; NOT DEVICE-TESTED. A new approved mechanic must add its section. | Producer rule #25 |
 | 29 | 2026-10-27 | **Parallel prototypes integrated**: World Shift (#44), Resonance Gates (#40, keep) and Shatter Symphony (#46) merged, Lab only, under the permanent merge rule with one combined regression per merge. Keep / tune / drop for World Shift and Symphony is requested after the Producer's phone test of run #122. | Human Producer | [LAB.md](LAB.md) |
 | 28 | 2026-10-27 | **Resonance Gates: KEEP as a Lab-only prototype** (Producer, after phone-testing run #105 "went good no issue"; explicit decision on PR #40). Not approved for campaign integration. World Shift and Resonance merged under the permanent merge rule; Gauntlet sequencing updated so it does not wait for Symphony. | Human Producer | [RESONANCE_GATES.md](RESONANCE_GATES.md) |
