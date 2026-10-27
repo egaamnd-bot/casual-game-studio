@@ -125,9 +125,15 @@
           check(Pulse.Skins.isUnlocked(s2, Pulse.Skins.byId(id)) && s2.skins.unlocked.includes(id), `${id}: unlocked by completing stages at ${stars} stars`);
         }
         const s72 = writeSave(54);
-        check(!Pulse.Skins.isUnlocked(s72, Pulse.Skins.byId('aether-crown')), 'Aether Crown (72) stays locked with all 18 current stages at 3 stars: it needs the stages still to be built');
+        check(!Pulse.Skins.isUnlocked(s72, Pulse.Skins.byId('aether-crown')), 'Aether Crown (72) is still locked at 54 stars');
         const gr = Pulse.Skins.grantUnlocks(s72, 72);
         check(gr.map((s) => s.id).join() === 'aether-crown' && Pulse.Skins.isUnlocked(s72, Pulse.Skins.byId('aether-crown')), 'and unlocks at 72 stars');
+        // With the 30-stage campaign (90 stars) the last skin is reachable through real completions: 24 stages at 3 stars is exactly 72.
+        check(Pulse.STAGES.length === 30, 'the campaign has 30 stages, so 90 stars are available');
+        const s71 = writeSave(71), s72r = writeSave(72), s90 = writeSave(90);
+        check(!Pulse.Skins.isUnlocked(s71, Pulse.Skins.byId('aether-crown')), 'Aether Crown: still locked at 71 stars from real completions');
+        check(Pulse.Skins.isUnlocked(s72r, Pulse.Skins.byId('aether-crown')) && s72r.skins.unlocked.includes('aether-crown'), 'Aether Crown: unlocked by completing stages at 72 stars (reachable once stages 19-24 are three-starred)');
+        check(Pulse.Campaign.totalStars(s90) === 90 && Pulse.SKINS.every((k) => Pulse.Skins.isUnlocked(s90, k)), 'all 90 stars: every skin is unlocked');
         // Earned skins stay earned; a selected new skin survives save and load.
         const s3 = writeSave(36); Pulse.Skins.select(s3, 'chrono-shard'); Pulse.Save.write(s3);
         const back = Pulse.Save.load();
