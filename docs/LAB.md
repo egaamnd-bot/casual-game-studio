@@ -29,3 +29,5 @@ Switch the whole menu entry off with `CONFIG.lab.enabled = false`.
 ## Files
 
 `src/js/lab.js` (registry), `src/js/lab-scene.js` (LAB screen), a few guarded lines in `game-scene.js`, `menu-scenes.js`, `main.js`; tests in `tests/lab.html`.
+
+Planned: a **Developer Campaign / QA Gauntlet** entry built on this Lab (curated sequence of sections, one per mechanic). Requirement and seam: [DEV_GAUNTLET.md](DEV_GAUNTLET.md). Not built yet.
