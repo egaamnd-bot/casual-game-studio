@@ -43,7 +43,7 @@ The Lab already gives the isolation this needs, so the Gauntlet is a thin layer 
 | 8 | Shatter Symphony | PR for #32 | As defined by that prototype | As documented in `docs/SHATTER_SYMPHONY.md` |
 | 9 | World Shift | PR for #33 | As defined by that prototype | As documented in `docs/WORLD_SHIFT.md` |
 
-Sections 7-9 are added only when their prototype PRs are merged. A section for a mechanic that is not approved or not merged does not ship.
+Sections 7-9 are added only when their prototype is merged. Sequencing update (Producer, 2026-10-27): the Gauntlet is built with the approved, integrated mechanics available at that time. Resonance Gates (PR #40) and World Shift (PR #44) are merged (Lab only), so they are covered; Shatter Symphony is added when its PR merges, and the checklist states plainly which mechanics are covered. No empty or fake section, and no claim that every mechanic is covered while one is pending. A section for a mechanic that is not approved or not merged does not ship.
 
 ## Build order and acceptance
 
