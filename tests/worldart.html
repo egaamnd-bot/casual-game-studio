@@ -96,7 +96,8 @@
         const plays = []; const realPlay = Pulse.Sfx.play; Pulse.Sfx.play = (name, ...a) => { plays.push(name); return realPlay.call(Pulse.Sfx, name, ...a); };
         q = await startStage(Pulse.STAGES.length - 1); q.completeStage();
         check(!plays.includes('milestone'), 'the finale sting waits for the clear panel (not at the moment of clearing)');
-        await wait(1100);
+        for (let i = 0; i < 40 && !plays.includes('milestone'); i++) await wait(100); // the delay runs on scene time: allow a slow, loaded machine up to 4 s
+        await wait(600); // and then make sure it does not play a second time
         Pulse.Sfx.play = realPlay;
         check(plays.filter((n) => n === 'milestone').length === 1 && q.state === 'complete', 'the campaign finale plays the existing sting exactly once');
       }
