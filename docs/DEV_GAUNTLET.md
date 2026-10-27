@@ -1,6 +1,6 @@
 # Developer Campaign / QA Gauntlet
 
-Status: **BUILT on `feature/dev-gauntlet` (PR pending merge), browser-tested only. NOT DEVICE-TESTED.** Requirement from Producer rule 2026-10-27, Issue #28.
+Status: **BUILT and merged (PR #48, merge 2147b2c7), browser-tested only. NOT DEVICE-TESTED.** Requirement from Producer rule 2026-10-27, Issue #28.
 
 ## Purpose
 
@@ -56,7 +56,7 @@ Sections 7-9 are added only when their prototype is merged. Sequencing update (P
 
 Every newly approved mechanic must add its Gauntlet section (or an explicit written reason it cannot) as part of its own PR or the next Gauntlet PR. See `docs/AI_HANDOFF_PROTOCOL.md` and Decision #25.
 
-## Implemented (feature/dev-gauntlet)
+## Implemented (PR #48)
 
 Open it from **Lab > Developer Gauntlet (QA)**. Code: `src/js/gauntlet.js`, `src/js/gauntlet-scene.js`; guarded hooks in `game-scene.js`, `lab-scene.js`, `main.js`. Guard: `CONFIG.gauntlet.enabled` and `CONFIG.lab.enabled`; off means no section is registered and no LAB entry exists (`tests/gauntlet-off.html`).
 Sections are Lab entries (`gauntlet-<n>-<key>`, stage id `lab-...`), never in `Pulse.STAGES`, never written to the save. After a run each section shows "Triggered: ..." or "Not triggered: ..." as proof. "Next section" chains them; "Sections" returns to the list.
