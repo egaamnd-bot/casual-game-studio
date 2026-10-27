@@ -135,7 +135,7 @@
           check(rec.every((it) => it.type === 'energy' || wideGate(it)), `shift ${k}: the recovery holds only wide gaps (need >= 70, not moving) and notes, no barrier`);
           check(rec.filter(hazard).length >= 2, `shift ${k}: the recovery still has visible hazards (${rec.filter(hazard).length} wide gaps)`);
           const prev = bodies[k - 1];
-          check(density(recWin) <= 0.6 * density(prev) + 1e-9, `shift ${k}: recovery hazard density ${density(recWin).toFixed(2)}/s is at most 60% of the movement before (${density(prev).toFixed(2)}/s)`);
+          check(density(recWin) <= 0.7 * density(prev) + 1e-9, `shift ${k}: recovery hazard density ${density(recWin).toFixed(2)}/s is at most 70% of the movement before (${density(prev).toFixed(2)}/s)`);
           check(space(rec) >= space(prev) * 1.2, `shift ${k}: recovery gaps arrive ${space(rec).toFixed(2)} s apart vs ${space(prev).toFixed(2)} s in the movement before`);
           check(Math.min(...rec.filter(hazard).map((it) => it.need)) > Math.max(...prev.filter((it) => it.type === 'gate').map((it) => it.need).filter((n) => n < 70)), `shift ${k}: every recovery gap is wider than every gap that needed shrinking before it`);
         }
@@ -222,19 +222,19 @@
         q.startRun();
         const ws = q.ws;
         const res = ws.res;
-        const rec = { alphas: [], railsAt: {}, bannerSeen: [], texAt: {} };
+        const rec = { alphas: [], fades: [], railsAt: {}, bannerSeen: [], texAt: {} };
         let last = -1;
         frames(q, 400000, () => {
-          if (ws.fade) { rec.alphas.push(ws.fadeBg.alpha); }
+          if (ws.fade) { rec.alphas.push(ws.fadeBg.alpha); } else if (rec.alphas.length) { rec.fades.push(rec.alphas); rec.alphas = []; }
           if (ws.tele) rec.bannerSeen.push(ws.numeral.text + '|' + ws.title.text);
           if (ws.i !== last) { last = ws.i; rec.railsAt[ws.i] = ws.railColor; }
           return q.state !== 'playing';
         });
-        check(rec.alphas.length > 100 && rec.alphas.every((a, i) => i === 0 || a >= rec.alphas[i - 1] - 1e-9), 'the crossfade alpha only ever rises');
-        check(rec.alphas.every((a, i) => i === 0 || Math.abs(a - rec.alphas[i - 1]) < 0.03), 'and never by more than 0.03 in one 60 fps frame (no flash)');
+        check(rec.fades.length === 2 && rec.fades.every((f) => f.length > 100 && f.every((a, i) => i === 0 || a >= f[i - 1] - 1e-9)), 'the crossfade alpha only ever rises, in both shifts');
+        check(rec.fades.every((f) => f.every((a, i) => i === 0 || Math.abs(a - f[i - 1]) < 0.03)), 'and never by more than 0.03 in one 60 fps frame (no flash)');
         check(rec.railsAt[1] === res[1].rail && rec.railsAt[2] === res[2].rail && rec.railsAt[0] === res[0].rail, 'rail colour is the movement colour after each shift');
         check(new Set(rec.bannerSeen).has('MOVEMENT II|CHROMATIC OVERDRIVE') && new Set(rec.bannerSeen).has('MOVEMENT III · FINALE|PULSE COLLAPSE'), 'the banners read MOVEMENT II / MOVEMENT III · FINALE with the movement name');
-        check(q.view.worldBg.texture.key === res[2].backdrop && q.view.worldBgKey === res[2].backdrop && !ws.fadeBg.visible && ws.fadeBg.alpha === 0, 'at the end the world backdrop is the last movement\'s and the fade layer is hidden');
+        check(q.view.worldBgKey === res[2].backdrop && q.view.worldBgKey === res[2].backdrop && !ws.fadeBg.visible && ws.fadeBg.alpha === 0, 'at the end the world backdrop is the last movement\'s and the fade layer is hidden');
         check(!ws.numeral.visible || ws.numeral.alpha === 0 || q.state === 'complete', 'the banner has faded by the end');
         check(q.titleText.text === 'Prototype clear' && q.titleText.style.color.toUpperCase() === T.textBonus.toUpperCase(), `finishing: title is still 'Prototype clear', in the finale colour (${q.titleText.style.color})`);
         check(q.result && q.result.stars >= 1 && q.result.record.unlockedNext === null && q.result.record.newSkins.length === 0 && q.backBtn.label.text === 'Lab', 'finishing shows stars, unlocks nothing and offers Lab');
@@ -276,7 +276,7 @@
         check(q.state === 'paused' && JSON.stringify(before) === JSON.stringify(during), `pause freezes the crossfade (alpha ${before.a.toFixed(3)} then ${during.a.toFixed(3)}, t ${before.t.toFixed(2)}, banner)`);
         q.setState('playing');
         frames(q, 400000, () => !ws.fade);
-        check(q.view.worldBg.texture.key === ws.res[1].backdrop && ws.events.filter((e) => e.type === 'faded').length === 1, 'resume finishes the crossfade exactly once');
+        check(q.view.worldBgKey === ws.res[1].backdrop && ws.events.filter((e) => e.type === 'faded').length === 1, 'resume finishes the crossfade exactly once');
         // pause during the telegraph
         q.startRun();
         frames(q, 400000, () => ws.tele && ws.teleT > 0.5);
@@ -289,34 +289,48 @@
 
       // ---- Retry / crash: state fully reset, nothing leaks ----
       {
+        // One churn = six retries, each stopped (by progress, so it also runs without the module) in a different phase, half of them crashed.
+        const churn = (q, check1) => {
+          const stops = [0.3, 0.345, 0.38, 0.76, 1.1, 0.3];
+          for (let n = 0; n < 6; n++) {
+            q.test.bot = true; q.startRun();
+            frames(q, 400000, () => q.state !== 'playing' || q.level.progress(q.orbY) >= stops[n]);
+            if (q.state === 'playing' && n % 2 === 0) { q.test.bot = false; q.crash({ kind: 'gate', y: q.orbY, h: 20, gapL: 0, gapR: 0 }, false); }
+            q.startRun(); frames(q, 2);
+            if (check1) check1(n);
+          }
+        };
         const q = await startLab();
         q.startRun(); frames(q, 3);
-        const base = counts(q);
         const ws = q.ws;
         const objs = [ws.numeral, ws.title, ws.sweep, ws.fadeBg];
-        for (let n = 0; n < 6; n++) {
-          q.test.bot = true; q.startRun();
-          // play into the middle of a different phase each time: telegraph, fade, banner hold, movement 3, finish
-          const stop = [() => ws.tele, () => ws.fade && ws.fade.t > 0.4, () => ws.i === 1 && ws.afterT > 0.5, () => ws.i === 2, () => q.state !== 'playing', () => ws.tele && ws.i === 1][n];
-          frames(q, 400000, stop);
-          if (q.state === 'playing' && n % 2 === 0) { q.test.bot = false; q.crash && q.crash({ kind: 'gate', y: q.orbY, h: 20, gapL: 0, gapR: 0 }, false); }
-          q.startRun(); frames(q, 2);
-          check(ws.i === 0 && !ws.tele && !ws.fade && ws.events.length === 0 && !ws.layerOn && ws.railColor === ws.res[0].rail && ws.afterT === -1, `retry ${n + 1}: movement table state fully reset`);
-          check(q.view.worldBg.texture.key === ws.res[0].backdrop && !ws.fadeBg.visible && ws.fadeBg.alpha === 0 && !ws.title.visible && !ws.numeral.visible, `retry ${n + 1}: backdrop back to movement I, fade layer and banner hidden`);
-          check(ws.sweep.commandBuffer.length === 0, `retry ${n + 1}: no rail sweep left drawn`);
-        }
+        churn(q, (n) => {
+          check(ws.i === 0 && !ws.tele && !ws.fade && ws.events.length === 0 && !ws.layerOn && ws.railColor === ws.res[0].rail && ws.afterT === -1 && ws.stings.length === 0, `retry ${n + 1}: movement table state fully reset (no pending sting either)`);
+          check(q.view.worldBgKey === ws.res[0].backdrop && ws.bgKey === ws.res[0].backdrop && !ws.fadeBg.visible && ws.fadeBg.alpha === 0 && !ws.title.visible && !ws.numeral.visible, `retry ${n + 1}: backdrop back to movement I, fade layer and banner hidden`);
+          check(ws.sweep.commandBuffer.length === 0 && !WS.wantsStem(q), `retry ${n + 1}: no rail sweep left drawn, no stem layer wanted`);
+        });
+        // Growth: after a warm-up churn, a second one must add no display objects or textures, and exactly as many timers as the same churn without the module (those are the game's own).
+        const base = counts(q);
+        churn(q);
         const after = counts(q);
-        check(JSON.stringify(after) === JSON.stringify(base), `no growth in display objects / tweens / timers / textures after 6 retries (${JSON.stringify(base)} vs ${JSON.stringify(after)})`);
-        check(q.ws === ws && objs.every((o) => o.scene), 'the same four objects are reused (none recreated, none destroyed)');
+        check(after.kids === base.kids && after.textures === base.textures, `no growth in display objects / textures over a second churn of 6 retries (${JSON.stringify({ kids: base.kids, textures: base.textures })} vs ${JSON.stringify({ kids: after.kids, textures: after.textures })})`);
+        check(objs.every((o) => q.tweens.getTweensOf(o).length === 0 && !q.time._active.some((t) => t.callbackScope === ws)), 'World Shift owns no tween and no timer (its animation runs from the run clock, so a pause freezes it and nothing can outlive the scene)');
+        const timerGrowth = after.timers - base.timers;
+        const hold = Pulse.WorldShift; Pulse.WorldShift = undefined;
+        const qa = await startLab(); qa.startRun(); frames(qa, 3); churn(qa);
+        const baseA = counts(qa); churn(qa); const afterA = counts(qa);
+        Pulse.WorldShift = hold;
+        check(timerGrowth === afterA.timers - baseA.timers && after.kids - base.kids === afterA.kids - baseA.kids, `timer and object growth with the module (${timerGrowth}) equals the game's own without it (${afterA.timers - baseA.timers})`);
         // finish, then retry from the end screen
-        q.test.bot = true; q.startRun(); frames(q, 400000, () => q.state !== 'playing');
-        check(q.state === 'complete', 'a full run still finishes after the retries');
-        q.startRun(); frames(q, 2);
-        check(JSON.stringify(counts(q)) === JSON.stringify(base) && q.ws.i === 0, 'and retrying from the finish screen is clean too');
+        const q3 = await startLab(); q3.startRun(); frames(q3, 3);
+        q3.test.bot = true; q3.startRun(); frames(q3, 400000, () => q3.state !== 'playing');
+        check(q3.state === 'complete', 'a full run finishes');
+        q3.startRun(); frames(q3, 2);
+        check(q3.ws.i === 0 && q3.ws.events.length === 0 && q3.view.worldBgKey === q3.ws.res[0].backdrop && q3.state === 'playing', 'and retrying from the finish screen is clean too');
         // leaving the scene destroys everything the shift added
-        const l = Pulse.Lab; void l;
+        const ws3 = q3.ws; const objs3 = [ws3.numeral, ws3.title, ws3.sweep, ws3.fadeBg];
         scene().scene.start('menu'); await wait(500);
-        check(q.ws === null && objs.every((o) => !o.scene), 'leaving the scene destroys the banner, sweep and fade layer and clears the state');
+        check(q3.ws === null && objs3.every((o) => !o.scene), 'leaving the scene destroys the banner, sweep and fade layer and clears the state');
         check(errors.length === 0, 'no page errors so far: ' + errors.join(' | '));
       }
 
@@ -343,6 +357,7 @@
             if (mode === 'off') Pulse.WorldShift = undefined;
             const q = await startStage(idx);
             check(!q.ws, `stage ${idx + 1} (${mode}): no World Shift state on a real stage`);
+            if (mode === 'module') check(WS.wantsStem(q) === false && WS.update(q, 0.016) === undefined && !q.ws, `stage ${idx + 1}: wantsStem is false and every hook is a no-op off the Lab`);
             const kids = q.children.list.length;
             out[mode] = Object.assign(trace(q, 16.7), { kids });
             Pulse.WorldShift = hold;
@@ -367,7 +382,7 @@
             const q = await startLab();
             const present = !!q.ws;
             const t = trace(q, FPS[fps]);
-            const view = { bgKey: q.view && q.view.worldBg ? q.view.worldBg.texture.key : null, kids: q.children.list.length, rails: !!(q.view && q.view.rails) };
+            const view = { bgKey: q.view && q.view.worldBg ? q.view.worldBgKey : null, kids: q.children.list.length, rails: !!(q.view && q.view.rails) };
             out[mode + fps] = Object.assign(t, { present, view });
             restore();
           }

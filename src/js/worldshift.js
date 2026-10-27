@@ -169,7 +169,7 @@
     const y = Math.round(sc.H * 0.27);
     const ws = {
       res, i: 0, tele: false, teleT: 0, afterT: -1, fade: null, layerOn: false, events: [], stings: [],
-      view, canFade: false, railColor: 0,
+      view, canFade: false, railColor: 0, bgKey: res[0].backdrop, fadeKey: null,
     };
     // Banner (behind the world graphics, so a gate or note always draws over it).
     ws.numeral = UI.text(sc, cx, y, '', 20, T.textDim, true).setDepth(1.6).setAlpha(0).setVisible(false);
@@ -200,8 +200,10 @@
     const v = ws.view;
     if (v) {
       if (v.rails) { v.rails.clear(); drawRails(v.rails, ws.res[0].rail, sc.SW, sc.SH); }
-      if (ws.canFade && v.worldBg.texture.key !== ws.res[0].backdrop) v.worldBg.setTexture(ws.res[0].backdrop);
-      if (ws.canFade) v.worldBgKey = ws.res[0].backdrop;
+      if (ws.canFade) {
+        if (ws.bgKey !== ws.res[0].backdrop) v.worldBg.setTexture(ws.res[0].backdrop);
+        v.worldBgKey = ws.bgKey = ws.res[0].backdrop; // (a TileSprite's own texture key is internal, so the logical key is kept here)
+      }
     }
   }
 
@@ -235,6 +237,7 @@
       if (ws.sweep) ws.sweep.clear();
       if (ws.canFade) {
         ws.fadeBg.setTexture(m.backdrop).setAlpha(0).setVisible(true);
+        ws.fadeKey = m.backdrop;
         ws.fade = { t: 0, key: m.backdrop, k: m.index };
       }
     }
@@ -274,7 +277,7 @@
       ws.fadeBg.setAlpha(a);
       if (u >= 1) {
         ws.view.worldBg.setTexture(ws.fade.key);
-        ws.view.worldBgKey = ws.fade.key;
+        ws.view.worldBgKey = ws.bgKey = ws.fade.key;
         ws.fadeBg.setVisible(false).setAlpha(0);
         log(ws, sc, 'faded', ws.fade.k);
         ws.fade = null;
