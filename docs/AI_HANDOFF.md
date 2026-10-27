@@ -1,17 +1,26 @@
 # Current AI Handoff
 
-> Status snapshot. Historical handoffs live in [`docs/ai-handoffs/`](ai-handoffs/); structure per [AI_HANDOFF_PROTOCOL.md](AI_HANDOFF_PROTOCOL.md). Latest notes: [campaign batch 1](ai-handoffs/2026-10-26-campaign-batch-1.md), [comet trail](ai-handoffs/2026-10-26-comet-trail-ribbon.md), [world backdrops](ai-handoffs/2026-10-26-world-backdrops.md). Assets: [ASSET_MANIFEST.md](ASSET_MANIFEST.md).
+> Status snapshot. Historical handoffs live in [`docs/ai-handoffs/`](ai-handoffs/); structure per [AI_HANDOFF_PROTOCOL.md](AI_HANDOFF_PROTOCOL.md). Latest notes: [parallel prototypes kickoff](ai-handoffs/2026-10-26-parallel-prototypes-kickoff.md), [near-miss](ai-handoffs/2026-10-26-near-miss-overdrive.md), [barrier-ready cue](ai-handoffs/2026-10-26-barrier-ready-cue.md), [campaign batch 2](ai-handoffs/2026-10-26-campaign-batch-2.md), [audio pack](ai-handoffs/2026-10-26-audio-pack.md). Assets: [ASSET_MANIFEST.md](ASSET_MANIFEST.md). Master tracker: [Issue #28](https://github.com/egaamnd-bot/casual-game-studio/issues/28).
 
 - Updated: 2026-10-26 (UTC)
 - Project: PULSE
-- Status: MILESTONES 1-2, CAMPAIGN BATCH 1 (PR #20), COMET TRAIL (PR #21), WORLD BACKDROPS (PR #22) AND EXPANSION SKINS (PR #23) MERGED AND VERIFIED. NEXT: Phase 2C audio (12 SFX, 3 Overdrive stems), then campaign Batch 2 (stages 19-24). Note: [2026-10-26-new-skins.md](ai-handoffs/2026-10-26-new-skins.md).
-- `main` @ `352912fdba634e24a1b1d4cf5f196260614907ea` (PR #23 merge of head `5db1f1b`); integrated build [run #73](https://github.com/egaamnd-bot/casual-game-studio/actions/runs/40337064152) success, artifact `pulse-debug-apk-run73` (latest APK for playtesting: ribbon comet trail, 18 stages, world backdrops, 10 skins). NOT DEVICE-TESTED.
-- Tests: at the skins merge all suites PASS at 540x960 (skins 209, campaign 3081, mirror 1083, routes 382, overdrive 1720, melody 809, rhythm 16754, trail 111, worldart 72, assets, scene, portrait, logic). `gameplay.html` is a manual page that fails identically on main (known, not a regression). Aether Crown (72 stars) is unreachable until stages 19+ exist.
-- Device testing: Producer phone-tested run #49 (routes: 36/36 stars, fun and fair). Mirror Pulse, campaign stages 13-18, the ribbon comet trail and every later APK: NOT DEVICE-TESTED.
-- Workflow: Claude is Lead Developer, reviewer and merge operator (permanent since 2026-10-26); ChatGPT is a report reviewer, not a merge gate; Producer decides product/gameplay and releases.
+- Status: MERGED AND BUILT. Audio pack (PR #25), Campaign Batch 2 / stages 19-24 (PR #26), barrier-ready cue (PR #27), near-miss → Overdrive prototype on stage 10 (PR #34) and the Prototype Lab foundation (PR #35). THREE PROTOTYPE TRACKS IN PROGRESS IN PARALLEL (Resonance Gates #31, Shatter Symphony #32, World Shift #33), plus barrier palette comfort (#29) and Campaign Batch 3 (stages 25-30) queued on the master tracker.
+- `main` @ `f49e6bd23a2632aa7badf76cc4cdc903c73210a9` (PR #36 barrier palette merge of head `e742a756`, built by run #87 on the PR head; integrated main build of `f49e6bd`: [run #88](https://github.com/egaamnd-bot/casual-game-studio/actions/runs/40365997452) success). Before that: `4b06814` (PR #35 Lab, head `461b75c`). Build history: run #81 = near-miss head `7dcab297` (Producer phone-tested); run #82 = main `0ac1aeb` (near-miss merge), success; run #83 = Lab head `461b75c`, success. Main `4b06814` (Lab merge) is built by [run #84](https://github.com/egaamnd-bot/casual-game-studio/actions/runs/40356974974), success.
+- Campaign: 24 stages (worlds 1-2 complete, world 3 starts at stage 21). Stage 30 finale ("Campaign complete") not built yet.
+
+## Evidence, by type (kept separate)
+- **Automated tests (browser, headless):** near-miss head `7dcab297` full suite at 540×960, 360×640, 412×915: `graze.html` PASS at all three; every other suite PASS except (a) `gameplay.html` FAIL at all viewports — a manual-play page that fails identically on main (known, not a regression) and (b) `audio.html` at 360×640 failed one check once in a full run and passed 3 of 3 when rerun alone (test race, fixed in PR #35). Lab head (PR #35): full suite at 540×960 17/18 PASS (`gameplay.html` known); `lab.html`, `audio.html`, `portrait.html` PASS at the other two viewports; full suites for the Lab tree at 360×640 and 412×915 were run after the merge: 17/18 pages PASS at each, `gameplay.html` FAIL (known).
+- **Producer phone tests:** run #49 (routes) fun and fair; the skin build worked as intended; **run #81 (near-miss prototype, stage 10) "went well"** (Producer feedback 2026-10-26). Run #81 also contains the audio pack, Batch 2 stages and barrier-ready cue, but the Producer's feedback covers the near-miss feel only: those items are NOT SPECIFICALLY DEVICE-TESTED. Mirror Pulse tuning, stages 13-24 difficulty and the comet ribbon trail beyond "worked" remain without detailed device feedback.
+- **Barrier palette (#29, PR #36, MERGED):** full suite at all three viewports PASS on head `51ffe688` (18/18 pages incl. new `palette.html`; `gameplay.html` skipped by default in full runs from now on); the final one-line commit `e742a756` was re-verified with `palette.html` + `scene.html` at 540×960 and CI run #87. NOT DEVICE-TESTED (comfort and readability to be judged on the phone; `CONFIG.palette.soft = false` reverts).
+- **Not built / not tested:** nothing from the three new prototypes or Campaign Batch 3 exists on main yet.
+
+## Rules in force
+Claude is Lead Developer, reviewer and merge operator (self-review, full regression, exact-SHA merge, verify main build, update this file); ChatGPT is a report reviewer, not a merge gate; the Producer decides product/gameplay and releases. Prototypes are flagged and playable only from LAB until the Producer approves wider use. Browser suites share a single lock on the 2-core machine (`/home/claude/bin/pulse-test`).
 
 ## Known limitations
-Echo readability, colour contrast, cue loudness and timing feel NOT DEVICE-TESTED; durations reasoned from 300 px/s, not phone-tuned; Mirror Pulse is a stage 7 prototype only.
+Mirror/route/Overdrive/graze tuning is by reasoning and bots, refined only by the Producer's phone feedback so far; echo readability and cue loudness not measured on a device; `gameplay.html` is a manual page that always fails headless; the barrier-ready corona and sound level have no specific device feedback.
 
-## Next recommended task
-Batch 2 (stages 19-24). Producer phone-tests run #62 and the Batch 1 APK; tune from feedback. Backlog (not built): Near-Miss Rewards, Collectible Chains, World Finale Sequences; combined safe-route vs. paired-risk-route sequence after validation.
+## Next recommended tasks
+1. Merge the three prototype PRs one at a time (each after its own checks), combined regression after each, then one combined APK for the Producer's phone assessment (keep / tune / discard per prototype).
+2. Campaign Batch 3 (stages 25-30, `docs/CAMPAIGN_30.md`).
+3. Producer decision pending: widen the near-miss graze beyond stage 10, or tune the numbers (3 per graze, 15 per run).
