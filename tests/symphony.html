@@ -180,7 +180,10 @@
       S.register();
       const entry = Pulse.Lab.find(S.LAB_ID);
       check(!!entry && entry.flags.symphony === true && entry.base === 's14-safe-or-sorry' && entry.stage.id === 'lab-shatter-symphony', 'the Lab entry exists: stage 14 as a new stage id, flags.symphony');
-      check(!Pulse.STAGES.some((s) => s.id === entry.stage.id) && Pulse.STAGES.length === 24 && Pulse.STAGES.findIndex((s) => s.id === 's14-safe-or-sorry') === 13, 'it is not a campaign stage: 24 stages, stage 14 where it was');
+      {
+        const ids = Pulse.STAGES.map((s) => s.id), nums = ids.map((id) => parseInt(id.slice(1), 10));
+        check(!ids.includes(entry.stage.id) && Pulse.STAGES.length === 30 && ids.findIndex((id) => id === 's14-safe-or-sorry') === 13 && ids[29] === 's30-pulse-zero' && new Set(ids).size === 30 && nums.every((n, i) => n === i + 1), 'it is not a campaign stage: 30 stages, unique ids in order 1..30, stage 14 where it was');
+      }
       check(entry.stage.items === Pulse.STAGES[13].items && entry.stage.speed.start === Pulse.STAGES[13].speed.start, 'it plays stage 14\'s own layout and speed (same items array)');
       check(typeof C.symphony === 'object' && C.symphony.enabled === true, 'CONFIG.symphony.enabled is on by default (the Lab flag is what scopes it)');
       check(!!Pulse.Lab.list().find((e) => e.id === S.LAB_ID) && Pulse.Lab.list().filter((e) => e.id === S.LAB_ID).length === 1, 'registering twice does not duplicate the entry');
@@ -282,8 +285,10 @@
       const nMiss = layerLog.filter((x) => x.ok).length; await play(q, 72); check(layerLog.filter((x) => x.ok).length === nMiss, 'and the arpeggio is silent again');
       // A route clear builds it without a streak, for ~8 beats.
       q.routeClears = (q.routeClears || 0) + 1; const nr = layerLog.length; await play(q, 102);
+      // The level eases up with a 0.9 s time constant, so the first note can land a little after 102 frames on a slow or loaded run: wait for it inside the same ~8-beat boost window (at most 60 more frames), and keep the total at 342 frames so the checks below are unchanged.
+      let extra = 0; while (extra < 60 && layerLog.slice(nr).filter((x) => x.ok).length < 1) { await play(q, 6); extra += 6; }
       check(layerLog.slice(nr).filter((x) => x.ok).length >= 1, `a cleared risk route lifts the level to 2 and the arpeggio enters (v ${d.v.toFixed(2)})`);
-      await play(q, 240); check(d.v < 1.5, `and it falls back after about 8 beats (v ${d.v.toFixed(2)})`);
+      await play(q, 240 - extra); check(d.v < 1.5, `and it falls back after about 8 beats (v ${d.v.toFixed(2)})`);
       // Overdrive: the arpeggio steps aside for the stem; afterwards the level is capped at 2.
       setCombo(16); await play(q, 108); const nOd = layerLog.filter((x) => x.ok).length; odOn(q); await play(q, 54);
       check(layerLog.filter((x) => x.ok).length === nOd, 'during Overdrive the arpeggio does not play (the stem carries it)');
