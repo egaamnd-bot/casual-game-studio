@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse resonance gates: rule, timing, lab stage</title>
+  <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
+</head>
+<body>
+  <script>
+    // Resonance gates (docs/RESONANCE_GATES.md), part 1: the band rule, achievability with the real orb rates, the lab stage, scripted taps.
+    try { localStorage.clear(); } catch (e) {}
+    window.PULSE_ASSET_BASE = '../src/';
+    window.PULSE_TEST = { autoStart: true, holdReady: true, bot: false, mode: 'campaign', stageIndex: 0 };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/melody.js"></script>
+  <script src="../src/js/overdrive.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/graze.js"></script>
+  <script src="../src/js/mirror.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/resonance.js"></script>
+  <script src="../src/js/patterns.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script src="../src/js/render.js"></script>
+  <script src="../src/js/ui.js"></script>
+  <script src="../src/js/assets.js"></script>
+  <script src="../src/js/trail.js"></script>
+  <script src="../src/js/sprite-view.js"></script>
+  <script src="../src/js/game-scene.js"></script>
+  <script src="../src/js/menu-scenes.js"></script>
+  <script src="../src/js/lab.js"></script>
+  <script src="../src/js/lab-scene.js"></script>
+  <script src="../src/js/main.js"></script>
+  <script src="resonance-common.js"></script>
+  <script>
+    // ---- A scripted orb size: the pure rules driven by real orb physics (Pulse.Orb.step) ----
+    // Time is relative to the instant the gate's middle line is level with the orb. A tap holds the screen from `ts`
+    // for `D` seconds and then lets go. Frames are sampled like the game: orb first, then the world, then the check.
+    function sim({ fps, speed, ts, D, lo, hi, phase = 0, win = K.window }) {
+      const dt = 1 / fps;
+      const o = Pulse.Orb.create();
+      let z = { d: NaN, r: NaN, hit: false };
+      for (let t = -1.2 + phase * dt; t < 1.2; t += dt) {
+        Pulse.Orb.step(o, t >= ts && t < ts + D, dt, W);
+        const d = speed * (t + dt);
+        const first = z.d !== z.d;
+        if (!z.hit && Z.swept(first ? d : z.d, first ? o.radius : z.r, d, o.radius, win, lo, hi)) z.hit = true;
+        z.d = d; z.r = o.radius;
+      }
+      return z.hit;
+    }
+    // The total length (ms) of the tap start times, within a 1.2 s range, that earn the reward (a long tap can earn it
+    // twice: once while shrinking through the band and once while growing back; both ranges are counted).
+    function tolerance(p) {
+      let total = 0;
+      for (let ms = -700; ms <= 500; ms += 2) if (sim(Object.assign({}, p, { ts: ms / 1000 }))) total += 2;
+      return total;
+    }
+
+
+    async function run() {
+      for (let i = 0; i < 200 && !(scene() && scene().state); i++) await wait(100);
+      await Pulse.Audio.loading; await wait(300); Pulse.Audio.unlock();
+
+      // ---- The rule: band edges (closed band), window edges ----
+      check(K.minLo > C.orb.minRadius && K.maxHi < R - C.pickup.sizeTolerance && K.band[0] >= K.minLo && K.band[1] <= K.maxHi, `bands are intermediate: [${K.minLo}, ${K.maxHi}] lies strictly between the smallest size ${C.orb.minRadius} and the barrier-smash size ${R - C.pickup.sizeTolerance}`);
+      check(!Pulse.isCharged(K.maxHi) && !Pulse.isCharged(K.band[1]), 'no band reaches a radius that counts as charged (the barrier rule keeps its meaning)');
+      const pt = (r, d = 0) => Z.swept(d, r, d, r, K.window, 26, 46);
+      for (const [r, want] of [[25.999, false], [26, true], [26.001, true], [36, true], [45.999, true], [46, true], [46.001, false], [20, false], [56, false]]) check(pt(r) === want, `radius ${r} against [26, 46] at the middle line: ${want ? 'in' : 'out'}`);
+      for (const [d, want] of [[0, true], [K.window, true], [-K.window, true], [K.window + 0.001, false], [-K.window - 0.001, false], [200, false], [-200, false]]) check(pt(36, d) === want, `radius 36, gate middle ${d} px from the orb: ${want ? 'counts' : 'does not count'} (window ±${K.window} px, closed)`);
+      check(Z.inBand(26, 26, 46) && Z.inBand(46, 26, 46) && !Z.inBand(25.99, 26, 46) && !Z.inBand(46.01, 26, 46), 'inBand is closed at both ends');
+      // A changing radius: enters the band inside the window, or only before / after it.
+      check(Z.swept(-30, 56, 0, 30, K.window, 26, 46), 'radius falls into the band during the frame the gate arrives: counts');
+      check(!Z.swept(-60, 56, -40, 30, K.window, 26, 46), 'in the band only while the gate is still 40..60 px away: does not count');
+      check(!Z.swept(40, 30, 60, 56, K.window, 26, 46), 'in the band only after the gate has gone 40..60 px past: does not count');
+      check(Z.swept(-100, 56, 100, 56, K.window, 26, 46) === false, 'a full-size orb never counts');
+      check(Z.swept(-10, 56, 10, 20, K.window, 26, 46), 'sweeping through the band inside one frame counts (continuous check, not point samples)');
+      check(Z.swept(-10, 30, 10, 30, K.window, 40, 46) === false, 'a radius that never reaches the band does not count');
+      // Leave and re-enter: still a single yes (it is a yes/no per gate).
+      check(Z.swept(-10, 36, 0, 50, K.window, 26, 46) && Z.swept(0, 50, 10, 36, K.window, 26, 46), 'leaving and re-entering the band: each part counts, the gate still pays once (below)');
+      // Band normalization keeps bands intermediate.
+      check(Z.normalize([10, 70]).join() === [K.minLo, K.maxHi].join(), `normalize clamps [10, 70] to [${K.minLo}, ${K.maxHi}]`);
+      check(Z.normalize([30, 31]).join() === K.band.join() && Z.normalize(null).join() === K.band.join() && Z.normalize([40, 30]).join() === K.band.join(), 'normalize replaces degenerate bands with the default');
+      check(Z.normalize([28, 40]).join() === '28,40', 'normalize keeps a valid band as given');
+
+      // ---- Achievability with the real shrink / grow rates (pure simulation of Pulse.Orb.step) ----
+      const rows = [];
+      let minTol = Infinity, maxDiff = 0;
+      const bestOf = {};
+      for (const [lo, hi] of [[26, 46], [24, 38], [32, 46]]) {
+        for (const speed of [250, 300]) {
+          for (const D of [0.1, 0.15, 0.2, 0.3]) {
+            const widths = FPS.map(([fps]) => tolerance({ fps, speed, D, lo, hi }));
+            minTol = Math.min(minTol, ...widths);
+            maxDiff = Math.max(maxDiff, Math.max(...widths) - Math.min(...widths));
+            bestOf[`${lo},${hi},${speed}`] = Math.max(bestOf[`${lo},${hi},${speed}`] || 0, ...widths);
+            if (D === 0.15 && speed === 300) rows.push(`[${lo},${hi}] ${widths.join('/')}`);
+          }
+        }
+      }
+      check(maxDiff <= 45, `the timing slack agrees across 30 / 60 / 144 fps (largest difference ${maxDiff} ms; the orb's hold is sampled once per frame, so a few ms is physical)`);
+      check(minTol >= 90, `every tap length from 100 to 300 ms has at least 90 ms of start-time slack (smallest ${minTol} ms)`);
+      check(Object.values(bestOf).every((v) => v >= 250), `the best tap for each band and speed has at least 250 ms of slack (${JSON.stringify(bestOf)})`);
+      notes.push(`150 ms tap @300 px/s, start-time slack ms at 30/60/144 fps: ${rows.join('; ')}; smallest of all ${minTol} ms`);
+      // Ideal durations in the band (shrinking / growing through it).
+      const inBandMs = (lo, hi) => `${((hi - lo) / C.orb.shrinkRate * 1000).toFixed(0)}/${((hi - lo) / C.orb.growRate * 1000).toFixed(0)}`;
+      notes.push(`time inside the band while shrinking/growing (ms): [26,46] ${inBandMs(26, 46)}, [24,38] ${inBandMs(24, 38)}, [32,46] ${inBandMs(32, 46)}; window ±${K.window} px = ±${(K.window / 300 * 1000).toFixed(0)} ms at 300 px/s`);
+      // A gate that nobody reacts to (the orb held still at a size): full size, and the smallest, never pay.
+      check(!sim({ fps: 60, speed: 300, ts: 5, D: 0, lo: 26, hi: 46 }), 'never touching the screen (full size) earns nothing');
+      check(!sim({ fps: 60, speed: 300, ts: -1.2 + 0.0, D: 5, lo: 26, hi: 46 }), 'holding the screen from long before the gate (the orb is already at its smallest) earns nothing');
+
+
+      // ---- Lab prototype registration ----
+      const entry = Pulse.Lab.find('resonance');
+      check(!!entry && Pulse.Lab.list().length === 1, 'the prototype registered itself even though lab.js loads after resonance.js');
+      const stage = entry.stage;
+      check(entry.base === 's3-controlled-overload' && stage.world.index === 1 && entry.baseIndex === 2, 'based on a world-1 stage');
+      check(!Pulse.STAGES.some((s) => s.id === stage.id) && Pulse.STAGES.length === 24 && Pulse.STAGES[0].id === 's1-first-pulse', 'not part of the campaign list (24 stages, same order)');
+      check(Pulse.Campaign.validate(stage, W).length === 0, 'the lab stage passes the campaign validator');
+      check(Math.max(stage.speed.start, stage.speed.end) < 430, `calm pacing: top speed ${Math.max(stage.speed.start, stage.speed.end)} px/s < 430`);
+      const gates = entry.flags.resonance.gates;
+      const idxs = Object.keys(gates).map(Number);
+      check(idxs.length >= 6 && idxs.length <= 8, `${idxs.length} resonance gates (6-8 wanted)`);
+      check(idxs.every((i) => stage.items[i].type === 'gate' && stage.items[i].need >= R + 20 && !stage.items[i].length && !stage.items[i].slide), 'every resonance gate is an ordinary gate wide enough for a full-size orb (passable at any size)');
+      check(idxs.every((i) => { const b = Z.normalize(gates[i]); return b.join() === gates[i].join() && b[0] > C.orb.minRadius && b[1] < R - C.pickup.sizeTolerance && b[1] - b[0] >= 14; }), 'every band is intermediate and at least 14 px wide');
+      check(stage.items.filter((it) => it.type === 'gate').length > idxs.length && stage.items.some((it) => it.type === 'energy'), 'mixed with ordinary gates and gold notes');
+      check(idxs.some((i) => stage.items[i].x < 0) && idxs.some((i) => stage.items[i].x > 0), 'resonance gates sit on the left and on the right');
+
+
+      const { GT, plain, D, tapsFor, play, stdIdx, cap0 } = await prepare();
+      let r;
+      K.runCap = 1000; // count every payment in the next runs; the cap has its own test
+      // Taps for the standard-band gates only.
+      r = await play(tapShape(tapsFor((g) => stdIdx.includes(g.idx))));
+      check(r.o.state === 'complete' && r.o.count === stdIdx.length && r.o.shown === stdIdx.length && r.o.charge === stdIdx.length * K.charge, `taps on the ${stdIdx.length} standard gates: ${r.o.count} rewards of ${K.charge} (charge ${r.o.charge}), run completes`);
+      check(r.bursts === stdIdx.length, `and ${r.bursts} bursts / effects (one per reward)`);
+      const withTaps = r.o;
+      check(Math.abs((withTaps.od - plain.od) - withTaps.charge) < 1e-6 && withTaps.charge > 0, `the Overdrive charge total is exactly ${withTaps.charge} higher than in the plain run (${withTaps.od} vs ${plain.od})`);
+      check(withTaps.score === plain.score && withTaps.energy === plain.energy && withTaps.t === plain.t && withTaps.stars === plain.stars, `score ${withTaps.score}, energy ${withTaps.energy}, time ${withTaps.t}, stars ${withTaps.stars} identical to the plain run`);
+      // Every band: one tap per gate, aligned to the gate's own band.
+      const perBand = { '26,46': 0, '24,38': 0, '32,46': 0 };
+      r = await play(tapShape(GT.map((g) => { const b = g.band; const bottom = (b[0] + b[1]) / 2; const dd = (R - bottom) / C.orb.shrinkRate; return [g.t - dd - 0.0, dd + 0.02]; })));
+      check(r.o.shown === idxs.length && r.o.count === idxs.length, `a tap aimed at each gate's own band (standard, low and high): all ${idxs.length} gates pay (${r.o.count}, effects ${r.o.shown})`);
+      // Static sizes: only a radius inside the band pays.
+      const staticRun = async (rad) => { const out = await play(() => rad); return out.o; };
+      const expect = (rad) => idxs.filter((i) => rad >= gates[i][0] && rad <= gates[i][1]).length;
+      for (const rad of [20, 25.99, 26, 36, 38.01, 46, 46.01, 56]) {
+        const o = await staticRun(rad);
+        check(o.state === 'complete' && o.count === expect(rad) && o.shown === expect(rad), `constant radius ${rad}: ${expect(rad)} of ${idxs.length} gates pay (got ${o.count}, effects ${o.shown}), run completes with no crash`);
+        // Too small (20) or too large (56): a safe pass, no reward, no penalty, nothing different from a plain run.
+        if (rad === 20 || rad === 56) check(o.count === 0 && o.charge === 0 && o.score === plain.score && o.energy === plain.energy && o.stars === plain.stars, `radius ${rad}: safe pass, no reward, score / energy / stars unchanged`);
+      }
+      // In the band only before or after the window: nothing.
+      const earlyLate = GT.map((g) => [g.t - 0.5, 0.1]); // dips well before the gate, back to full size long before the window
+      r = await play(tapShape(earlyLate));
+      check(r.o.count === 0, `dipping through the band 0.4 s before each gate: nothing (count ${r.o.count})`);
+      // Re-entering: dip, return above the band, dip again inside the window: still exactly one per gate.
+      const twice = GT.flatMap((g) => [[g.t - 0.25, 0.1], [g.t - 0.07, 0.14]]); // dip, climb back above the band, dip again through the window
+      r = await play(tapShape(twice));
+      check(r.o.count === idxs.length && r.o.shown === idxs.length && r.bursts === idxs.length, `leave and re-enter the band around each gate: one reward per gate (${r.o.count} rewards, ${r.bursts} effects for ${idxs.length} gates; at ${burstAt.slice(-8).join(',')})`);
+      // A radius that leaves the band right inside the window is still a yes (instant rule).
+      // Frame rate and a hitch: the same result.
+      const fixedTaps = tapShape(tapsFor((g) => stdIdx.includes(g.idx)));
+      const byFps = [];
+      for (const [fps, ms] of FPS) byFps.push((await play(fixedTaps, { ms })).o);
+      check(byFps.every((o) => o.count === stdIdx.length && o.charge === byFps[0].charge), `30 / 60 / 144 fps: the same ${stdIdx.length} rewards (${byFps.map((o) => o.count).join(' / ')})`);
+      const hitched = await play(fixedTaps, { ms: 16.667, hitch: { at: GT[1].t - 0.05, ms: 50 } });
+      check(hitched.o.count === stdIdx.length, `a 50 ms hitch right at a gate: the same ${stdIdx.length} rewards (${hitched.o.count})`);
+      // Repeated runs are identical.
+      const reps = [];
+      for (let i = 0; i < 3; i++) reps.push(JSON.stringify((await play(fixedTaps)).o));
+      check(new Set(reps).size === 1, 'three repeated runs of the same taps give identical results');
+      K.runCap = cap0;
+      odNormal();
+      check(errors.length === 0, `page errors: ${errors.join(' | ')}`);
+    }
+    finish('resonance tests (rule, timing, taps)', run);
+  </script>
+</body>
+</html>

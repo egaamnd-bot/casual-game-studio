@@ -400,6 +400,7 @@
       this.cuedBarrier = null;
       this.grazeCharge = 0; // Overdrive units earned from grazes this run (capped)
       this.grazes = 0;
+      if (Pulse.Resonance) Pulse.Resonance.reset(this); // resonance gates (docs/RESONANCE_GATES.md)
       this.routeClears = 0;
       this.resetMirror();
       this.mirrorClears = 0;
@@ -694,10 +695,12 @@
       const r = this.radius;
       const ox = this.orbX;
       const grazing = this.grazeOn();
+      const resonance = !!Pulse.Resonance && Pulse.Resonance.on(this);
       for (let i = 0; i < segs.length; i++) {
         const s = segs[i];
         if (!s.active) continue;
         if (grazing && s.kind === 'gate' && !s.ring && !s.scored) Pulse.Graze.observe(s, ox, this.orbY, r, this.level.width); // swept closest approach (feedback only)
+        if (resonance && s.kind === 'gate' && !s.ring && !s.scored) Pulse.Resonance.observe(this, s, ox, this.orbY, r); // swept size band (docs/RESONANCE_GATES.md)
         let event = this.level.resolve(s, this.orbY, r, this.orbState.charge, ox);
         let byEcho = false;
         // Mirror Pulse: the echo is checked on its own against the paired obstacles of the zone.
@@ -774,6 +777,7 @@
             if (this.view) this.view.smash(s);
           } else {
             this.contact('pass', s, prevCombo);
+            if (resonance) Pulse.Resonance.cleared(this, s, r);
             if (grazing) this.graze(s, r);
             else this.checkNearMiss(s, r);
             if (s.fork && s.route) this.routePassed(s);
@@ -1223,6 +1227,7 @@
       if (this.view && this.view.renderEcho) this.view.renderEcho(mir && this.echoK > 0, this.radius);
 
       this.drawOverdrive();
+      if (Pulse.Resonance) Pulse.Resonance.draw(this); // resonance target rings (docs/RESONANCE_GATES.md)
 
       // The charge ring only appears while a charged barrier is on screen.
       this.chargeRingShown = active &&

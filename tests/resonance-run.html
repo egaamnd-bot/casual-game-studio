@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse resonance gates: runs, caps, equivalence</title>
+  <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
+</head>
+<body>
+  <script>
+    // Resonance gates (docs/RESONANCE_GATES.md), part 2: one reward per gate, cap, Overdrive on, crashes, the save, equivalence, overlay.
+    try { localStorage.clear(); } catch (e) {}
+    window.PULSE_ASSET_BASE = '../src/';
+    window.PULSE_TEST = { autoStart: true, holdReady: true, bot: false, mode: 'campaign', stageIndex: 0 };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/melody.js"></script>
+  <script src="../src/js/overdrive.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/graze.js"></script>
+  <script src="../src/js/mirror.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/resonance.js"></script>
+  <script src="../src/js/patterns.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script src="../src/js/render.js"></script>
+  <script src="../src/js/ui.js"></script>
+  <script src="../src/js/assets.js"></script>
+  <script src="../src/js/trail.js"></script>
+  <script src="../src/js/sprite-view.js"></script>
+  <script src="../src/js/game-scene.js"></script>
+  <script src="../src/js/menu-scenes.js"></script>
+  <script src="../src/js/lab.js"></script>
+  <script src="../src/js/lab-scene.js"></script>
+  <script src="../src/js/main.js"></script>
+  <script src="resonance-common.js"></script>
+  <script>
+    async function run() {
+      for (let i = 0; i < 200 && !(scene() && scene().state); i++) await wait(100);
+      await Pulse.Audio.loading; await wait(300); Pulse.Audio.unlock();
+
+      const { entry, gates, idxs, GT, plain, D, tapsFor, play, stdIdx, cap0 } = await prepare();
+      let q, r;
+      // ---- One reward per gate: pooled segments, retry, pause ----
+      // Only the first gate is tapped; the pooled segment objects it used are reused by later gates, which must not pay.
+      r = await play(tapShape([[GT[0].t - D / 2 - 0.06, D]]));
+      check(r.o.count === 1 && r.o.charge === K.charge, `one tap, one reward, even though the same segment objects are reused by later gates (count ${r.o.count})`);
+      // Retry within one scene: a second run starts clean and pays again.
+      {
+        const x = await startLab('resonance'); pinFn(x, tapShape(tapsFor((g) => stdIdx.includes(g.idx)))); drive(x);
+        const first = outcome(x);
+        x.startRun(); frames(x, 2);
+        check(Z.stats(x).count === 0 && Z.stats(x).charge === 0, 'retry: the run starts with no rewards counted');
+        drive(x);
+        const second = outcome(x); unpin(x);
+        check(first.count === stdIdx.length && JSON.stringify(first) === JSON.stringify(second), `retry: the second run pays the same (${first.count} then ${second.count}) and ends identically`);
+      }
+      // Pause in the middle of a crossing, then resume.
+      {
+        const x = await startLab('resonance'); pinFn(x, tapShape([[GT[0].t - D / 2 - 0.06, D]]));
+        let paused = false;
+        const c = clockOf(x);
+        drive(x, { hook: (s) => { if (!paused && s.elapsed >= GT[0].t - 0.01 && s.state === 'playing') { paused = true; s.pause(); for (let i = 0; i < 40; i++) { c.now += 16.667; s.update(c.now, 16.667); s.draw(); } s.setState('playing'); } } });
+        unpin(x);
+        check(paused && Z.stats(x).count === 1, `pause and resume mid-crossing: the same single reward (count ${Z.stats(x).count})`);
+      }
+      // A tall gate (tunnel), a sliding gate and a plain one, all from one lab entry registered for this test.
+      {
+        const base = Pulse.STAGES[2];
+        const items = [
+          { type: 'gate', need: 84, length: 220, t: 1.2, x: 0 }, // tall
+          { type: 'gate', need: 110, t: 1.2, x: 0, beat: 0.5, slide: { amp: 24, beats: 4, phase: 0 } }, // sliding
+          { type: 'gate', need: 84, t: 1.2, x: -60 }, // left
+          { type: 'gate', need: 84, t: 1.2, x: 60 }, // right
+          { type: 'energy', t: 0.6, x: 0 },
+        ];
+        const stg = Pulse.Lab.derive(base.id, { id: 'lab-rz-test', name: 'RZ test', items, hints: [], speed: { start: 250, end: 250 } });
+        Pulse.Lab.register({ id: 'rz-test', title: 'RZ test', desc: 'tests', base: base.id, stage: stg, flags: { resonance: { gates: { 0: [26, 46], 1: [26, 46], 2: [26, 46], 3: [26, 46] } } } });
+        const x = await startLab('rz-test', { bot: true }); pinFn(x, () => 36); drive(x); unpin(x);
+        check(x.state === 'complete' && Z.stats(x).count === 4, `tall (220 px), sliding, left and right gates each pay once at a constant in-band radius (count ${Z.stats(x).count}, state ${x.state})`);
+        const x2 = await startLab('rz-test', { bot: true }); pinFn(x2, () => 52); drive(x2); unpin(x2);
+        check(x2.state === 'complete' && Z.stats(x2).count === 0, 'the same gates at radius 52: safe pass, nothing');
+        Pulse.Lab._remove('rz-test');
+      }
+
+      // ---- Cap, Overdrive on, crash ----
+      K.runCap = cap0;
+      {
+        const all = tapShape(GT.map((g) => { const bottom = (g.band[0] + g.band[1]) / 2; const dd = (R - bottom) / C.orb.shrinkRate; return [g.t - dd, dd + 0.02]; }));
+        const o = (await play(all)).o;
+        check(K.runCap < THRESHOLD && K.runCap === 20, `the per-run cap is ${K.runCap} units, far below the ${THRESHOLD} needed to fill the meter`);
+        check(o.charge === K.runCap && o.count === K.runCap / K.charge, `${idxs.length} correct crossings: charge stops at the cap (${o.charge}), ${o.count} paid`);
+        const x = await startLab('resonance'); pinFn(x, all); bursts = 0; drive(x); unpin(x);
+        check(bursts === idxs.length, `the effect still shows for every correct crossing after the cap (${bursts} of ${idxs.length})`);
+        const y = await startLab('resonance'); pinFn(y, all); bursts = 0;
+        drive(y, { hook: (s) => { s.od.active = true; s.od.remaining = C.overdrive.duration; s.od.meter = 100; } }); unpin(y);
+        check(Z.stats(y).charge === 0 && Z.stats(y).count === 0 && bursts === idxs.length, `while Overdrive is on: the effect shows (${bursts}), no charge is added (${Z.stats(y).charge}) and the cap is not used`);
+      }
+      // A crash pays nothing. An unsteered orb (on the lane centre, radius in every band) passes the centred gate and
+      // hits the wall of the next, off-centre one.
+      {
+        const x = await startLab('resonance', { bot: false });
+        pinFn(x, () => 36);
+        drive(x);
+        unpin(x);
+        check(x.state === 'over' && Z.stats(x).count === 1 && Z.stats(x).charge === K.charge, `an unsteered orb passes the centred gate (one reward) and dies on the next one, which pays nothing (state ${x.state}, count ${Z.stats(x).count})`);
+        check(x.od.meter <= 100 && x.od.chargedTotal >= 0, 'and the run is over');
+      }
+      // A crash on the gate itself, AFTER its middle line has passed with the radius in the band: nothing for that gate.
+      {
+        const x = await startLab('resonance', { bot: false });
+        const g = GT[1]; // x = -70
+        pinFn(x, () => 36);
+        drive(x, { hook: (s) => {
+          const t = s.elapsed;
+          const px = t < g.t - 0.35 ? 270 : t < g.t + 0.03 ? 270 + g.x : 400; // into the gap, then slammed into the right wall
+          s.orbState.x = px; s.orbState.tx = px; s.orbState.vx = 0;
+        } });
+        unpin(x);
+        const gz = x.level.segments.find((sg) => sg.rz && Math.abs(sg.rz.at - x.level.items[idxs[1]].at) < 1);
+        check(x.state === 'over' && Z.stats(x).count === 1 && gz && gz.rz.hit && !gz.rz.paid, `crash after the middle line with the radius in the band: the gate was 'hit' but is never paid (state ${x.state}, rewards ${Z.stats(x).count}, hit ${gz && gz.rz.hit}, paid ${gz && gz.rz.paid})`);
+      }
+
+      // ---- The lab never writes the save ----
+      {
+        const before = saveText();
+        const x = await startLab('resonance'); pinFn(x, tapShape(tapsFor(() => true))); drive(x); unpin(x);
+        check(x.state === 'complete' && saveText() === before, 'a completed lab run with rewards leaves the save byte-identical');
+        x.startRun(); frames(x, 3); x.crash && x.crash('wall');
+        x.startRun(); frames(x, 5);
+        check(saveText() === before, 'crash and retry leave the save untouched too');
+      }
+
+      // ---- Nothing else changes: collision, then whole runs ----
+      const Lv = Pulse.Level.prototype;
+      const ref = (seg, x, y, rr) => { // the documented rectangles, written independently of level.js
+        if (y + rr < seg.y || y - rr > seg.y + seg.h) return false;
+        const cr = (rx, ry, rw, rh) => { const dx = x - Math.min(rx + rw, Math.max(rx, x)); const dy = y - Math.min(ry + rh, Math.max(ry, y)); return dx * dx + dy * dy < rr * rr; };
+        return cr(0, seg.y, seg.gapL, seg.h) || cr(seg.gapR, seg.y, W - seg.gapR, seg.h);
+      };
+      let agree = 0, differ = 0;
+      for (const enabled of [true, false]) {
+        K.enabled = enabled; seed = 4242;
+        for (let i = 0; i < 4000; i++) {
+          const cx = 120 + rnd() * 300, half = 30 + rnd() * 70;
+          const seg = { kind: 'gate', y: 600 + rnd() * 200, h: 20 + rnd() * 60, gapL: cx - half, gapR: cx + half };
+          const x = rnd() * W, y = 650 + rnd() * 100, rr = 20 + rnd() * 36;
+          if (Lv.hitsWall.call({ width: W }, seg, x, y, rr) === ref(seg, x, y, rr)) agree++; else differ++;
+        }
+      }
+      K.enabled = true;
+      check(differ === 0, `Level.hitsWall agrees with the reference rectangles on ${agree} random samples with the module on and off (${differ} differ)`);
+      check(C.orb.radius === 56 && C.orb.minRadius === 20 && C.orb.shrinkRate === 190 && C.orb.growRate === 260 && C.pickup.sizeTolerance === 8, 'orb sizes and rates are unchanged');
+      check(Lv.hitsWall.toString().indexOf('Resonance') < 0 && Lv.resolve.toString().indexOf('Resonance') < 0 && Pulse.Orb.step.toString().indexOf('Resonance') < 0, 'collision, resolve and orb physics contain no resonance code');
+
+      const botRun = async (sel) => { const x = sel.lab ? await startLab(sel.lab) : await (async () => { scene().scene.start('game', { mode: 'campaign', stageIndex: sel.stage }); await wait(450); const y = scene(); y.test = { holdReady: true, bot: true, route: 'safe' }; y.startRun(); frames(y, 2); return y; })(); drive(x, { ms: 16.667 }); const o = outcome(x); return { s: o.state, sc: o.score, e: o.energy, t: o.t, st: o.stars }; };
+      odNormal(); // the real threshold for whole-run equivalence
+      for (const sel of [{ lab: 'resonance' }, { stage: 0 }, { stage: 9 }]) {
+        K.enabled = true; const a = await botRun(sel);
+        K.enabled = false; const b = await botRun(sel);
+        K.enabled = true;
+        check(a.s === 'complete' && JSON.stringify(a) === JSON.stringify(b), `${sel.lab ? 'resonance lab stage' : 'stage ' + (sel.stage + 1)}: state, score, energy, time and stars identical with the prototype on and off (${JSON.stringify(a)})`);
+      }
+      // Resonance rewards also leave state/score/energy/time/stars identical to a run without them.
+      K.enabled = false; const off = await botRun({ lab: 'resonance' }); K.enabled = true;
+      odQuiet();
+      K.runCap = 1000;
+      const rr2 = await play(tapShape(tapsFor((g) => stdIdx.includes(g.idx))));
+      K.runCap = cap0;
+      odNormal();
+      check(rr2.o.count > 0 && rr2.o.state === off.s && rr2.o.score === off.sc && rr2.o.energy === off.e && rr2.o.t === off.t && rr2.o.stars === off.st, 'a run that earns rewards ends with the same state, score, energy, time and stars as one that does not');
+      // No resonance state on scenes that never play a resonance stage.
+      scene().scene.start('game', { mode: 'campaign', stageIndex: 0 }); await wait(450);
+      q = scene(); q.test = { holdReady: true, bot: true, route: 'safe' }; q.startRun(); frames(q, 60);
+      check(!Z.on(q) && !q.rz, 'a campaign stage keeps no resonance state at all');
+      scene().scene.start('game', { mode: 'endless' }); await wait(450);
+      q = scene(); q.test = { holdReady: true }; q.startRun(); frames(q, 60);
+      check(!Z.on(q) && !q.rz, 'Endless keeps no resonance state at all');
+
+      // ---- The overlay ----
+      q = await startLab('resonance');
+      pinFn(q, () => 36);
+      let sawShape = false, sawLit = false, minDepth = 9;
+      drive(q, { hook: (s) => { if (s.rz && s.rz.g && s.rz.g.scene && s.rz.g.commandBuffer.length > 0) { sawShape = true; minDepth = Math.min(minDepth, s.rz.g.depth); } } });
+      unpin(q);
+      check(sawShape && q.rz.g.depth > q.world.depth && q.rz.g.depth < q.hud.depth, `the target rings are drawn between the walls (depth ${q.world.depth}) and the HUD (${q.hud.depth}) on their own graphics object (depth ${minDepth})`);
+      check(Z.stats(q).shown <= idxs.length, `no more effects than resonance gates (${Z.stats(q).shown} of ${idxs.length})`);
+      K.enabled = false; q.startRun(); frames(q, 30); const cb = q.rz.g.commandBuffer.length; K.enabled = true;
+      check(cb === 0, 'with the prototype off the overlay is empty');
+      const rzOff = await (async () => { K.enabled = false; const x = await startLab('resonance'); pinFn(x, () => 36); drive(x); unpin(x); K.enabled = true; return Z.stats(x); })();
+      check(rzOff.count === 0 && rzOff.charge === 0, 'with CONFIG.resonance.enabled = false nothing is earned');
+
+      // ---- A world 2 and a world 3 lab base: the overlay needs no art of its own ----
+      for (const baseId of ['s5-charged-energy', 's9-overload']) {
+        const key = 'rz-' + baseId;
+        const stg = Pulse.Lab.derive(baseId, { id: 'lab-' + key, name: key, items: entry.stage.items, hints: [], speed: { start: 250, end: 300 } });
+        Pulse.Lab.register({ id: key, title: key, desc: 't', base: baseId, stage: stg, flags: { resonance: { gates } } });
+        const x = await startLab(key); const gt = gateTimes(x); pinFn(x, tapShape(gt.map((g) => [g.t - D / 2 - 0.06, D]))); drive(x); unpin(x);
+        check(x.state === 'complete' && Z.stats(x).count > 0, `${baseId}-based lab stage plays and pays the same way (state ${x.state}, count ${Z.stats(x).count})`);
+        Pulse.Lab._remove(key);
+      }
+      check(errors.length === 0, `page errors: ${errors.join(' | ')}`);
+      check(errors.length === 0, `page errors: ${errors.join(' | ')}`);
+    }
+    finish('resonance tests (runs, cap, equivalence)', run);
+  </script>
+</body>
+</html>
