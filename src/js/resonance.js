@@ -73,7 +73,7 @@
   }
 
   function reset(scene) {
-    if (!on(scene)) { scene.rz = null; return; } // a scene that moves on to any other stage keeps no resonance state at all
+    if (!on(scene)) { if (scene.rz && scene.rz.g && scene.rz.g.scene) scene.rz.g.clear(); scene.rz = null; return; } // a scene that moves on to any other stage keeps no resonance state at all
     const st = state(scene);
     st.run++;
     st.charge = 0;

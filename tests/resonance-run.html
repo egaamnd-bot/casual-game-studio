@@ -189,10 +189,27 @@
       unpin(q);
       check(sawShape && q.rz.g.depth > q.world.depth && q.rz.g.depth < q.hud.depth, `the target rings are drawn between the walls (depth ${q.world.depth}) and the HUD (${q.hud.depth}) on their own graphics object (depth ${minDepth})`);
       check(Z.stats(q).shown <= idxs.length, `no more effects than resonance gates (${Z.stats(q).shown} of ${idxs.length})`);
-      K.enabled = false; q.startRun(); frames(q, 30); const cb = q.rz.g.commandBuffer.length; K.enabled = true;
+      const g0 = q.rz.g; K.enabled = false; q.startRun(); frames(q, 30); const cb = g0.scene ? g0.commandBuffer.length : 0; K.enabled = true;
       check(cb === 0, 'with the prototype off the overlay is empty');
       const rzOff = await (async () => { K.enabled = false; const x = await startLab('resonance'); pinFn(x, () => 36); drive(x); unpin(x); K.enabled = true; return Z.stats(x); })();
       check(rzOff.count === 0 && rzOff.charge === 0, 'with CONFIG.resonance.enabled = false nothing is earned');
+
+      // ---- Lifecycle: stage restart and scene shutdown leave no leaked state or rings ----
+      {
+        const x = await startLab('resonance'); pinFn(x, () => 36); frames(x, 200); unpin(x);
+        const ring = x.rz.g, run0 = x.rz.run;
+        check(ring.scene && ring.commandBuffer.length > 0, 'a run in progress has its overlay drawn');
+        scene().scene.start('game', { mode: 'campaign', stageIndex: 0 }); await wait(450);
+        const y = scene(); y.test = { holdReady: true, bot: true, route: 'safe' }; y.startRun(); frames(y, 20);
+        check(!ring.scene && !y.rz, 'leaving for another stage destroys the overlay (no leaked rings) and drops the resonance state');
+        const z2 = await startLab('resonance'); frames(z2, 200);
+        check(z2.rz.g !== ring && z2.rz.g.scene && Z.stats(z2).shown === 0 && Z.stats(z2).charge === 0, 'coming back starts with a fresh overlay and zero rewards');
+        z2.startRun(); frames(z2, 2);
+        check(z2.rz.run > 0 && Z.stats(z2).charge === 0 && z2.rz.burst === null, 'a retry resets rewards and any burst in progress');
+        z2.scene.restart({ mode: 'campaign', lab: 'resonance' }); await wait(450);
+        const w2 = scene(); w2.test = { holdReady: true, bot: true, route: 'safe' }; w2.startRun(); frames(w2, 20);
+        check(Z.stats(w2).charge === 0 && w2.rz.g.scene && w2.children.list.filter((o) => o.type === 'Graphics' && o.depth === 3.1).length === 1, 'a scene restart keeps exactly one resonance overlay');
+      }
 
       // ---- A world 2 and a world 3 lab base: the overlay needs no art of its own ----
       for (const baseId of ['s5-charged-energy', 's9-overload']) {
