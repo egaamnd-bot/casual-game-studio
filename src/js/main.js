@@ -24,7 +24,7 @@
     input: { activePointers: 3 },
     // Sounds come from src/js/sfx.js; Phaser's own audio engine is unused for now.
     audio: { noAudio: true },
-    scene: [Pulse.BootScene, Pulse.MenuScene, Pulse.StageSelectScene, Pulse.GameScene].concat(Pulse.LabScene ? [Pulse.LabScene] : []),
+    scene: [Pulse.BootScene, Pulse.MenuScene, Pulse.StageSelectScene, Pulse.GameScene].concat(Pulse.LabScene ? [Pulse.LabScene] : []).concat(Pulse.GauntletScene ? [Pulse.GauntletScene] : []),
     // Headless test browsers barely run requestAnimationFrame, so test pages use timers.
     fps: test ? { forceSetTimeOut: true, target: 60 } : undefined,
   });

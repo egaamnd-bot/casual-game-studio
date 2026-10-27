@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse gauntlet production guard</title>
+  <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
+</head>
+<body>
+  <script>
+    // Developer Campaign / QA Gauntlet (docs/DEV_GAUNTLET.md): every section through the real game systems, retry, chaining, exit,
+    // save isolation, flag cleanup and the production guard. The per-feature tests stay; this supplements them.
+    try { localStorage.clear(); } catch (e) {}
+    window.PULSE_ASSET_BASE = '../src/';
+    window.PULSE_TEST = { autoStart: true, holdReady: true, bot: false, mode: 'campaign', stageIndex: 0 };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+  <script src="../src/js/config.js"></script>
+  <script>Pulse.CONFIG.gauntlet = { enabled: false };</script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/melody.js"></script>
+  <script src="../src/js/symphony.js"></script>
+  <script src="../src/js/overdrive.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/graze.js"></script>
+  <script src="../src/js/mirror.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/resonance.js"></script>
+  <script src="../src/js/patterns.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script src="../src/js/render.js"></script>
+  <script src="../src/js/ui.js"></script>
+  <script src="../src/js/assets.js"></script>
+  <script src="../src/js/trail.js"></script>
+  <script src="../src/js/worldshift.js"></script>
+  <script src="../src/js/sprite-view.js"></script>
+  <script src="../src/js/game-scene.js"></script>
+  <script src="../src/js/menu-scenes.js"></script>
+  <script src="../src/js/lab.js"></script>
+  <script src="../src/js/lab-scene.js"></script>
+  <script src="../src/js/gauntlet.js"></script>
+  <script src="../src/js/gauntlet-scene.js"></script>
+  <script src="../src/js/main.js"></script>
+  <script>
+    const C = Pulse.CONFIG, G = Pulse.Gauntlet;
+    const fails = []; let checks = 0;
+    const check = (ok, msg) => { checks++; if (!ok) fails.push(msg); };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const errors = [];
+    window.addEventListener('error', (e) => errors.push(e.message));
+    (async () => {
+      await wait(600);
+      check(C.gauntlet.enabled === false, 'the guard flag is off');
+      check(!!G && G.available() === false, 'available() is false');
+      check(G.sections().length === 0, 'no section is registered');
+      check(!Pulse.Lab.list().some((e) => e.group === 'gauntlet' || /^gauntlet-/.test(e.id)), 'no Gauntlet entry in the Lab registry');
+      check(!Pulse.STAGES.some((s) => /gauntlet/.test(s.id)) && Pulse.STAGES.length === 30, 'the campaign is the untouched 30 stages');
+      const game = window.__pulseGame;
+      game.scene.stop('game'); game.scene.start('lab'); await wait(300);
+      const texts = (o, out = []) => { (o.list || o.getAll && o.getAll() || []).forEach((c) => { if (c.text !== undefined) out.push(String(c.text)); if (c.list) texts(c, out); }); return out; };
+      const lab = game.scene.getScene('lab');
+      const all = texts(lab.children, []);
+      check(!all.some((t) => /Gauntlet/.test(t)), 'the LAB screen shows no Gauntlet entry');
+      check(errors.length === 0, 'no script errors: ' + errors.join('; '));
+      const ok = fails.length === 0;
+      document.title = (ok ? 'PASS ' : 'FAIL ' + fails.length + ': ' + fails.join(' | ')) + (ok ? ' gauntlet guard ' + checks + ' checks' : '');
+    })();
+  </script>
+</body>
+</html>

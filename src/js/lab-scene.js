@@ -16,14 +16,15 @@
       this.add.rectangle(0, 0, W, H, T.background).setOrigin(0).setDepth(-3);
       UI.text(this, W / 2, 56, 'Lab', 34, T.text, true);
       UI.text(this, W / 2, 92, 'Prototypes · not part of the campaign · no stars, no saves', 14, T.textDim);
-      const list = Pulse.Lab.list();
+      const list = Pulse.Lab.list().filter((e) => !e.group); // Gauntlet sections live on their own screen
+      if (Pulse.Gauntlet && Pulse.Gauntlet.available()) list.unshift({ title: 'Developer Gauntlet (QA)', desc: 'Every mechanic in a short curated sequence. Nothing is saved.', go: () => this.scene.start('gauntlet') });
       const top = 150;
       const rowH = Math.min(150, (H - top - 120) / Math.max(1, list.length));
       list.forEach((e, k) => {
         const y = top + rowH / 2 + k * rowH;
         UI.button(this, W / 2, y - 14, 440, 64, e.title, () => {
           Pulse.Sfx.play('select');
-          this.scene.start('game', { mode: 'campaign', lab: e.id });
+          if (e.go) e.go(); else this.scene.start('game', { mode: 'campaign', lab: e.id });
         }, { size: 26 });
         UI.text(this, W / 2, y + 34, e.desc, 14, T.textDim).setWordWrapWidth(440).setAlign('center');
       });
