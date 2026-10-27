@@ -66,6 +66,15 @@
   const mirrorZone = (id, items) => items.map((it) => Object.assign(it, { zone: id }));
   // Beat-aligns an item to a coarser grid than the stage's (`sub` beats). Only ever delays an item.
   const on = (item, sub) => Object.assign(item, { beat: sub || 1 });
+  // Where a swaying gap is when it reaches the orb (offset = amp * sin(2*pi*phase), see Rhythm.motionOffset):
+  // gold placed there sits on the gap's path through the wall.
+  const crest = (x, amp, phase) => Math.round(x + amp * Math.sin(2 * Math.PI * phase));
+  // A travelling wave: `n` swaying gaps whose phases step by `step` of a cycle, each followed by a gold
+  // note on its path. (The sway is on the off-beat grid like every moving gap.)
+  const wave = (n, need, t, x, amp, beats, p0, step) => Array.from({ length: n }, (_, i) => {
+    const ph = p0 + i * step;
+    return [on(slide(need, t, x, amp, beats, ph), 0.5), gold(0.4, crest(x, amp, ph))];
+  }).flat();
   // n gates alternating left and right of the lane centre by `amp` (first one on side `s`).
   const zig = (n, need, t, amp, s) => Array.from({ length: n }, (_, i) => gap(need, t, ((i % 2 ? -1 : 1) * (s || 1)) * amp));
   // n gates sweeping from x0 to x1 (a slalom curve).
@@ -638,6 +647,176 @@
         // Phrase 4
         gap(42, 0.6, 80), bar(0.5), gap(42, 0.55, -80), bar(0.5), on(breathe(40, 0.55, 40, 26, 4, 0), 0.5), charged(0.7), gap(42, 0.55, -70), bar(0.5), gap(42, 0.55, 70), bar(0.5), gap(42, 0.5, -80), gold(0.45, -70), bar(0.5), gap(42, 0.5, 80), gold(0.4, 70),
         wide(0.5, 0), ...trail(4, 0.3, -80, 80, gold), gold(0.35, 0),
+      ],
+    },
+
+    // ---------------- Batch 3 · stages 25-30 (docs/CAMPAIGN_30.md). Arc 3 closes with 30, the campaign finale. ----------------
+    {
+      id: 's25-narrow-margin', name: 'Narrow Margin', world: W3,
+      intro: 'The smallest gaps in the game, with time to line up. Gold sits right on the line.',
+      teaches: 'Precision peak: the narrowest gaps the game allows (half-width 34-36) and two long tunnels at 34, one narrow gate and one barrier per phrase, gold exactly on the line.',
+      profile: 'Spare and exact: one very narrow gate per phrase, a barrier, a breath. Slow enough to aim, so a loose line loses gold.',
+      speed: { start: 400, end: 440 }, exit: RUNOUT,
+      pace: 1.0, grid: 0.25, spread: 0.9,
+      hints: [{ from: 0.4, to: 4.5, title: 'THE SMALLEST GAP.', sub: 'LINE UP EARLY  ·  THE GOLD IS ON THE LINE' }],
+      items: [
+        wide(1.0, 0), gold(0.4, 0),
+        gap(36, 0.9, -70), gold(0.5, -70), bar(0.8), mint(0.4, 150), gold(0.45, 30),
+        gap(35, 0.9, 80), gold(0.5, 80), bar(0.8), wide(0.6, 0),
+        gap(34, 0.9, -90), gold(0.5, -90), bar(0.8), mint(0.4, 150), gold(0.45, 0),
+        gap(36, 0.9, 60), tunnel(34, 260, 0.75, 60), gold(0.5, 60), bar(0.8), wide(0.6, 0),
+        gap(34, 0.9, -80), gold(0.5, -80), bar(0.8), mint(0.4, 150), gold(0.45, 40),
+        gap(35, 0.9, 90), gold(0.5, 90), bar(0.8), wide(0.6, 0),
+        gap(34, 0.9, -60), tunnel(34, 280, 0.75, -60), gold(0.5, -60), bar(0.8), mint(0.4, -150), gold(0.45, 60),
+        gap(35, 0.9, -80), gold(0.5, -80), bar(0.8), mint(0.4, 150), wide(0.6, 0),
+        gap(34, 0.9, 70), gold(0.5, 70), bar(0.8), gold(0.45, 0), gold(0.4, -60),
+      ],
+    },
+    {
+      id: 's26-counterpoint', name: 'Counterpoint', world: W3,
+      intro: 'Three swaying gates in a row, each a step behind the last. Ride the wave.',
+      teaches: 'Triple sway: waves of three swaying gates with staggered phases (a travelling wave), gold on the wave\'s path, and a charged barrier between waves.',
+      profile: 'A rolling sea: seven waves of three swaying gates, a charged barrier to break each one, gold riding the crest.',
+      speed: { start: 410, end: 450 }, exit: RUNOUT,
+      pace: 0.7, grid: 0.25, spread: 0.9,
+      hints: [{ from: 0.4, to: 4.5, title: 'RIDE THE WAVE.', sub: 'EACH GATE A STEP BEHIND  ·  FOLLOW THE GOLD' }],
+      items: [
+        wide(1.0, 0), gold(0.4, 0),
+        ...wave(3, 48, 0.7, 0, 50, 6, 0.0, 1 / 6), charged(0.9), gold(0.4, 0),
+        ...wave(3, 48, 0.6, 0, 60, 6, 0.5, -1 / 6), charged(0.8), gold(0.4, -50),
+        ...wave(3, 48, 0.6, 0, 60, 6, 0.75, 1 / 6), charged(0.8), gold(0.4, 40),
+        ...wave(3, 48, 0.6, 0, 70, 7, 0.25, 1 / 7), charged(0.8), mint(0.35, -150), gold(0.4, 0),
+        ...wave(3, 48, 0.6, 0, 70, 6, 0.0, -1 / 6), charged(0.75), gold(0.4, 60),
+        ...wave(3, 50, 0.6, 0, 80, 8, 0.5, 1 / 8), charged(0.75), gold(0.4, -40),
+        ...wave(3, 50, 0.6, 0, 80, 8, 0.25, -1 / 4), charged(0.75), gold(0.4, 0), gold(0.4, 60),
+      ],
+    },
+    {
+      id: 's27-convergence', name: 'Convergence', world: W3,
+      intro: 'Your echo and you, drawn together. The openings close in toward the middle, one gap for both.',
+      teaches: 'Mirror Pulse pinch: mirrored pairs that converge on the centre, a centred gap both orbs pass through, then diverge; barriers between the zones.',
+      profile: 'Three echoes that fold inward: pairs closing on the centre, a pinch, then opening out again, with a barrier cadence between.',
+      speed: { start: 395, end: 430 }, exit: RUNOUT, // 430 px/s keeps the 560 px mirror telegraph at 1.3 s
+      pace: 0.8, grid: 0.25, spread: 0.6,
+      mirrorHints: {
+        's27-m1': { title: 'THE ECHO CLOSES IN', sub: 'THE PAIRS DRAW TOWARD THE MIDDLE' },
+        's27-m2': { title: 'PINCH, AND AGAIN', sub: 'BOTH ORBS THROUGH THE CENTRE' },
+        's27-m3': { title: 'LAST CONVERGENCE', sub: 'TWO ORBS · ONE FINGER · ONE GAP' },
+      },
+      items: [
+        wide(1.0, 0), gold(0.4, 0), gap(46, 0.6, -80), gold(0.4, -70), bar(0.55), gold(0.4, 60), gap(44, 0.55, 80), gold(0.4, 70), bar(0.5), gold(0.4, 0),
+        ...mirrorZone('s27-m1', [mgate(64, 1.0, 170), mgate(58, 0.5, 140), mgate(54, 0.5, 115), mgate(50, 0.5, 95), gap(58, 0.5, 0), mgate(50, 0.5, 95), mgate(54, 0.5, 125), mint(0.35, 140), mgate(60, 0.5, 160)]),
+        gold(0.4, 0), bar(0.5), gold(0.4, -70), gap(44, 0.55, -80), gold(0.4, -70), gap(44, 0.55, 80), gold(0.4, 70), charged(0.8), gold(0.4, 0),
+        ...mirrorZone('s27-m2', [mgate(56, 1.0, 150), mgate(52, 0.5, 110), gap(54, 0.5, 0), bar(0.55), mgate(52, 0.55, 110), gap(52, 0.5, 0), mint(0.35, 0), mgate(54, 0.5, 130), bar(0.5)]),
+        gold(0.4, 80), gold(0.4, -80), bar(0.5), gold(0.4, 0), gap(44, 0.55, 70), gold(0.4, 60), gap(44, 0.55, -70), gold(0.4, -60), bar(0.5), gold(0.4, 0),
+        ...mirrorZone('s27-m3', [mgate(54, 1.0, 160), mgate(50, 0.5, 120), mgate(48, 0.5, 96), mgate(46, 0.5, 82), gap(50, 0.5, 0), mint(0.35, 0), mgate(46, 0.5, 82), mgate(48, 0.5, 100), bar(0.55), mgate(52, 0.55, 140)]),
+        gold(0.4, 0), bar(0.5), gold(0.4, 70), gold(0.4, -70), gold(0.4, 0),
+      ],
+    },
+    {
+      id: 's28-overdrive-protocol', name: 'Overdrive Protocol', world: W3,
+      intro: 'Long risky lanes pay in mint. Charge up on the climb, then spend it on the dense stretch.',
+      teaches: 'Greed chains: three forks whose risk lane is a long ladder of mint notes (a route clear and a run of Overdrive), each followed by a dense stretch to spend it on. The safe lane is always open and stars never need the risk.',
+      profile: 'Risk as power: three growing forks (5, 6, 7 rows) paid in mint ladders, each followed by a dense burst of walls.',
+      speed: { start: 415, end: 455 }, exit: RUNOUT,
+      pace: 0.7, grid: 0.25, spread: 0.6,
+      routeHints: {
+        's28-a': { title: 'A LADDER OF MINT', sub: 'LEFT SAFE · RIGHT RISKY (LONG LADDER)' },
+        's28-b': { title: 'LONGER, AND REVERSED', sub: 'LEFT RISKY (LONG LADDER) · RIGHT SAFE' },
+        's28-c': { title: 'THE LONGEST LADDER', sub: 'CLIMB IT, THEN SPEND IT' },
+      },
+      items: [
+        wide(1.0, 0), gold(0.4, 0), gap(46, 0.6, -80), gold(0.4, -70), bar(0.5), gold(0.4, 70),
+        wide(0.7, 0),
+        forkRow('s28-a', 'R', 0.9, [72, -135], [46, 140]), routeNote('s28-a', 'risk', 0.35, 140),
+        forkRow('s28-a', 'R', 0.5, [72, -135], [46, 170]), routeNote('s28-a', 'risk', 0.3, 165), routeNote('s28-a', 'safe', 0.1, -135),
+        forkRow('s28-a', 'R', 0.5, [72, -135], [44, 125]), routeNote('s28-a', 'risk', 0.3, 130),
+        forkRow('s28-a', 'R', 0.5, [72, -135], [44, 160]), routeNote('s28-a', 'risk', 0.3, 150),
+        forkRow('s28-a', 'R', 0.5, [72, -135], [44, 130], true),
+        gold(0.4, 90), bar(0.5), gold(0.4, 0), ...zig(2, 42, 0.5, 90), gold(0.4, 80), charged(0.7), gold(0.4, 0), gold(0.4, -60),
+        wide(0.7, 0),
+        forkRow('s28-b', 'L', 0.9, [44, -150], [70, 130]), routeNote('s28-b', 'risk', 0.35, -140),
+        forkRow('s28-b', 'L', 0.5, [44, -115], [70, 150]), routeNote('s28-b', 'risk', 0.3, -125),
+        forkRow('s28-b', 'L', 0.5, [42, -165], [70, 120]), routeNote('s28-b', 'risk', 0.3, -160), routeNote('s28-b', 'safe', 0.1, 135),
+        forkRow('s28-b', 'L', 0.5, [42, -120], [70, 150]), routeNote('s28-b', 'risk', 0.3, -125),
+        forkRow('s28-b', 'L', 0.5, [42, -155], [70, 125]), routeNote('s28-b', 'risk', 0.3, -150),
+        forkRow('s28-b', 'L', 0.5, [42, -125], [70, 145], true),
+        gold(0.4, -90), bar(0.5), ...snake(3, 40, 0.5, -90, 90), gold(0.4, 80), charged(0.7), gold(0.4, 0), gap(40, 0.5, -80), gold(0.4, -70), bar(0.45), gold(0.4, 0), gold(0.4, 60),
+        wide(0.7, 0),
+        forkRow('s28-c', 'R', 0.9, [72, -140], [42, 135]), routeNote('s28-c', 'risk', 0.35, 135),
+        forkRow('s28-c', 'R', 0.5, [72, -140], [42, 170]), routeNote('s28-c', 'risk', 0.3, 165),
+        forkRow('s28-c', 'R', 0.5, [72, -140], [40, 120]), routeNote('s28-c', 'risk', 0.3, 125), routeNote('s28-c', 'safe', 0.1, -140),
+        forkRow('s28-c', 'R', 0.5, [72, -140], [40, 165]), routeNote('s28-c', 'risk', 0.3, 160),
+        forkRow('s28-c', 'R', 0.5, [72, -140], [40, 125]), routeNote('s28-c', 'risk', 0.3, 125),
+        forkRow('s28-c', 'R', 0.5, [72, -140], [40, 160]), routeNote('s28-c', 'risk', 0.3, 155),
+        forkRow('s28-c', 'R', 0.5, [72, -140], [40, 130], true),
+        gold(0.4, 90), bar(0.5), ...zig(3, 40, 0.5, 90, -1), gold(0.4, 80), charged(0.7), gold(0.4, 0), bar(0.4), gold(0.4, 0), gold(0.4, 60), gold(0.4, -60),
+      ],
+    },
+    {
+      id: 's29-call-and-response', name: 'Call and Response', world: W3,
+      intro: 'Learn the phrase, then answer it. The reply changes one thing. The gold sits on the change.',
+      teaches: 'Sequences: five four-bar motifs, each played once as a call and then repeated as a response with one change (swapped lane, mirrored sway, a different barrier); the gold sits on what changed.',
+      profile: 'A memory test: every pattern is shown once, then answered with a twist. Nothing new appears without a first hearing.',
+      speed: { start: 420, end: 460 }, exit: RUNOUT,
+      pace: 0.7, grid: 0.25, spread: 0.7,
+      hints: [{ from: 0.4, to: 4.5, title: 'CALL, THEN RESPONSE.', sub: 'THE REPLY CHANGES ONE THING  ·  GOLD ON THE CHANGE' }],
+      items: [
+        wide(1.0, 0), gold(0.4, 0), gap(46, 0.7, -60),
+        // Motif 1: a left-right pair, a barrier. Response: the pair swaps sides.
+        gap(42, 0.7, -85), gap(42, 0.55, 85), bar(0.55), wide(0.5, 0),
+        gap(42, 0.65, 85), gold(0.45, 80), gap(42, 0.55, -85), gold(0.45, -80), bar(0.55), gold(0.4, 0),
+        // Motif 2: a sway, a charged barrier, a gap. Response: the sway runs the other way, a plain barrier, the gap swaps sides.
+        on(slide(44, 0.65, 0, 70, 6, 0.25), 0.5), charged(0.8), gap(42, 0.55, -90), wide(0.5, 0),
+        on(slide(44, 0.65, 0, 70, 6, 0.75), 0.5), gold(0.45, -70), bar(0.55), gap(42, 0.55, 90), gold(0.45, 80), mint(0.35, -150), gold(0.4, 0),
+        // Motif 3: a gap, a tunnel, a barrier. Response: the tunnel on the other side, closed by a charged barrier.
+        gap(42, 0.65, 70), tunnel(40, 260, 0.55, 70), bar(0.55), wide(0.5, 0),
+        gap(42, 0.65, -70), tunnel(40, 260, 0.55, -70), gold(0.45, -70), charged(0.75), gold(0.45, 0), gold(0.4, 60),
+        // Motif 4: a breathing gate, a narrow gap, a barrier, a narrow gap. Response: the order flips and the barrier is charged.
+        on(breathe(40, 0.65, 0, 28, 4, 0), 0.5), gap(38, 0.55, -85), bar(0.55), gap(38, 0.55, 85), wide(0.5, 0),
+        gap(38, 0.65, 85), gold(0.45, 80), charged(0.75), gap(38, 0.55, -85), gold(0.45, -80), on(breathe(40, 0.55, 0, 28, 4, 0), 0.5), gold(0.45, 0), mint(0.35, 150), gold(0.4, 0),
+        // Motif 5: the finale of the set, a sway into a zig with two barriers. Response: the sway is mirrored, the zig is reversed, one barrier is charged.
+        on(slide(42, 0.65, 0, 70, 6, 0.75), 0.5), gap(40, 0.55, 90), bar(0.55), gap(40, 0.55, -90), bar(0.5), wide(0.5, 0),
+        on(slide(42, 0.65, 0, 70, 6, 0.25), 0.5), gold(0.45, 70), gap(40, 0.55, -90), gold(0.45, -80), charged(0.75), gap(40, 0.55, 90), gold(0.45, 80), bar(0.5), gold(0.4, 0), gold(0.4, 60), gold(0.4, -60), gold(0.4, 0),
+      ],
+    },
+    {
+      id: 's30-pulse-zero', name: 'Pulse Zero', world: W3,
+      intro: 'The last run. Everything you have learned, once each: weave, sway, echo, fork, gauntlet.',
+      teaches: 'Campaign finale: five movements that each reprise one mechanic once (precision weave, counter-sway, one Mirror Pulse zone, a fork whose risk lane is a long mint ladder, a gauntlet of barriers and a charged chain), a gold recovery before the finish.',
+      profile: 'The longest run in the game: five movements with a breath of gold between each, never the fastest, ending on a gold recovery and the finish.',
+      speed: { start: 400, end: 430 }, exit: { type: 'finish', runout: 420 }, // 430 px/s keeps the 560 px mirror telegraph at 1.3 s
+      pace: 0.9, grid: 0.25, spread: 0.7,
+      mirrorHints: { 's30-m1': { title: 'THE LAST ECHO', sub: 'TWO ORBS · ONE FINGER' } },
+      routeHints: { 's30-f': { title: 'THE LAST FORK', sub: 'LEFT SAFE · RIGHT RISKY (A LONG LADDER OF MINT)' } },
+      items: [
+        // I. Precision weave
+        wide(1.0, 0), gold(0.4, 0),
+        gap(38, 0.7, -80), gold(0.45, -70), gap(38, 0.65, 80), gold(0.45, 70), gap(36, 0.65, -80), gold(0.45, -70), gap(36, 0.65, 80), gold(0.45, 70), wide(0.6, 0), mint(0.35, 150),
+        gap(36, 0.65, -60), gold(0.45, -60), bar(0.6), gap(36, 0.65, 60), gold(0.45, 60), gap(36, 0.65, 0), gold(0.45, 0), wide(0.6, 0), gold(0.4, 0), gold(0.4, 60),
+        // II. Counter-sway
+        on(slide(46, 0.8, -40, 60, 6, 0.25), 0.5), on(slide(46, 0.6, 40, 60, 6, 0.75), 0.5), gold(0.45, 0), bar(0.55),
+        on(slide(44, 0.65, -40, 60, 6, 0.75), 0.5), on(slide(44, 0.85, 40, 60, 6, 0.25), 0.5), gold(0.45, 0), gap(42, 0.55, 80), gold(0.4, 70),
+        on(slide(44, 0.65, 40, 60, 6, 0.75), 0.5), on(slide(44, 0.85, -40, 60, 6, 0.25), 0.5), gold(0.45, 0), bar(0.55),
+        on(slide(44, 0.65, 0, 70, 6, 0.25), 0.5), gold(0.4, 0), wide(0.55, 0), gold(0.4, -60), gold(0.4, 60),
+        // III. Echo (one Mirror Pulse zone)
+        gap(44, 0.7, -80), gold(0.4, -70),
+        ...mirrorZone('s30-m1', [mgate(62, 1.0, 150), bar(0.55), mgate(54, 0.5, 120), mint(0.35, 120), mgate(50, 0.5, 100), gap(54, 0.5, 0), mgate(54, 0.5, 130)]),
+        gold(0.4, 0), gold(0.4, 70), bar(0.55), gold(0.4, -70), gap(44, 0.55, 70), gold(0.4, 60),
+        // IV. The fork: the risk lane is a long ladder of mint
+        wide(0.7, 0),
+        forkRow('s30-f', 'R', 0.9, [72, -135], [42, 140]), routeNote('s30-f', 'risk', 0.35, 140),
+        forkRow('s30-f', 'R', 0.5, [72, -135], [42, 170]), routeNote('s30-f', 'risk', 0.3, 165), routeNote('s30-f', 'safe', 0.1, -135),
+        forkRow('s30-f', 'R', 0.5, [72, -135], [40, 125]), routeNote('s30-f', 'risk', 0.3, 130),
+        forkRow('s30-f', 'R', 0.5, [72, -135], [40, 165]), routeNote('s30-f', 'risk', 0.3, 160),
+        forkRow('s30-f', 'R', 0.5, [72, -135], [40, 125]), routeNote('s30-f', 'risk', 0.3, 125),
+        forkRow('s30-f', 'R', 0.5, [72, -135], [40, 160]), routeNote('s30-f', 'risk', 0.3, 160),
+        forkRow('s30-f', 'R', 0.5, [72, -135], [40, 130], true),
+        gold(0.4, 90), gold(0.4, 20), gold(0.4, -60),
+        // V. Final gauntlet: barriers and a charged chain, then a gold recovery into the finish
+        gap(40, 0.7, -80), bar(0.55), gap(40, 0.55, 80), bar(0.5), gap(38, 0.55, -80), bar(0.5), gap(38, 0.55, 80), gold(0.4, 70), bar(0.5), gap(38, 0.55, -60), gold(0.4, -50), bar(0.5),
+        charged(0.8), gold(0.4, 0), charged(0.65), gold(0.4, 0), gap(38, 0.55, -80), charged(0.7), gold(0.4, -70), bar(0.5), gap(38, 0.55, 80), charged(0.7),
+        wide(0.6, 0), ...trail(5, 0.3, 80, -80, gold), gold(0.3, 0),
       ],
     },
   ];

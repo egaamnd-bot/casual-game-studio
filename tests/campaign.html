@@ -223,9 +223,17 @@
     for (let i = 12; i < STAGES.length; i++) {
       check(STAGES[i].speed.end <= 460, `${STAGES[i].id}: top speed ${STAGES[i].speed.end} is within the 460 px/s ceiling`);
       const opens = i === 12 || i % 10 === 0; // the first new stage after the shipped 12, and each later world opener
-      if (!opens) check(STAGES[i].speed.end >= STAGES[i - 1].speed.end, `${STAGES[i].id}: top speed does not fall inside its world`);
+      // A stage with a Mirror Pulse zone is capped at floor(telegraph px / 1.3 s) = 430 px/s (the telegraph is a fixed 560 px), so after
+      // a faster stage (24 reaches 440) it may sit lower; it still may not fall below that cap, and no stage without a zone may fall.
+      const capped = STAGES[i].items.some((it) => it.zone);
+      if (capped) {
+        check(STAGES[i].speed.end <= Math.floor(C.mirror.telegraphPx / 1.3), `${STAGES[i].id}: a mirror stage stays within the telegraph cap (${STAGES[i].speed.end} <= ${Math.floor(C.mirror.telegraphPx / 1.3)} px/s)`);
+        if (!opens) check(STAGES[i].speed.end >= Math.min(STAGES[i - 1].speed.end, Math.floor(C.mirror.telegraphPx / 1.3)), `${STAGES[i].id}: a mirror stage does not fall below the telegraph cap`);
+      } else if (!opens) check(STAGES[i].speed.end >= STAGES[i - 1].speed.end, `${STAGES[i].id}: top speed does not fall inside its world`);
       if (opens) check(STAGES[i].speed.end >= STAGES[i - 1].speed.end - 60, `${STAGES[i].id}: a new world opens at most 60 px/s below the last stage`);
     }
+    // The campaign finale is the hardest by memory and length, never the fastest (docs/CAMPAIGN_30.md, stage 30).
+    if (STAGES.length >= 30) check(STAGES[29].speed.end < Math.max(...STAGES.map((s) => s.speed.end)), 'the stage-30 finale is not the fastest stage');
     const avgW = (a, b, k) => stat.slice(a, b).reduce((s, c) => s + c[k], 0) / (b - a);
     check(avgW(0, 4, 'median') > avgW(4, 8, 'median') && avgW(4, 8, 'median') > avgW(8, 12, 'median'), `clear time falls world by world (${avgW(0, 4, 'median').toFixed(2)} > ${avgW(4, 8, 'median').toFixed(2)} > ${avgW(8, 12, 'median').toFixed(2)} s)`);
     check(avgW(0, 4, 'wallsPerSec') < avgW(8, 12, 'wallsPerSec'), 'obstacles per second rise from world 1 to world 3');

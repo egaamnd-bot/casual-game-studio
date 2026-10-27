@@ -1,6 +1,6 @@
 # PULSE Campaign: 30 stages in three worlds
 
-Status: DESIGN (Milestone 3, Phase A). Stages 1-12 exist and are shipped; stages 13-30 are PLANNED. Nothing below is device-tested. Design rules, validators and the test plan are in this document; the missing-asset list is in [GEMINI_WORLD_ASSET_BRIEF.md](GEMINI_WORLD_ASSET_BRIEF.md).
+Status: all 30 stages are IMPLEMENTED (Batch 1 = 13-18, Batch 2 = 19-24, Batch 3 = 25-30; see the "as built" tables at the end). Nothing in stages 13-30 is device-tested. The per-stage text below is the original design; where the built stage differs, the "as built" tables say so. Design rules, validators and the test plan are in this document; the missing-asset list is in [GEMINI_WORLD_ASSET_BRIEF.md](GEMINI_WORLD_ASSET_BRIEF.md).
 
 ## 1. Audit of what exists (facts, from the repository)
 
@@ -188,3 +188,40 @@ Deviations from the design text above (all conservative, none touch stages 1-18)
 - **World finale moment**: the last stage of each arc shows "World n complete" (stage 10, 20) and "Campaign complete" (stage 30) on the clear panel with the existing max-multiplier sting after 0.9 s. There is no dedicated finale music or completion art (not supplied).
 - Backdrops: stage 20 uses `bg_portrait_w2_finale_s20`, stages 21-24 `bg_portrait_w3_pulse_collapse` (both PROVISIONAL per the manifest).
 
+## Batch 3 as built (stages 25-30, status: IMPLEMENTED, NOT DEVICE-TESTED)
+
+Measured by the campaign bots (perfect run, 540x960, 60 fps). All six pass validation, finish with all gold for the perfect, cautious (hold 0.75) and sloppy-steer bots at six track lengths and at 30/60/144 fps (`tests/campaign.html`, plus the mirror and route suites for 27/28/30). Durations and item counts again fall below the design text (as in Batches 1-2) except where noted. Every stage keeps the Pulse Collapse audio (140 bpm) and the arc-3 look; 30 uses the existing `bg_portrait_w3_finale_s30` backdrop.
+
+| # | Stage | Speed px/s | Items | Gold | Mint | Signature | Measured |
+|---|-------|-----------|-------|------|------|-----------|----------|
+| 25 | Narrow Margin | 400-440 | 46 | 16 | 5 | nine phrases, each one half-width 34-36 gate + a barrier; two tunnels at 34; gold exactly on the line | ~48 s |
+| 26 | Counterpoint | 410-450 | 60 | 30 | 1 | seven travelling waves of three swaying gates (6-8 beat cycles), gold on each gate's path, a charged barrier after every wave | ~45 s |
+| 27 | Convergence | 395-430 | 62 | 20 | 3 | three Mirror zones whose pairs close in on the centre, a centred pinch both orbs pass, then open out again | ~48 s |
+| 28 | Overdrive Protocol | 415-455 | 79 | 20 | 18 | three forks (5, 6, 7 rows) whose risk lane is a mint ladder (4, 5, 6 notes), each followed by a dense burst of walls | ~52 s |
+| 29 | Call and Response | 420-460 | 66 | 21 | 2 | five motifs, each played as a call and then as a response with one change (swapped side, mirrored sway, plain vs charged barrier); gold on the change | ~49 s |
+| 30 | Pulse Zero (campaign finale) | 400-430 | 102 | 36 | 9 | five movements: precision weave, counter-sway, one Mirror zone, a fork with a 6-note mint ladder, a gauntlet of barriers + charged chain, ending on a gold recovery | ~84 s |
+
+Difficulty proxies (design targets 8.7, 8.8, 9.0, 8.9, 9.4, 10 are provisional; the Producer tunes from phone feedback). Measured on the compiled track at 540x960: narrowest half-width (`need`), the smallest aiming window that implies (`2 x (need - 20)`; the validator floor is 28 px), median clear time between items, walls per second, how many tight (<40) gates, and what must be tracked at once.
+
+| # | Narrowest need | Aiming window | Median clear | Walls/s | Tight gates | Simultaneous demands |
+|---|---|---|---|---|---|---|
+| 21 (ref) | 38 | 36 px | 0.60 s | 0.79 | 52% | one |
+| 24 (ref) | 40 | 40 px | 0.61 s | 1.01 | 0% | one |
+| 25 | 34 | 28 px (the floor) | 0.95 s | 0.53 | 69% | one: size and line |
+| 26 | 48 | 56 px | 0.60 s | 0.64 | 0% | three moving gaps in sequence |
+| 27 | 44 | 48 px | 0.68 s | 0.81 | 0% | two orbs (echo) |
+| 28 | 40 | 40 px | 0.61 s | 0.79 | 0% | route choice + a streak to protect |
+| 29 | 38 | 36 px | 0.67 s | 0.87 | 13% | memory of the call |
+| 30 | 36 | 32 px | 0.72 s | 0.68 | 29% | everything, one at a time |
+
+The curve is climbed by different dials, not raw speed: 25 by the smallest windows with the most time (nothing else on screen), 26 by motion, 27 by the echo, 28 by optional risk, 29 by memory, 30 by length (84 s) and the largest set of different demands. Tuning knobs in `src/js/stages.js`: `speed`, `pace` (multiplies every authored clear time; validation still enforces the fairness floors), `spread`, each gap's `need`, `amp` and `beats` of sways, the rows and notes of a fork.
+
+Deviations from the design text above (all conservative, none touch stages 1-24):
+- **Speed**: stage 24 already runs to 440, so 25-26 start the cap at 440 and 450. Stages 27 and 30 contain a Mirror zone (a fixed 560 px telegraph needs 1.3 s), so they are capped at 430 and run below stage 26 and 29. `tests/campaign.html` therefore states the rule as: a stage with a zone must stay at or under 430 and not fall below the lower of 430 and the previous stage; every other stage may not fall. Stage 29 reaches the 460 ceiling; stage 30 is deliberately not the fastest (a new check).
+- **Stage 26** uses half-widths 48-50 (not the 40-44 of earlier sways): a swaying gate with a 60-80 px swing at that tempo must keep the 28 px aiming window over the whole crossing, which the validator enforces. Its difficulty is the travelling wave, not the narrowness.
+- **Stage 27** has three zones (the design says one converge-pinch-diverge): the first converges and diverges once, the second pinches twice, the third converges tighter (pairs down to a 72 px divider, close to the 64 px minimum the divider rule allows). No zone opening is tighter than stage 7's. Gold only outside zones.
+- **Stage 28**: a fork row's note after its last row could never count, so a ladder of N notes needs N + 1 rows (a rule from Batch 1). The forks therefore have 5, 6 and 7 rows with 4, 5 and 6 risk notes. It has 79 items (design 62-70) because of those rows.
+- **Stage 29** does not include a Mirror zone or a fork: either would cap or crowd the fastest stage in the game. Its five motifs use gaps, narrow gaps, sway, breathing gaps, a tunnel, plain and charged barriers and mint, each introduced as a call before it is answered.
+- **Stage 30** has the five movements of the design, one mechanic each (the tunnel, charge-chain-with-tunnel and breathing gaps are not repeated, so nothing new and nothing doubled). It has 102 items (design 100-110) and runs about 84 s (design 86-96). The finale has no dedicated music or art (none supplied): it uses world 3 at 140 bpm, the arc-3 finale backdrop, the "Campaign complete" title and the existing max-multiplier sting after 0.9 s. There is no Next button on the last stage.
+- **Stars**: 90 stars are now available; skin thresholds are unchanged and Aether Crown (72 stars) becomes reachable (`tests/skins.html`).
+- Stage 25's "quieter mix" is not implemented: it would need an audio-mix change (no new audio was added or requested).
