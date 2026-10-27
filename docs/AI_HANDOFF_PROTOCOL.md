@@ -94,6 +94,14 @@ Report actual counts, failures, skipped tests, warnings, environment caveats, an
 - If a real product/gameplay decision is pending, set status to `NEEDS PRODUCER DECISION` or `READY FOR REVIEW`, list the exact decision, and stop at that checkpoint.
 - If no approval is needed, explicitly state why the task can continue safely.
 
+## Developer Campaign / QA Gauntlet (permanent, 2026-10-27)
+
+The Producer requires a dedicated, isolated developer mode (inside the Prototype Lab) that exercises every approved mechanic in one short curated session. Spec, seam and acceptance evidence: [DEV_GAUNTLET.md](DEV_GAUNTLET.md).
+
+- Every newly approved mechanic or prototype must add its Gauntlet section, with its test and checklist row, or state in its handoff why it cannot.
+- The Gauntlet never changes campaign stage IDs, rules, saves, stars, unlocks, scores or Endless, and prototype flags must not leak out of it. It supplements the individual feature tests and never replaces them.
+- Its handoff must include the mechanic-to-section checklist with observed results and an APK built from the exact tested commit SHA; real-device validation is NOT DEVICE-TESTED until the Producer plays it.
+
 ## End-of-iteration checklist
 
 1. Verify branch name, PR URL, base/head commit SHAs, and PR dependencies from GitHub.

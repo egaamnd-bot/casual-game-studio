@@ -21,7 +21,8 @@ This guide turns the rules in [AI_TEAM.md](AI_TEAM.md) into a day-to-day workflo
 5. **Run relevant tests and builds** before asking for review. Until automated tests exist, describe the manual checks actually run.
 6. **Complete the handoff files** required by [docs/AI_HANDOFF.md](docs/AI_HANDOFF.md).
 7. **Open or update a pull request** into the appropriate base branch. Link dependencies and state explicitly whether the PR must wait for another PR.
-8. **Claude merges once its technical checklist passes** (own diff review, relevant and full regression tests, APK built from the exact head, nothing unrelated, no silent change to controls/collision/stars/saves). Then verify the integrated `main` build and update the handoff. Releases and design-direction changes still need the producer. No one waits for ChatGPT approval.
+8. **New approved mechanics get a Developer Campaign / QA Gauntlet section** (see [docs/DEV_GAUNTLET.md](docs/DEV_GAUNTLET.md)) with a test and a checklist row, kept isolated from the campaign, saves and Endless.
+9. **Claude merges once its technical checklist passes** (own diff review, relevant and full regression tests, APK built from the exact head, nothing unrelated, no silent change to controls/collision/stars/saves). Then verify the integrated `main` build and update the handoff. Releases and design-direction changes still need the producer. No one waits for ChatGPT approval.
 
 ## Commit Messages
 
