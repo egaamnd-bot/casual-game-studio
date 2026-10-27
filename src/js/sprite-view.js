@@ -197,6 +197,7 @@
       this.cometEcho = this.add(sc.add.image(x, y, 'comet_ring').setBlendMode('ADD').setVisible(false), 4.8);
       this.cometRipple = this.add(sc.add.image(x, y, 'comet_ring').setBlendMode('ADD').setVisible(false), 4.9);
       this.cometRing = this.add(sc.add.graphics(), 5.2);
+      this.orbRim = this.add(sc.add.graphics(), 5.1); // symmetric core rim + segmented halo (C.comet.symmetricOrb)
       // Barrier-ready corona: a thin ring just outside the orb while it could smash the barrier ahead (feedback only).
       this.readyRing = this.add(sc.add.image(x, y, 'comet_ring').setBlendMode('ADD').setVisible(false), 4.75);
       this.readyTarget = 0;
@@ -376,6 +377,9 @@
       // ---- Ribbon: overlapping stamps along the path, wide and bright at the orb, tapering to nothing ----
       const R = k.ribbon;
       const N = R.stamps;
+      // Symmetric orb: the wake fades in from the orb's edge so it reads as an afterimage, not a tail attached to the core.
+      const sym = !!k.symmetricOrb;
+      const lead = (u) => { if (!sym) return 1; const q = Math.max(0, Math.min(1, (u - 0.1) / 0.3)); return q * q * (3 - 2 * q); };
       const rib = this.rib;
       const step = len / (N - 1);
       Tr.ribbon(this.trail, len, N, rib, step * R.overlap * 0.5);
@@ -389,7 +393,7 @@
         const h = rib.gap[i] * R.overlap;
         const w = this.fitAhead(w0 * (0.28 + 0.72 * Math.pow(1 - u, 0.8)), h, rib.rot[i], rib.s[i], vr);
         st.setVisible(show).setPosition(rib.x[i], y + rib.s[i]).setRotation(rib.rot[i]).setTint(col)
-          .setAlpha(a0 * (0.35 + 0.65 * fall))
+          .setAlpha(a0 * (0.35 + 0.65 * fall) * lead(u))
           .setScale(w / tex, h / tex);
       }
 
@@ -404,7 +408,7 @@
         const h = this.core2.gap[i] * R.overlap;
         const w = this.fitAhead(cw0 * (0.3 + 0.7 * Math.pow(1 - u, 0.9)), h, this.core2.rot[i], this.core2.s[i], vr);
         this.coreRibbon[i].setVisible(show).setPosition(this.core2.x[i], y + this.core2.s[i]).setRotation(this.core2.rot[i]).setTint(this.skin.colors.core)
-          .setAlpha((0.5 + 0.3 * od) * (0.4 + 0.6 * Math.pow(1 - u, 1.2)))
+          .setAlpha((0.5 + 0.3 * od) * (0.4 + 0.6 * Math.pow(1 - u, 1.2)) * lead(u))
           .setScale(w / tex, h / tex);
       }
 
@@ -422,9 +426,9 @@
       }
       const tailH = this.vfx ? ({ comet_taper_short: 160, comet_taper_med: 256, comet_taper_long: 384 })[this.tailFrame] : 256;
       const tailW = this.vfx ? ({ comet_taper_short: 64, comet_taper_med: 80, comet_taper_long: 96 })[this.tailFrame] : 64;
-      this.cometTail.setVisible(show).setPosition(x, y).setTint(col).setAlpha(0.5 + 0.25 * od).setRotation(lean)
+      this.cometTail.setVisible(show && !sym).setPosition(x, y).setTint(col).setAlpha(0.5 + 0.25 * od).setRotation(lean)
         .setScale((2 * vr * 0.5 * f.glow * (1 + 0.25 * od)) / (tailW * 0.9), headLen / tailH);
-      this.cometStreak.setVisible(show).setPosition(x, y).setTint(this.skin.colors.core).setAlpha(0.7 + 0.3 * od).setRotation(lean)
+      this.cometStreak.setVisible(show && !sym).setPosition(x, y).setTint(this.skin.colors.core).setAlpha(0.7 + 0.3 * od).setRotation(lean)
         .setScale((2 * vr * (0.2 + 0.1 * od)) / (this.vfx ? 26 : 64), (headLen * 1.1) / (this.vfx ? 192 : 256));
 
       this.cometGlow.setVisible(true).setPosition(x, y).setTint(rk > 0 ? this.mixColor(col, 0xffffff, 0.35 * rk) : col).setAlpha(dead ? 0.5 : Math.min(1, 0.55 + 0.25 * (f.pop || 0) + 0.25 * od + 0.15 * rk))
@@ -437,7 +441,10 @@
       }
       // The disc is at least the collision radius across the lane; stretch only adds.
       const d = (2 * vr) / 128;
-      this.cometBody.setPosition(x, y).setTint(col).setScale(d * f.across, d * f.along);
+      // Symmetric orb: keep the disc round (only a slight squash), so shrink/grow reads through size and the halo, not a teardrop.
+      const sAlong = sym ? 1 + (f.along - 1) * 0.2 : f.along, sAcross = sym ? 1 + (f.across - 1) * 0.2 : f.across;
+      this.cometBody.setPosition(x, y).setTint(col).setScale(d * sAcross, d * sAlong);
+      this.drawOrbRim(sym && !dead, x, y, vr, col, od, rk, now);
       this.cometCore.setPosition(x, y).setTint(0xffffff).setAlpha(dead ? 0 : 0.9 + 0.1 * rk).setScale(d * (0.46 + 0.14 * rk));
 
       // Sparks: shed off the curve more often the faster you go or turn, drifting back with the world,
@@ -791,6 +798,23 @@
       for (const img of [this.body, this.ring, this.core, this.arcs]) {
         if (dead) img.setTint(T.danger);
         else img.clearTint();
+      }
+    }
+
+    // Crisp rim and a restrained segmented halo (eight arcs, rotating slowly). Purely cosmetic and symmetric about the orb.
+    drawOrbRim(on, x, y, vr, col, od, rk, now) {
+      const g = this.orbRim;
+      g.clear();
+      if (!on) return;
+      g.lineStyle(Math.max(1.5, vr * 0.07), this.mixColor(col, 0xffffff, 0.7), 0.95);
+      g.strokeCircle(x, y, vr * 0.97);
+      const R = vr * 1.3, spin = now / 1000 * 0.6, seg = Math.PI / 4;
+      g.lineStyle(Math.max(1.5, vr * 0.05), this.mixColor(col, 0xffffff, 0.25 + 0.4 * od), 0.55 + 0.25 * od + 0.2 * rk);
+      for (let i = 0; i < 8; i++) {
+        const a0 = spin + i * seg;
+        g.beginPath();
+        g.arc(x, y, R, a0 + seg * 0.14, a0 + seg * 0.62, false);
+        g.strokePath();
       }
     }
 
