@@ -117,6 +117,7 @@
       this.overlayImages = [];
       this.createHud();
       this.createButtons();
+      if (Pulse.WorldShift) Pulse.WorldShift.attach(this); // World Shift lab stage only (docs/WORLD_SHIFT.md)
 
       this.input.on('pointerdown', this.onPointerDown, this);
       this.setupKeys();
@@ -128,6 +129,7 @@
       this.events.once('shutdown', () => {
         this.game.events.off('blur', this.onFocusLost);
         this.game.events.off('hidden', this.onFocusLost);
+        if (Pulse.WorldShift) Pulse.WorldShift.detach(this);
         if (Pulse.Symphony) Pulse.Symphony.detach(this);
       });
 
@@ -329,6 +331,7 @@
         const finale = campaign && !this.lab && (this.stageIndex + 1) % Pulse.ARC_SIZE === 0;
         if (finale) this.titleText.setFontSize(44);
         show(this.titleText, finale ? (this.stageIndex + 1 >= Pulse.STAGES.length ? 'Campaign complete' : `World ${this.stage.arc.index} complete`) : this.lab ? 'Prototype clear' : 'Stage clear', finale ? T.textBonus : T.text);
+        if (this.lab && Pulse.WorldShift) Pulse.WorldShift.completeStyle(this);
         if (finale) this.time.delayedCall(900, () => { if (this.state === 'complete') Pulse.Sfx.play('milestone'); });
         // Dim the frozen play field so the results and buttons read cleanly over it.
         this.overlay.fillStyle(T.background, 0.82).fillRect(0, 0, this.SW, this.SH);
@@ -402,6 +405,7 @@
       this.cuedBarrier = null;
       this.grazeCharge = 0; // Overdrive units earned from grazes this run (capped)
       this.grazes = 0;
+      if (Pulse.Resonance) Pulse.Resonance.reset(this); // resonance gates (docs/RESONANCE_GATES.md)
       this.routeClears = 0;
       this.resetMirror();
       this.mirrorClears = 0;
@@ -421,6 +425,7 @@
       Pulse.Music.play(this.playingTrack);
       if (continuing) Pulse.Music.seek(0);
       if (this.view) this.view.spawn();
+      if (Pulse.WorldShift) Pulse.WorldShift.reset(this); // a retry starts again in movement I
       this.setState('playing');
     }
 
@@ -686,6 +691,7 @@
       this.speedNow = speed; // the comet tail grows with speed
       this.scroll += speed * dt * 0.5;
       this.level.update(dt, speed, this.elapsed);
+      if (Pulse.WorldShift) Pulse.WorldShift.update(this, dt); // movement telegraph / shift (presentation only)
       this.updateMirror();
       this.updateBarrierCue();
 
@@ -696,10 +702,12 @@
       const r = this.radius;
       const ox = this.orbX;
       const grazing = this.grazeOn();
+      const resonance = !!Pulse.Resonance && Pulse.Resonance.on(this);
       for (let i = 0; i < segs.length; i++) {
         const s = segs[i];
         if (!s.active) continue;
         if (grazing && s.kind === 'gate' && !s.ring && !s.scored) Pulse.Graze.observe(s, ox, this.orbY, r, this.level.width); // swept closest approach (feedback only)
+        if (resonance && s.kind === 'gate' && !s.ring && !s.scored) Pulse.Resonance.observe(this, s, ox, this.orbY, r); // swept size band (docs/RESONANCE_GATES.md)
         let event = this.level.resolve(s, this.orbY, r, this.orbState.charge, ox);
         let byEcho = false;
         // Mirror Pulse: the echo is checked on its own against the paired obstacles of the zone.
@@ -776,6 +784,7 @@
             if (this.view) this.view.smash(s);
           } else {
             this.contact('pass', s, prevCombo);
+            if (resonance) Pulse.Resonance.cleared(this, s, r);
             if (grazing) this.graze(s, r);
             else this.checkNearMiss(s, r);
             if (s.fork && s.route) this.routePassed(s);
@@ -918,7 +927,7 @@
       const on = Sfx.stemActive();
       // Needs the music in step with the run clock to START (so the loop lands in phase); once running it
       // is independent of the streamed music, so a re-alignment seek does not make it blip.
-      const want = this.state === 'playing' && this.od.active && (on === world || this.aligned());
+      const want = this.state === 'playing' && (this.od.active || (Pulse.WorldShift && Pulse.WorldShift.wantsStem(this))) && (on === world || this.aligned());
       if (on && (!want || on !== world)) Sfx.stemStop(this.state === 'playing' ? 300 : 60);
       else if (want && !on) {
         if (!Sfx.stemFits(world, this.trackBpm())) Sfx.stemPrepare(world);
@@ -1225,6 +1234,7 @@
       if (this.view && this.view.renderEcho) this.view.renderEcho(mir && this.echoK > 0, this.radius);
 
       this.drawOverdrive();
+      if (Pulse.Resonance) Pulse.Resonance.draw(this); // resonance target rings (docs/RESONANCE_GATES.md)
 
       // The charge ring only appears while a charged barrier is on screen.
       this.chargeRingShown = active &&
