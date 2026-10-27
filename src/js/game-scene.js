@@ -130,9 +130,11 @@
         this.game.events.off('blur', this.onFocusLost);
         this.game.events.off('hidden', this.onFocusLost);
         if (Pulse.WorldShift) Pulse.WorldShift.detach(this);
+        if (Pulse.Symphony) Pulse.Symphony.detach(this);
       });
 
       if (this.test) window.__pulseScene = this;
+      if (Pulse.Symphony) Pulse.Symphony.attach(this); // Shatter Symphony (Lab entry only): audio director, docs/SHATTER_SYMPHONY.md
       this.setState('ready');
       this.startMusic();
       if (this.test && this.test.autoStart && !this.test.holdReady) this.startRun();
