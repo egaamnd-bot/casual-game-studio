@@ -49,7 +49,25 @@ Only existing ones: the comet VFX atlas frame `comet_halo_bloom` (when that atla
 
 ## Tests (`tests/resonance.html`)
 
-RESULTS_PLACEHOLDER
+Two pages (the machine is slow, so the work is split; run both with `/home/claude/bin/pulse-test <worktree> <w> <h> resonance.html resonance-run.html`). Shared helpers: `tests/resonance-common.js`. `?manual=1` loads the game without running the checks.
+
+`resonance.html` (rule, timing, lab stage, scripted taps):
+- Band edges: radius 25.999 / 26 / 26.001 / 36 / 45.999 / 46 / 46.001 / 20 / 56 against `[26, 46]` (closed band); window edges at exactly `+-14` px and just beyond; a changing radius that enters inside the window, only before it, only after it, or sweeps through inside one frame.
+- Bands are intermediate (never touch the smallest size or a charged radius); `normalize` clamps and rejects degenerate bands.
+- Achievability by simulation with the real `Pulse.Orb.step` at 30 / 60 / 144 fps, stage speeds 250 and 300 px/s, tap lengths 100 / 150 / 200 / 300 ms, all three bands: smallest start-time slack 100 ms, best tap per band at least 250 ms; the slack agrees across frame rates within 45 ms. 150 ms tap at 300 px/s: `[26,46]` 250/266/258 ms, `[24,38]` 182/200/188 ms, `[32,46]` 250/266/258 ms (30/60/144 fps).
+- The lab stage: registered although `lab.js` loads later, valid, world 1, not in `Pulse.STAGES`, 7 gates, wide enough to pass at any size, 25-35 s, top speed below 430. The compiled gate timing matches the observed middle-line crossing within 30 ms.
+- In the game with a scripted radius: taps on the standard gates pay exactly 3 x 4 units and nothing else changes (score, energy, time, stars, and the Overdrive charge total is exactly that much higher); taps aimed at each band pay 7 of 7; constant radii 20, 25.99, 26, 36, 38.01, 46, 46.01, 56 pay exactly the gates whose band contains them (too small / too large: no reward, nothing different from a plain run); a dip 0.4 s early pays nothing; leave-and-re-enter pays once per gate; 30 / 60 / 144 fps and a 50 ms hitch pay identically; repeated runs identical.
+
+`resonance-run.html` (lifecycle, cap, equivalence):
+- One reward per gate: pooled segment reuse, retry, pause mid-crossing, a tall (220 px) gate, a sliding gate, left and right gates.
+- Cap (20, a correct tap on all 7 gates pays 5), effect still shown after the cap, nothing added while Overdrive is on.
+- Crashes pay nothing (unsteered orb; a crash after the middle line with the radius in the band).
+- Lifecycle: leaving for another stage destroys the overlay and drops the state; coming back starts clean; retry resets rewards and bursts; a scene restart keeps exactly one overlay.
+- The lab run never changes the save (completed run, crash, retry).
+- Nothing else changes: `Level.hitsWall` agrees with an independent reference on 8000 random samples with the module on and off; orb sizes and rates unchanged; collision, `resolve` and orb physics contain no resonance code; whole bot runs of the lab stage, stage 1 and stage 10 give identical state, score, energy, time and stars with `CONFIG.resonance.enabled` true and false; a run that earns rewards ends with the same state, score, energy, time and stars as one that does not; campaign and Endless scenes keep no resonance state.
+- Overlay: drawn between the walls and the HUD on its own graphics object, empty when disabled; world-2 and world-3 based lab stages play and pay the same way.
+
+Not tested: anything on a phone. Readability of the rings was only looked at in headless screenshots of world 1 and world 3 (NOT DEVICE-TESTED).
 
 ## For the Producer to judge on a phone
 
