@@ -108,6 +108,7 @@ Pulse.CONFIG = {
     enabled: true,
     tailBase: 2.0, // tail length = this × radius ...
     tailPerSpeed: 0.62, // ... + this × speed (px/s), scaled down while the orb is shrunk
+    symmetricOrb: true, // Issue #42: compact symmetric energy core (rim + segmented halo), no tapered head/streak attached; the ribbon stays as a separate wake. false = previous look
     nodes: 10, // pooled sparkle nodes behind the orb (never more)
     nodeIntervalMs: 28,
     backdropAlpha: 0.5, // dims the v4 background so the sphere and walls pop
