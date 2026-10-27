@@ -4,7 +4,7 @@
 
 - Updated: 2026-10-27 (UTC)
 - Project: PULSE
-- Status: DEVELOPER GAUNTLET MERGED (PR #48, merge `2147b2c7`, tested head `84fd3a32`; Lab > Developer Gauntlet (QA), nine sections). Campaign Batch 3 and the three prototypes (World Shift, Resonance Gates, Shatter Symphony; Lab only) were merged earlier. Integrated main build: run #126 success (APK artifact `pulse-debug-apk-run126`). **Gauntlet, World Shift and Symphony are NOT DEVICE-TESTED.** In progress on its own branch: player-orb redesign (Issue #42, `feature/orb-redesign`), not merged, NOT DEVICE-TESTED. ORB REDESIGN (Issue #42) is review-ready on `feature/orb-redesign` (PR pending Producer phone review): APK run #127 from tested src head `f2d706a3`, NOT DEVICE-TESTED, not merged.
+- Status: PLAYER ORB REDESIGN ACCEPTED by the Producer (phone-tested APK run #127) and MERGED (PR #50, merge `dc27d639`). Developer Gauntlet merged earlier (PR #48); Gauntlet, World Shift and Symphony remain NOT DEVICE-TESTED (run #126 APK has them). 
 - `main` @ `2147b2c74252d413f085d3007a99df052da1f72e` (merge of PR #48). Integrated main build: [run #126](https://github.com/egaamnd-bot/casual-game-studio/actions/runs/40491389525) success. Gauntlet tested head `84fd3a329f6c4f83fd0bd0058ddd13a21f5e23f2`: full suite 25/25 pages at 540x960, 360x640 and 412x915, 0 failures; push-build APK run #125 on that head. Merged `src/` and `tests/` equal the tested head (merge commit only).
 - Campaign: 30 stages (worlds 1-3 complete; stage 30 "Pulse Zero" shows "Campaign complete"). Stages 1-24 untouched. Stages 25-30 are bot-tuned; the Producer's run #107 phone test is positive overall, with no stage-specific numbers recorded. One test rule was loosened on purpose: a Mirror Pulse stage is capped at floor(560/1.3) = 430 px/s (`tests/campaign.html`, PR #41).
 
@@ -24,7 +24,7 @@ Usage-efficiency rule (2026-10-27): see [AI_HANDOFF_PROTOCOL.md](AI_HANDOFF_PROT
 Mirror/route/Overdrive/graze tuning is by reasoning and bots, refined only by the Producer's phone feedback so far; echo readability and cue loudness not measured on a device; `gameplay.html` is a manual page that always fails headless; the barrier-ready corona and sound level have no specific device feedback.
 
 ## Next recommended tasks
-0. Producer: phone-test the Gauntlet (run #126) and decide keep/tune/drop for World Shift and Symphony. Then: player-orb redesign (Issue #42, `feature/orb-redesign`) review.
+0. Producer: phone-test the Gauntlet (Lab > Developer Gauntlet) and decide keep/tune/drop for World Shift and Symphony; near-miss graze scope and the loosened Mirror Pulse speed rule still await decisions.
 1. Merge the three prototype PRs one at a time (each after its own checks), combined regression after each, then one combined APK for the Producer's phone assessment (keep / tune / discard per prototype).
 2. Campaign Batch 3 (stages 25-30, `docs/CAMPAIGN_30.md`).
 3. Producer decision pending: widen the near-miss graze beyond stage 10, or tune the numbers (3 per graze, 15 per run).
