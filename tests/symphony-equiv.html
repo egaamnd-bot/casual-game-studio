@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse Shatter Symphony equivalence tests</title>
+  <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
+</head>
+<body>
+  <script>
+    // Shatter Symphony (docs/SHATTER_SYMPHONY.md): event ledger, intensity, arpeggio, density restraint, stem fades,
+    // mute / pause / retry / scene transitions, latency, and bit-for-bit gameplay equivalence on and off.
+    try { localStorage.clear(); } catch (e) {}
+    window.PULSE_ASSET_BASE = '../src/';
+    window.PULSE_TEST = { autoStart: true, holdReady: true, bot: false, mode: 'campaign', stageIndex: 0 };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/melody.js"></script>
+  <script src="../src/js/symphony.js"></script>
+  <script src="../src/js/overdrive.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/graze.js"></script>
+  <script src="../src/js/mirror.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/patterns.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script src="../src/js/render.js"></script>
+  <script src="../src/js/ui.js"></script>
+  <script src="../src/js/assets.js"></script>
+  <script src="../src/js/trail.js"></script>
+  <script src="../src/js/sprite-view.js"></script>
+  <script src="../src/js/game-scene.js"></script>
+  <script src="../src/js/menu-scenes.js"></script>
+  <script src="../src/js/lab.js"></script>
+  <script src="../src/js/lab-scene.js"></script>
+  <script src="../src/js/main.js"></script>
+  <script>
+    const C = Pulse.CONFIG;
+    const S = Pulse.Symphony;
+    const P = S.pure;
+    const fails = [];
+    const notes = [];
+    let checks = 0;
+    const check = (ok, msg) => { checks++; if (!ok) fails.push(msg); };
+    const near = (a, b, eps) => Math.abs(a - b) <= eps;
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const scene = () => window.__pulseScene;
+    const errors = [];
+    window.addEventListener('error', (e) => errors.push(e.message));
+
+    // Virtual time: performance.now = real + skew, and every stepped frame adds its dt to the skew, so the 35 ms
+    // retrigger guard sees game time passing even though the frames run back to back.
+    const realPerf = performance.now.bind(performance);
+    const T0 = realPerf();
+    const mark = (l) => { notes.push(`${l}@${Math.round((realPerf() - T0) / 1000)}s`); document.title = 'RUN ' + notes.join(' '); };
+    let skew = 0;
+    performance.now = () => realPerf() + skew;
+    const fake = new WeakMap();
+    const clockOf = (sc) => { let c = fake.get(sc); if (!c) { c = { now: sc.time.now }; fake.set(sc, c); Object.defineProperty(sc.time, 'now', { get: () => c.now, set: () => {}, configurable: true }); } return c; };
+    const frames = (sc, n, until, ms) => { const c = clockOf(sc); const dt = ms || 16.667; for (let i = 0; i < n; i++) { c.now += dt; skew += dt; sc.update(c.now, dt); sc.draw && sc.draw(); if (until && until()) return true; } return !until; };
+    const advance = (ms) => { skew += ms; };
+    // Steps `n` frames but lets real time pass too (40 ms per 6 frames): arpeggio notes are real audio nodes that end in
+    // real time, so a burst of simulated seconds in a few real milliseconds would hit the in-flight cap by itself.
+    const play = async (sc, n) => { for (let i = 0; i < n; i += 6) { frames(sc, Math.min(6, n - i)); await wait(30); } };
+
+    // ---- Recorders: every Sfx.play / Sfx.notes call (hooked = taken by the director), every buffer / oscillator start, node creation ----
+    const rec = [];
+    const realPlay = Pulse.Sfx.play.bind(Pulse.Sfx);
+    Pulse.Sfx.play = (name, o) => { const hooked = !!Pulse.Sfx.getHook(); const r = realPlay(name, o); rec.push({ k: 'play', name, o: o || {}, hooked, ok: r, at: realPerf() }); return r; };
+    const realNotes = Pulse.Sfx.notes.bind(Pulse.Sfx);
+    Pulse.Sfx.notes = (specs, ld) => { const hooked = !!Pulse.Sfx.getHook(); const r = realNotes(specs, ld); rec.push({ k: 'notes', specs, ld, hooked, ok: r, at: realPerf() }); return r; };
+    const layerLog = [];
+    const realLayer = Pulse.Sfx.layerNote.bind(Pulse.Sfx);
+    Pulse.Sfx.layerNote = (spec, delay) => { const q = scene(); const r = realLayer(spec, delay); layerLog.push({ spec, delay, ok: r, tt: Pulse.Rhythm.trackTime(q.clock), bpm: q.clock.bpm, dense: !!(q._symphony && q._symphony.dense), od: !!q.od.active, state: q.state }); return r; };
+    const created = { gain: 0, osc: 0, src: 0 };
+    const proto = AudioContext.prototype;
+    for (const [m, key] of [['createGain', 'gain'], ['createOscillator', 'osc'], ['createBufferSource', 'src']]) { const f = proto[m]; proto[m] = function (...a) { created[key]++; return f.apply(this, a); }; }
+    const srcStarts = [];
+    const realSrcStart = AudioBufferSourceNode.prototype.start;
+    AudioBufferSourceNode.prototype.start = function (...a) { srcStarts.push({ loop: this.loop, dur: this.buffer && this.buffer.duration, when: a[0], off: a[1], cur: this.context.currentTime, real: realPerf() }); return realSrcStart.apply(this, a); };
+    let ramps = null; // while an array: every setValueAtTime / linearRamp on any AudioParam
+    const rLin = AudioParam.prototype.linearRampToValueAtTime, rSet = AudioParam.prototype.setValueAtTime;
+    AudioParam.prototype.linearRampToValueAtTime = function (v, t) { if (ramps) ramps.push({ k: 'ramp', v, t }); return rLin.call(this, v, t); };
+    AudioParam.prototype.setValueAtTime = function (v, t) { if (ramps) ramps.push({ k: 'set', v, t }); return rSet.call(this, v, t); };
+    let intervals = 0;
+    const sI = window.setInterval, cI = window.clearInterval;
+    window.setInterval = (...a) => { const id = sI(...a); intervals++; ids.add(id); return id; };
+    const ids = new Set();
+    window.clearInterval = (id) => { if (ids.delete(id)) intervals--; return cI(id); };
+
+    const odOn = (x) => { x.od.active = true; x.od.remaining = C.overdrive.duration; x.od.meter = C.overdrive.threshold; };
+    const stubAligned = (x, on) => { x.aligned = () => (on === undefined ? x.state === 'playing' : on); };
+    const real = (name) => rec.filter((r) => r.k === 'play' && r.name === name && !r.hooked && r.ok).length;
+    const packs = () => rec.filter((r) => r.k === 'play' && /^pack/.test(r.name) && !r.hooked && r.ok);
+    const noteCalls = () => rec.filter((r) => r.k === 'notes' && !r.hooked);
+    const gainSum = (list) => list.reduce((a, s) => a + (s.gain || 0), 0);
+    // Unless a bot plays, the level is frozen (nothing moves, nothing can crash or finish), so the audio rules can be
+    // driven for as long as needed; the real Phaser loop keeps ticking during awaits and must not end the run.
+    const calm = (q, opts) => { if (!(opts && opts.bot)) q.level.update = function () {}; return q; };
+    const startLab = async (opts) => { window.__pulseGame.scene.start('game', { mode: 'campaign', lab: S.LAB_ID }); await wait(400); const q = scene(); q.test = Object.assign({ holdReady: true }, opts || {}); return calm(q, opts); };
+    const startStage = async (idx, opts) => { window.__pulseGame.scene.start('game', { mode: 'campaign', stageIndex: idx }); await wait(400); const q = scene(); q.test = Object.assign({ holdReady: true }, opts || {}); return calm(q, opts); };
+    // Fires cues from inside the scene's own step (as the game does): the director's frame batch is in effect.
+    const inStep = (q, fn) => { const old = Object.prototype.hasOwnProperty.call(q, 'updateStem'); const prev = q.updateStem; let done = false; q.updateStem = function () { if (!done) { done = true; fn(); } return prev.apply(this, arguments); }; frames(q, 1); if (old) q.updateStem = prev; else delete q.updateStem; };
+    const reset = () => { rec.length = 0; layerLog.length = 0; };
+
+    async function run() {
+      for (let i = 0; i < 200 && !(scene() && scene().state); i++) await wait(100);
+      await Pulse.Audio.loading; await wait(300); Pulse.Audio.unlock(); await wait(100);
+      S.register();
+      mark('Gameplay'); // ================= Gameplay equivalence: director on vs off =================
+      const runBot = async (how) => {
+        const x = how.lab ? await startLab({ bot: true, route: how.route || 'safe' }) : await startStage(how.idx, { bot: true, route: how.route || 'safe' });
+        if (how.force) S.attach(x, { force: true });
+        stubAligned(x); x.startRun();
+        let guard = 0; frames(x, 60000, () => x.state !== 'playing' || ++guard < 0);
+        const dd = x._symphony;
+        return { sig: JSON.stringify({ s: x.state, sc: x.score, e: x.energy, b: x.bonus, t: +x.elapsed.toFixed(3), st: x.result && x.result.stars, od: x.od.activations, rc: x.routeClears, cl: x.cleared, nm: x.nearMisses, tr: Math.round(x.level.travelled), cb: x.scoring.combo }), stats: dd ? Object.assign({}, dd.stats) : null };
+      };
+      const cases = [{ lab: true, name: 'Lab Shatter Symphony (stage 14 layout)' }, { lab: true, route: 'risk', name: 'Lab, risk-route bot' }, { idx: 0, force: true, name: 'stage 1' }, { idx: 3, force: true, name: 'stage 4 (forks)' }, { idx: 6, force: true, name: 'stage 7 (Mirror Pulse)' }, { idx: 9, force: true, name: 'stage 10' }, { idx: 11, force: true, name: 'stage 12' }];
+      let firstOff = null, firstOn = null; let totalPlayed = 0, totalArp = 0, totalDropped = 0;
+      for (const cs of cases) {
+        C.symphony.enabled = true; const on = await runBot(cs);
+        C.symphony.enabled = false; const off = await runBot(cs); C.symphony.enabled = true; if (cs.lab && !firstOff) firstOff = off.sig; if (cs.lab && !firstOn) firstOn = on;
+        check(on.sig === off.sig && on.sig.includes('"s":"complete"') && !off.stats && !!on.stats, `${cs.name}: state, score, energy, time, stars, Overdrive count identical with the director on and off (${on.sig.slice(0, 120)}; director ${JSON.stringify(on.stats)})`);
+        totalPlayed += on.stats ? on.stats.played : 0; totalArp += on.stats ? on.stats.arp : 0; totalDropped += on.stats ? on.stats.dropped : 0;
+      }
+      check(totalPlayed > 0 && totalArp > 20, `the director was really exercised in those runs (cues ${totalPlayed}, dropped ${totalDropped}, arpeggio notes ${totalArp})`);
+      // Same layout with and without the Lab wrapper: campaign stage 14 equals the Lab stage run.
+      C.symphony.enabled = false; const camp14 = await runBot({ idx: 13 }); const lab14 = { sig: firstOff }; C.symphony.enabled = true;
+      const strip = (s) => { const o = JSON.parse(s); return JSON.stringify(Object.assign(o, { st: o.st })); };
+      check(strip(camp14.sig) === strip(lab14.sig), `Lab stage 14 plays exactly as campaign stage 14 (${camp14.sig.slice(0, 90)})`);
+      // Deterministic.
+      const r1 = firstOn, r2 = await runBot({ lab: true }); check(r1.sig === r2.sig && JSON.stringify(r1.stats) === JSON.stringify(r2.stats), 'two Lab bot runs give identical results and identical director statistics (deterministic)');
+      // Frame rate: the same run at 30 and 144 fps, director on.
+      const atFps = async (ms) => { const x = await startLab({ bot: true, route: 'safe' }); stubAligned(x); x.startRun(); frames(x, 90000, () => x.state !== 'playing', ms); return { sc: x.score, e: x.energy, od: x.od.activations, st: x.result && x.result.stars, s: x.state, played: x._symphony.stats.played }; };
+      const f30 = await atFps(33.3), f60 = await atFps(16.7), f144 = await atFps(6.9);
+      mark('fps'); check(f30.s === 'complete' && f60.s === 'complete' && f144.s === 'complete' && f30.sc === f60.sc && f60.sc === f144.sc && f30.st === f60.st && f60.st === f144.st, `30 / 60 / 144 fps: same completion, score and stars with the director (${f30.sc}/${f60.sc}/${f144.sc}; cues ${f30.played}/${f60.played}/${f144.played})`);
+      // Density in a real run: how often the stage is dense (reported, not asserted to a number).
+      {
+        const x = await startLab({ bot: true, route: 'safe' }); stubAligned(x); x.startRun(); let dn = 0, tot = 0, arpWhileDense = 0;
+        frames(x, 90000, () => { tot++; if (x._symphony.dense) dn++; return x.state !== 'playing'; });
+        arpWhileDense = layerLog.filter((l) => l.ok && l.dense).length;
+        notes.push(`stage 14 dense ${(100 * dn / tot).toFixed(0)}% of frames`);
+        check(arpWhileDense === 0 && dn > 0 && dn < tot, `in the real stage the layer sees both dense (${(100 * dn / tot).toFixed(0)}% of frames) and sparse stretches, and never plays while dense`);
+        // Ledger discipline over a whole real run: consecutive played cues are either a window apart or an escalation.
+        const pl = x._symphony.log.filter((l) => l.played); let bad = 0; for (let i = 1; i < pl.length; i++) if (pl[i].at - pl[i - 1].at < C.symphony.window && S.PRIORITY[pl[i].type] <= S.PRIORITY[pl[i - 1].type]) bad++;
+        const hookedNames = new Set(rec.filter((x) => x.k === 'play' && x.hooked).map((x) => x.name));
+        check([...hookedNames].every((n) => /^pack(Combo4|Combo8|Combo16|RouteClear|OdOn|OdOff)$/.test(n)), `over a whole real run only the six cue samples were ever taken by the hook (${[...hookedNames].join(',')}); no input sound was`);
+        check(bad === 0, `a whole real run: no two played cues inside ${C.symphony.window} s unless the second outranks the first (${pl.length} cues in the log)`);
+      }
+      scene().scene.start('menu'); await wait(300);
+      check(S.current() === null && Pulse.Sfx.getHook() === null && Pulse.Sfx.layerCount() === 0, 'at the end: no director, no hook, no layer notes');
+      check(errors.length === 0, `page errors: ${errors.join(' | ')}`);
+    }
+    run().then(() => { document.title = fails.length ? `FAIL ${fails.length}: ${fails.join(' | ')} || ${notes.join(' ')}` : `PASS symphony equivalence tests ${checks} checks | ${notes.join(' | ')}`; })
+      .catch((e) => { document.title = 'FAIL error ' + e.message + ' ' + (e.stack || '').split('\n')[1]; });
+  </script>
+</body>
+</html>

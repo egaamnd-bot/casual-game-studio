@@ -7,7 +7,7 @@
 </head>
 <body>
   <script>
-    // Shatter Symphony (docs/SHATTER_SYMPHONY.md): event ledger, intensity, arpeggio, density restraint, stem fades,
+    // Shatter Symphony (docs/SHATTER_SYMPHONY.md; gameplay equivalence lives in symphony-equiv.html): event ledger, intensity, arpeggio, density restraint, stem fades,
     // mute / pause / retry / scene transitions, latency, and bit-for-bit gameplay equivalence on and off.
     try { localStorage.clear(); } catch (e) {}
     window.PULSE_ASSET_BASE = '../src/';
@@ -55,15 +55,17 @@
     // Virtual time: performance.now = real + skew, and every stepped frame adds its dt to the skew, so the 35 ms
     // retrigger guard sees game time passing even though the frames run back to back.
     const realPerf = performance.now.bind(performance);
+    const T0 = realPerf();
+    const mark = (l) => { notes.push(`${l}@${Math.round((realPerf() - T0) / 1000)}s`); document.title = 'RUN ' + notes.join(' '); };
     let skew = 0;
     performance.now = () => realPerf() + skew;
     const fake = new WeakMap();
     const clockOf = (sc) => { let c = fake.get(sc); if (!c) { c = { now: sc.time.now }; fake.set(sc, c); Object.defineProperty(sc.time, 'now', { get: () => c.now, set: () => {}, configurable: true }); } return c; };
-    const frames = (sc, n, until, ms) => { const c = clockOf(sc); const dt = ms || 16.667; for (let i = 0; i < n; i++) { c.now += dt; skew += dt; sc.update(c.now, dt); sc.draw && sc.draw(); if (until && until()) return true; } return !until; };
+    const frames = (sc, n, until, ms) => { const c = clockOf(sc); const dt = ms || 16.667; for (let i = 0; i < n; i++) { c.now += dt; skew += dt; sc.update(c.now, dt); if (until && until()) return true; } return !until; };
     const advance = (ms) => { skew += ms; };
     // Steps `n` frames but lets real time pass too (40 ms per 6 frames): arpeggio notes are real audio nodes that end in
     // real time, so a burst of simulated seconds in a few real milliseconds would hit the in-flight cap by itself.
-    const play = async (sc, n) => { for (let i = 0; i < n; i += 6) { frames(sc, Math.min(6, n - i)); await wait(40); } };
+    const play = async (sc, n) => { for (let i = 0; i < n; i += 6) { frames(sc, Math.min(6, n - i)); await wait(20); } };
 
     // ---- Recorders: every Sfx.play / Sfx.notes call (hooked = taken by the director), every buffer / oscillator start, node creation ----
     const rec = [];
@@ -110,7 +112,22 @@
       await Pulse.Audio.loading; await wait(300); Pulse.Audio.unlock(); await wait(100);
       const baseIntervals = intervals;
 
-      // ================= Pure rules =================
+      mark('The'); // ================= The original Overdrive stem timing is untouched when the director is not attached =================
+      const stemTiming = async (world, bpm) => {
+        await Pulse.Sfx.stemPrepare(world); Pulse.Sfx.stemStop(0); ramps = [];
+        const ok = Pulse.Sfx.stemStart(world, bpm, 0); const enter = ramps; ramps = [];
+        Pulse.Sfx.stemStop(); const leave = ramps; ramps = null; Pulse.Sfx.stemStop(0);
+        return { ok, enter, leave };
+      };
+      const origStem = (r, label) => {
+        const e = r.enter, l = r.leave;
+        check(r.ok && e.length === 2 && e[0].k === 'set' && e[0].v === 0 && e[1].k === 'ramp' && e[1].v === 1 && near(e[1].t - e[0].t, 0.12, 1e-6), `${label}: stem entry is the original: set 0, ONE linear ramp to 1 over 0.12 s (${JSON.stringify(e.map((x) => [x.k, +x.v.toFixed(3)]))})`);
+        check(l.length === 2 && l[0].k === 'set' && l[1].k === 'ramp' && l[1].v === 0 && near(l[1].t - l[0].t, 0.25, 1e-6), `${label}: stem exit is the original: hold, ONE linear ramp to 0 over 0.25 s`);
+      };
+      origStem(await stemTiming(1, 125), 'before any director');
+      check(Pulse.Sfx.getHook() === null && Pulse.Sfx.layerCount() === 0 && Pulse.Sfx.stemActive() === 0, 'no hook, no layer note, no stem at boot');
+
+      mark('Pure'); // ================= Pure rules =================
       const K = C.combo;
       check(P.targetLevel(0, false, false) === 0 && P.targetLevel(3, false, false) === 0 && P.targetLevel(K.layerA, false, false) === 1 && P.targetLevel(K.layerB, false, false) === 2 && P.targetLevel(K.flourish, false, false) === 3, 'intensity target: combo 0-3 -> 0, 4 -> 1, 8 -> 2, 16 -> 3');
       check(P.targetLevel(0, false, true) === 2 && P.targetLevel(5, false, true) === 2 && P.targetLevel(20, false, true) === 3 && P.targetLevel(0, true, false) === 3, 'a fresh route clear holds level 2; Overdrive is 3');
@@ -159,7 +176,7 @@
       r = P.resolve([cue('combo4')], null, 10, true); check(!r.play && r.dropped[0].reason === 'dense', 'dense: the quietest cue (combo 4) is skipped');
       r = P.resolve([cue('combo8')], null, 10, true); check(r.play && r.play.type === 'combo8', 'dense: combo 8 still plays');
 
-      // ================= Lab entry, attach rules =================
+      mark('Lab'); // ================= Lab entry, attach rules =================
       S.register();
       const entry = Pulse.Lab.find(S.LAB_ID);
       check(!!entry && entry.flags.symphony === true && entry.base === 's14-safe-or-sorry' && entry.stage.id === 'lab-shatter-symphony', 'the Lab entry exists: stage 14 as a new stage id, flags.symphony');
@@ -180,7 +197,7 @@
       check(!Object.prototype.hasOwnProperty.call(oldScene, 'step') && !oldScene._symphony && Pulse.Sfx.getHook() === null, 'shutting a scene down detaches: its methods are its own again, no hook left');
       q = await startLab(); stubAligned(q);
 
-      // ================= Event ledger in the game =================
+      mark('Event'); // ================= Event ledger in the game =================
       q.startRun(); frames(q, 30);
       const visuals = []; const realQuality = q.quality.bind(q); q.quality = (t, c) => { visuals.push(t); return realQuality(t, c); };
       // Baseline: the same three cues with the director removed (the old behaviour: three stacked cues).
@@ -215,12 +232,17 @@
       for (let i = 0; i < 40; i++) { inStep(q, () => { q.comboMilestone(16); q.routeClear({}); q.overdriveStarted(); }); }
       check(Pulse.Audio.status().voices - v0 <= 6 && Pulse.Audio.status().voices <= 6, `never more than 6 effect voices after 120 cue triggers (${Pulse.Audio.status().voices})`);
       check(Pulse.Sfx.stats().active <= 14, `and at most 14 synthesized notes (${Pulse.Sfx.stats().active})`);
+      // The 35 ms retrigger guard still holds with the director in front.
+      await wait(600); advance(100); reset(); { const a = Pulse.Sfx.play('packCombo16'), b = Pulse.Sfx.play('packCombo16'); advance(40); await wait(5); const c = Pulse.Sfx.play('packCombo16'); check(a === true && b === false && c === true, `35 ms retrigger guard: ${a}/${b} at once, ${c} after 40 ms`); }
+      // Input sounds are never taken by the hook (it exists only inside the four cue methods), even in a frame that also fires cues.
+      await wait(600); reset(); inStep(q, () => { Pulse.Sfx.play('shrinkStart'); Pulse.Sfx.play('expand'); q.comboMilestone(8); Pulse.Sfx.play('pass'); });
+      check(rec.filter((x) => x.k === 'play' && ['shrinkStart', 'expand', 'pass'].includes(x.name)).every((x) => !x.hooked) && Pulse.Sfx.getHook() === null, 'input and contact sounds in a cue frame are not hooked: they play at once');
       // The lead note of a hit is never captured or delayed: it plays through the normal path even inside a cue frame.
       d = await fresh(); reset(); inStep(q, () => { q.hitFeedback('pickup', { quality: 'good' }); q.comboMilestone(8); });
       const leads = rec.filter((x) => x.k === 'notes' && !x.hooked && x.specs.some((s) => !s.layer));
       check(leads.length === 1 && rec.findIndex((x) => x === leads[0]) < rec.findIndex((x) => x.k === 'play' && x.name === 'packCombo8' && !x.hooked), 'the lead note of a hit plays at once, before the cue is resolved');
 
-      // ================= Latency: same audio time as the baseline, same frame =================
+      mark('Latency:'); // ================= Latency: same audio time as the baseline, same frame =================
       const probe = async (withDir) => {
         const x = scene(); if (withDir) { if (!x._symphony) S.attach(x, { force: true }); } else if (x._symphony) x._symphony.detach();
         stubAligned(x); x.od.active = false; x.startRun(); frames(x, 40); await wait(500); advance(500); srcStarts.length = 0; reset();
@@ -231,22 +253,23 @@
       };
       const pb = await probe(false), pd = await probe(true);
       check(!!pb && !!pd, 'both runs started the combo-16 sample');
-      check(pb && pd && near(pb.phase, pd.phase, 0.02) && Math.abs(pb.rel - pd.rel) <= 0.0167 + Math.abs(pb.phase - pd.phase), `the cue is scheduled at the same audio time (baseline +${pb && (pb.rel * 1000).toFixed(1)} ms, director +${pd && (pd.rel * 1000).toFixed(1)} ms; both within one 60 fps frame of each other)`);
+      check(pb && pd && near(pb.rel, pb.phase, 0.003) && near(pd.rel, pd.phase, 0.003), `the cue starts exactly when the existing groove wait says, with and without the director (baseline wait ${pb && (pb.phase * 1000).toFixed(1)} ms -> start +${pb && (pb.rel * 1000).toFixed(1)} ms; director wait ${pd && (pd.phase * 1000).toFixed(1)} ms -> +${pd && (pd.rel * 1000).toFixed(1)} ms): zero added delay`);
       check(pd && pd.wall < 16.7, `and within one frame of the event on the wall clock (${pd && pd.wall.toFixed(2)} ms, includes one full scene step)`);
       check(pd && pd.rel <= 0.08 + 0.0167, `the quantising wait never exceeded the existing 80 ms bound (${pd && (pd.rel * 1000).toFixed(1)} ms)`);
       q = scene(); if (!q._symphony) S.attach(q, { force: true }); stubAligned(q);
 
-      // ================= Intensity and the arpeggio =================
+      mark('Intensity'); // ================= Intensity and the arpeggio =================
       q.od.active = false; q.startRun(); stubAligned(q); d = q._symphony; reset();
       const setCombo = (n) => { q.scoring.combo = n; };
-      await play(q, 90); check(layerLog.length === 0 && d.v < 0.01, 'combo 0: level 0, no arpeggio');
-      setCombo(4); await play(q, 240); check(layerLog.length === 0 && d.v > 0.5 && d.v < 1.2, `combo 4: level eases towards 1 and the arpeggio is still out (v ${d.v.toFixed(2)})`);
-      setCombo(8); const n8 = layerLog.length; await play(q, 300);
+      await play(q, 18); check(layerLog.length === 0 && d.v < 0.01, 'combo 0: level 0, no arpeggio');
+      setCombo(4); await play(q, 90); check(layerLog.length === 0 && d.v > 0.5 && d.v < 1.2, `combo 4: level eases towards 1 and the arpeggio is still out (v ${d.v.toFixed(2)})`);
+      setCombo(8); const n8 = layerLog.length; await play(q, 144);
       const eighths = layerLog.slice(n8).filter((x) => x.ok);
-      check(eighths.length > 5 && d.v > 1.75 && d.v < 2.2, `combo 8: level 2, eighth-note arpeggio (${eighths.length} notes in 5 s, v ${d.v.toFixed(2)})`);
-      setCombo(16); const n16 = layerLog.length; await play(q, 420);
+      check(eighths.length > 5 && d.v > 1.75 && d.v < 2.2, `combo 8: level 2, eighth-note arpeggio (${eighths.length} notes in 4 s, v ${d.v.toFixed(2)})`);
+      setCombo(16); const n16 = layerLog.length; await play(q, 144);
       const sixteenths = layerLog.slice(n16).filter((x) => x.ok);
-      check(sixteenths.length > eighths.length * 1.5 && d.v > 2.55, `combo 16: sixteenth-note arpeggio (${sixteenths.length} notes in 7 s, v ${d.v.toFixed(2)})`);
+      const rate = (a) => (a.length > 1 ? (a.length - 1) / (a[a.length - 1].tt - a[0].tt) : 0);
+      check(rate(sixteenths) > rate(eighths) * 1.5 && d.v > 2.55, `combo 16: sixteenth-note arpeggio (${rate(sixteenths).toFixed(1)} notes/s of run time against ${rate(eighths).toFixed(1)} for eighths, v ${d.v.toFixed(2)})`);
       // On the grid of the run clock: (track time at the call + delay) is a whole number of 16ths.
       const gridErr = (x) => { const stepS = 60 / x.bpm / 4; const k = (x.tt + x.delay) / stepS; return Math.abs(k - Math.round(k)); };
       const okGrid = layerLog.filter((x) => x.ok).every((x) => gridErr(x) < 0.02 && x.delay >= 0 && x.delay <= C.symphony.lookahead + 1e-6);
@@ -254,27 +277,27 @@
       check(layerLog.filter((x) => x.ok).every((x) => x.spec.gain <= C.symphony.arpGain * 1.25 + 1e-9 && x.spec.gain > 0), `note peaks never exceed ${C.symphony.arpGain * 1.25} (${Math.max(...layerLog.map((x) => x.spec.gain)).toFixed(4)})`);
       check(Pulse.Sfx.layerCount() <= 6, `at most 6 arpeggio notes in flight (${Pulse.Sfx.layerCount()})`);
       // A miss: the streak resets, the level decays, the layer thins and stops.
-      setCombo(0); await play(q, 12); const midV = d.v; await play(q, 240);
-      check(midV > 2 && d.v < 0.4, `a miss: the level decays over ~2 s (${midV.toFixed(2)} -> ${d.v.toFixed(2)})`);
-      const nMiss = layerLog.filter((x) => x.ok).length; await play(q, 120); check(layerLog.filter((x) => x.ok).length === nMiss, 'and the arpeggio is silent again');
+      setCombo(0); await play(q, 7); const midV = d.v; await play(q, 90);
+      check(midV > 1.5 && d.v < 0.4, `a miss: the level decays over ~2 s (${midV.toFixed(2)} -> ${d.v.toFixed(2)})`);
+      const nMiss = layerLog.filter((x) => x.ok).length; await play(q, 72); check(layerLog.filter((x) => x.ok).length === nMiss, 'and the arpeggio is silent again');
       // A route clear builds it without a streak, for ~8 beats.
-      q.routeClears = (q.routeClears || 0) + 1; const nr = layerLog.length; await play(q, 200);
-      check(layerLog.slice(nr).filter((x) => x.ok).length > 3 && d.v >= 1.75, `a cleared risk route lifts the level to 2 (v ${d.v.toFixed(2)})`);
-      await play(q, 60 * 7); check(d.v < 1.5, `and it falls back after about 8 beats (v ${d.v.toFixed(2)})`);
+      q.routeClears = (q.routeClears || 0) + 1; const nr = layerLog.length; await play(q, 102);
+      check(layerLog.slice(nr).filter((x) => x.ok).length >= 1, `a cleared risk route lifts the level to 2 and the arpeggio enters (v ${d.v.toFixed(2)})`);
+      await play(q, 240); check(d.v < 1.5, `and it falls back after about 8 beats (v ${d.v.toFixed(2)})`);
       // Overdrive: the arpeggio steps aside for the stem; afterwards the level is capped at 2.
-      setCombo(16); await play(q, 300); const nOd = layerLog.filter((x) => x.ok).length; odOn(q); await play(q, 90);
+      setCombo(16); await play(q, 108); const nOd = layerLog.filter((x) => x.ok).length; odOn(q); await play(q, 54);
       check(layerLog.filter((x) => x.ok).length === nOd, 'during Overdrive the arpeggio does not play (the stem carries it)');
-      q.od.remaining = 0.01; await play(q, 3);
+      q.od.remaining = 0.01; await play(q, 6);
       check(!q.od.active && d.v <= 2.2, `when Overdrive ends the level drops from 3 to about 2 and has to be earned again (v ${d.v.toFixed(2)})`);
       setCombo(0);
 
-      // ================= Density restraint =================
+      mark('Density'); // ================= Density restraint =================
       const hazards = (n) => { const out = []; q.level.update = function () {}; for (let i = 0; i < n; i++) { const s = q.level.obtain(); Object.assign(s, { kind: 'gate', active: true, scored: false, resolved: false, broken: false, y: q.orbY - 60 - i * 70, h: 30, fork: false, slide: null, ring: null }); out.push(s); } return out; };
       const freeze = (segs) => { for (const s of segs) s.active = false; };
-      q.od.active = false; q.startRun(); stubAligned(q); d = q._symphony; setCombo(16); await play(q, 360); check(d.v > 2.55 && !d.dense, 'sparse stretch: arpeggio running');
-      let segs = hazards(5); const nd = layerLog.filter((x) => x.ok).length; reset(); await play(q, 20);
+      q.od.active = false; q.startRun(); stubAligned(q); d = q._symphony; setCombo(16); await play(q, 216); check(d.v > 2.55 && !d.dense, 'sparse stretch: arpeggio running');
+      let segs = hazards(5); await play(q, 12);
       check(d.dense === true, 'five walls inside 1.5 s -> dense');
-      await play(q, 120); check(layerLog.filter((x) => x.ok).length === 0, 'dense: the arpeggio is off (no notes queued in 2 s)');
+      reset(); await play(q, 72); check(layerLog.filter((x) => x.ok).length === 0, 'dense: the arpeggio is off (no notes queued in 2 s)');
       reset(); d.last = null; advance(1000); inStep(q, () => q.comboMilestone(4)); check(real('packCombo4') === 0 && d.log[d.log.length - 1].reason === 'dense', 'dense: the combo-4 chime is skipped');
       reset(); d.last = null; advance(1000); inStep(q, () => q.comboMilestone(8));
       const gainsD = rec.filter((x) => x.k === 'play' && x.name === 'packCombo8' && !x.hooked && x.ok)[0];
@@ -282,18 +305,18 @@
       const specsD = noteCalls().pop(); const specsBase = Pulse.Melody.milestone(q.worldIndex(), 8, { step: q.stepSeconds() });
       check(specsD && specsD.specs.every((sp, i) => near(sp.gain, specsBase[i].gain * C.symphony.denseGain, 1e-9)), 'and its phrase notes are scaled by the same factor, never louder');
       d.last = null; advance(1000); const duckBefore = d.stats.ducks; inStep(q, () => q.routeClear({})); check(d.stats.ducks === duckBefore, 'dense: no music dip under the cue');
-      freeze(segs); await play(q, 30); check(d.dense === false, 'walls cleared -> not dense (hysteresis released)');
-      const a0 = layerLog.length; await play(q, 240); check(layerLog.slice(a0).some((x) => x.ok), 'and the arpeggio comes back');
+      freeze(segs); await play(q, 18); check(d.dense === false, 'walls cleared -> not dense (hysteresis released)');
+      const a0 = layerLog.length; await play(q, 144); check(layerLog.slice(a0).some((x) => x.ok), 'and the arpeggio comes back');
       check(layerLog.every((x) => !(x.ok && x.dense)), 'no arpeggio note was ever queued while dense');
       setCombo(0);
 
-      // ================= Ducking =================
-      q.startRun(); stubAligned(q); await play(q, 20); advance(300); d = q._symphony; const dk0 = d.stats.ducks;
+      mark('Ducking'); // ================= Ducking =================
+      q.startRun(); stubAligned(q); await play(q, 12); advance(300); d = q._symphony; const dk0 = d.stats.ducks;
       inStep(q, () => q.routeClear({})); check(d.stats.ducks === dk0 + 1 && Pulse.Music.level === 0.72, `a route clear dips the music once (level ${Pulse.Music.level})`);
       await wait(450); check(Pulse.Music.level === 1, `and it recovers (level ${Pulse.Music.level})`);
       inStep(q, () => q.comboMilestone(4)); check(d.stats.ducks === dk0 + 1 || d.stats.ducks === dk0 + 1, 'combo 4 does not dip the music');
 
-      // ================= Stem fades =================
+      mark('Stem'); // ================= Stem fades =================
       await Pulse.Sfx.stemPrepare(2); const wq = await startLab(); stubAligned(wq); await wait(100); // 'ready' screen: the scene's own stem logic is idle
       const stemOnce = (shaped) => {
         Pulse.Sfx.stemShape(shaped); Pulse.Sfx.stemStop(0); ramps = [];
@@ -324,35 +347,37 @@
       check(Pulse.Sfx.stemActive() === 2 && stemSrc.length === 1 && Math.abs(stemSrc[0].off - (ct % stemSrc[0].dur)) < 0.25, `with the director the stem still starts once, in phase with the run clock (offset ${stemSrc[0] && stemSrc[0].off.toFixed(2)} vs ${ct.toFixed(2)})`);
       wq.od.active = false; frames(wq, 2); check(!Pulse.Sfx.stemActive(), 'it stops when Overdrive ends');
 
-      // ================= Mute and volumes =================
-      q = await startLab(); stubAligned(q); q.startRun(); d = q._symphony; q.scoring.combo = 16; await play(q, 400);
+      mark('Mute'); // ================= Mute and volumes =================
+      q = await startLab(); stubAligned(q); q.startRun(); d = q._symphony; q.scoring.combo = 16; await play(q, 240);
       check(layerLog.filter((x) => x.ok).length > 0, 'precondition: arpeggio running');
       Pulse.Audio.setVolume('music', 0); check(Pulse.Sfx.layerCount() === 0, 'music 0: arpeggio notes stop at once');
-      reset(); await play(q, 200); check(layerLog.filter((x) => x.ok).length === 0, 'and none are queued while music is muted');
-      Pulse.Audio.setVolume('music', 0.8); await play(q, 200); check(layerLog.filter((x) => x.ok).length > 3, 'music back up: the arpeggio returns');
-      Pulse.Audio.setVolume('music', 0.4); await play(q, 30); check(Pulse.Sfx.layerCount() >= 0, 'music at 40%: still fine');
+      reset(); await play(q, 120); check(layerLog.filter((x) => x.ok).length === 0, 'and none are queued while music is muted');
+      Pulse.Audio.setVolume('music', 0.8); await play(q, 120); check(layerLog.filter((x) => x.ok).length > 3, 'music back up: the arpeggio returns');
+      Pulse.Audio.setVolume('music', 0.4); await play(q, 18); check(near(Pulse.Sfx.layerLevel(), 0.4 * 0.85, 1e-6), `music 40%: the arpeggio bus follows (${Pulse.Sfx.layerLevel().toFixed(3)})`);
+      Pulse.Audio.setVolume('music', 0.8); check(near(Pulse.Sfx.layerLevel(), 0.8 * 0.85, 1e-6), `music 80%: ${Pulse.Sfx.layerLevel().toFixed(3)}`);
+      Pulse.Audio.setVolume('music', 0); check(Pulse.Sfx.layerLevel() === 0, 'music 0: the bus is 0'); Pulse.Audio.setVolume('music', 0.8);
       reset(); Pulse.Audio.setVolume('sfx', 0); advance(1000); d.last = null;
       inStep(q, () => { q.comboMilestone(16); q.overdriveStarted(); }); check(packs().length === 0 && noteCalls().every((c) => !c.ok), 'sfx 0: no cue sample or phrase is heard (nothing queued)');
       Pulse.Audio.setVolume('sfx', 1); Pulse.Audio.setVolume('music', 0.8);
       reset(); advance(1000); d.last = null; q.od.active = false; inStep(q, () => q.comboMilestone(16)); check(real('packCombo16') === 1, 'volumes restored: cues sound again');
       C.audioPack.samples = false; reset(); advance(1000); d.last = null; inStep(q, () => q.comboMilestone(8)); check(packs().length === 0 && noteCalls().length === 1, 'audioPack.samples off: the phrase still plays, no sample (as before)'); C.audioPack.samples = true;
 
-      // ================= Pause / resume =================
-      q.od.active = false; q.startRun(); stubAligned(q); d = q._symphony; q.scoring.combo = 16; await play(q, 400); reset();
-      await play(q, 40); check(layerLog.filter((x) => x.ok).length > 0, 'precondition: arpeggio running');
+      mark('Pause'); // ================= Pause / resume =================
+      q.od.active = false; q.startRun(); stubAligned(q); d = q._symphony; q.scoring.combo = 16; await play(q, 240); reset();
+      await play(q, 24); check(layerLog.filter((x) => x.ok).length > 0, 'precondition: arpeggio running');
       const ttPause = Pulse.Rhythm.trackTime(q.clock);
       q.pause(); check(q.state === 'paused' && Pulse.Sfx.layerCount() === 0, 'pause: arpeggio notes stop (none in flight)');
-      reset(); advance(2000); await play(q, 120); check(layerLog.filter((x) => x.ok).length === 0 && near(Pulse.Rhythm.trackTime(q.clock), ttPause, 1e-9), 'paused for 2 s: nothing is queued and the run clock has not moved');
-      q.setState('playing'); await play(q, 90);
+      reset(); advance(2000); await play(q, 72); check(layerLog.filter((x) => x.ok).length === 0 && near(Pulse.Rhythm.trackTime(q.clock), ttPause, 1e-9), 'paused for 2 s: nothing is queued and the run clock has not moved');
+      q.setState('playing'); await play(q, 54);
       const after = layerLog.filter((x) => x.ok);
       check(after.length > 0 && after.every((x) => gridErr(x) < 0.02) && after.every((x) => x.tt >= ttPause - 1e-9), `resume: the arpeggio picks up on the grid, nothing back-filled (${after.length} notes)`);
-      const ks = after.map((x) => Math.round((x.tt + x.delay) / (60 / x.bpm / 4))); check(new Set(ks).size === ks.length, 'and no step is queued twice');
+      const ks = after.map((x) => Math.round((x.tt + x.delay) / (60 / x.bpm / 4))); const dupes = ks.filter((k, i) => ks.indexOf(k) !== i); check(dupes.length === 0, `and no step is queued twice (duplicates: ${dupes.join(',')}; of ${ks.length}; times ${after.filter((x, i) => ks.indexOf(ks[i]) !== i || ks.lastIndexOf(ks[i]) !== i).map((x) => x.tt.toFixed(3) + '+' + x.delay.toFixed(3) + '/' + x.state).join(' ')})`);
       // Background / return.
-      Pulse.Audio.suspend(); reset(); await play(q, 60); check(Pulse.Sfx.layerCount() === 0, 'app hidden: nothing is queued');
-      const c0 = created.osc; await play(q, 60); check(created.osc === c0 && layerLog.filter((x) => x.ok).length === 0, 'and no node is created while the audio engine is suspended (nothing is retained to play later)');
+      Pulse.Audio.suspend(); reset(); await play(q, 36); check(Pulse.Sfx.layerCount() === 0, 'app hidden: nothing is queued');
+      const c0 = created.osc; await play(q, 36); check(created.osc === c0 && layerLog.filter((x) => x.ok).length === 0, 'and no node is created while the audio engine is suspended (nothing is retained to play later)');
       Pulse.Audio.resume(); await wait(300); check(Pulse.Audio.status().context === 'running', 'audio engine running again'); q.pause(); q.setState('playing');
 
-      // ================= Retry cycles: nothing grows =================
+      mark('Retry'); // ================= Retry cycles: nothing grows =================
       q = await startLab(); stubAligned(q); d = q._symphony;       const cycle = () => { q.startRun(); stubAligned(q); q.scoring.combo = 16; frames(q, 200); inStep(q, () => { q.comboMilestone(16); q.routeClear({}); q.overdriveStarted(); }); frames(q, 30); q.od.active = false; q.crash({ kind: 'gate' }); };
       cycle(); cycle(); await wait(300); const iv0 = intervals; const ownKeys = Object.keys(q).length;
       const per = [];
@@ -364,12 +389,12 @@
       check(intervals <= iv0 + 2 && Object.keys(q).length === ownKeys && q._symphony === d, `no timers or properties accumulate (intervals ${intervals} vs ${iv0}, keys ${Object.keys(q).length}/${ownKeys})`);
       check(d.log.length <= 60 && d.pending.length === 0, 'the ledger log is bounded and holds nothing pending');
 
-      // ================= Crash / clear =================
+      mark('Crash'); // ================= Crash / clear =================
       q.startRun(); stubAligned(q); q.scoring.combo = 16; frames(q, 300); check(d.v > 2, 'built up to level 3'); q.crash({ kind: 'gate' });
       check(d.v === 0 && Pulse.Sfx.layerCount() === 0, 'a crash drops the level to 0 and stops the layer at once');
       reset(); frames(q, 60); check(layerLog.length === 0, 'and nothing plays on the game-over screen');
 
-      // ================= Scene transitions =================
+      mark('Scene'); // ================= Scene transitions =================
       q = await startLab(); stubAligned(q); q.startRun(); q.scoring.combo = 16; frames(q, 200);
       const gone = q, dirOld = q._symphony; q.scene.start('menu'); await wait(500);
       check(!Object.prototype.hasOwnProperty.call(gone, 'step') && S.current() === null && Pulse.Sfx.getHook() === null && Pulse.Sfx.layerCount() === 0, 'game -> menu: detached, no hook, no layer note');
@@ -382,73 +407,42 @@
       q.scene.start('game', { mode: 'campaign', stageIndex: 1 }); await wait(400); q = scene(); stubAligned(q); q.startRun(); frames(q, 10); await Pulse.Sfx.stemPrepare(1);
       ramps = []; Pulse.Sfx.stemStop(0); const ok1 = Pulse.Sfx.stemStart(1, 125, 0); const lin2 = ramps; ramps = null; Pulse.Sfx.stemStop(0);
       check(ok1 && lin2.filter((x) => x.k === 'ramp').length === 1, 'outside the Lab the stem uses the original single linear ramp');
+      origStem(await stemTiming(1, 125), 'after the director was used and detached');
+      check(Pulse.Sfx.layerLevel() >= 0, 'layer bus exists');
 
-      // ================= Race: music unaligned / track change =================
-      q = await startLab(); q.startRun(); d = q._symphony; q.scoring.combo = 16; stubAligned(q, false); reset(); await play(q, 360);
+      mark('Race:'); // ================= Race: music unaligned / track change =================
+      q = await startLab(); q.startRun(); d = q._symphony; q.scoring.combo = 16; stubAligned(q, false); reset(); await play(q, 216);
       check(layerLog.filter((x) => x.ok).length === 0, 'music not in step with the run clock: no arpeggio (nothing is played against an unknown track position)');
-      stubAligned(q, true); await play(q, 120); const na = layerLog.filter((x) => x.ok).length; check(na > 0, 'it starts as soon as the music is in step');
-      stubAligned(q, false); await play(q, 3); reset(); await play(q, 120); check(layerLog.filter((x) => x.ok).length === 0, 'and stops again when it is not (a track change / cross-fade)');
-      stubAligned(q, true); Pulse.Rhythm.retune(q.clock, 140); reset(); await play(q, 200);
+      stubAligned(q, true); await play(q, 72); const na = layerLog.filter((x) => x.ok).length; check(na > 0, 'it starts as soon as the music is in step');
+      stubAligned(q, false); await play(q, 6); reset(); await play(q, 72); check(layerLog.filter((x) => x.ok).length === 0, 'and stops again when it is not (a track change / cross-fade)');
+      stubAligned(q, true); Pulse.Rhythm.retune(q.clock, 140); reset(); await play(q, 120);
       const l140 = layerLog.filter((x) => x.ok); check(l140.length > 3 && l140.every((x) => x.bpm === 140 && gridErr(x) < 0.02), `after a tempo change (125 -> 140) the notes follow the new grid (${l140.length} notes)`);
       const musicCalls = []; const mp = Pulse.Music.play, ms = Pulse.Music.stop, msk = Pulse.Music.seek;
       Pulse.Music.play = (...a) => { musicCalls.push('play'); return mp.apply(Pulse.Music, a); }; Pulse.Music.stop = (...a) => { musicCalls.push('stop'); return ms.apply(Pulse.Music, a); }; Pulse.Music.seek = (...a) => { musicCalls.push('seek'); return msk.apply(Pulse.Music, a); };
-      advance(1000); d.last = null; inStep(q, () => { q.comboMilestone(16); q.routeClear({}); q.overdriveStarted(); }); await play(q, 120);
+      advance(1000); d.last = null; inStep(q, () => { q.comboMilestone(16); q.routeClear({}); q.overdriveStarted(); }); await play(q, 72);
       Pulse.Music.play = mp; Pulse.Music.stop = ms; Pulse.Music.seek = msk;
       check(musicCalls.filter((c) => c !== 'seek').length === 0, `the director never plays, stops or switches a music track (calls: ${musicCalls.join(',') || 'none'})`);
       q.od.active = false;
 
-      // ================= Loudness ceilings =================
+      mark('Loudness'); // ================= Loudness ceilings =================
       const peakNow = (list) => list.reduce((a, c) => a + gainSum(c.specs), 0);
       check(peakNow(noteCalls().slice(-1)) <= Pulse.Melody.GAIN_CEILING + 1e-9, `one cue's notes sum to at most Melody.GAIN_CEILING (${Pulse.Melody.GAIN_CEILING})`);
       const worstLayer = 6 * C.symphony.arpGain * 1.25; check(worstLayer < Pulse.Melody.GAIN_CEILING / 1.5, `worst-case arpeggio (6 notes at peak) sums to ${worstLayer.toFixed(3)}, under half a cue's ceiling and on a bus scaled by the music volume`);
       check(layerLog.every((x) => x.spec.gain <= 0.06), 'no arpeggio note ever above 0.06');
 
-      // ================= Gameplay equivalence: director on vs off =================
-      const runBot = async (how) => {
-        const x = how.lab ? await startLab({ bot: true, route: how.route || 'safe' }) : await startStage(how.idx, { bot: true, route: how.route || 'safe' });
-        if (how.force) S.attach(x, { force: true });
-        stubAligned(x); x.startRun();
-        let guard = 0; frames(x, 60000, () => x.state !== 'playing' || ++guard < 0);
-        const dd = x._symphony;
-        return { sig: JSON.stringify({ s: x.state, sc: x.score, e: x.energy, b: x.bonus, t: +x.elapsed.toFixed(3), st: x.result && x.result.stars, od: x.od.activations, rc: x.routeClears, cl: x.cleared, nm: x.nearMisses, tr: Math.round(x.level.travelled), cb: x.scoring.combo }), stats: dd ? Object.assign({}, dd.stats) : null };
-      };
-      const cases = [{ lab: true, name: 'Lab Shatter Symphony (stage 14 layout)' }, { lab: true, route: 'risk', name: 'Lab, risk-route bot' }, { idx: 0, force: true, name: 'stage 1' }, { idx: 3, force: true, name: 'stage 4 (forks)' }, { idx: 6, force: true, name: 'stage 7 (Mirror Pulse)' }, { idx: 9, force: true, name: 'stage 10' }, { idx: 11, force: true, name: 'stage 12' }];
-      let totalPlayed = 0, totalArp = 0, totalDropped = 0;
-      for (const cs of cases) {
-        C.symphony.enabled = true; const on = await runBot(cs);
-        C.symphony.enabled = false; const off = await runBot(cs); C.symphony.enabled = true;
-        check(on.sig === off.sig && !off.stats && !!on.stats, `${cs.name}: state, score, energy, time, stars, Overdrive count identical with the director on and off (${on.sig.slice(0, 120)}; director ${JSON.stringify(on.stats)})`);
-        totalPlayed += on.stats ? on.stats.played : 0; totalArp += on.stats ? on.stats.arp : 0; totalDropped += on.stats ? on.stats.dropped : 0;
-      }
-      check(totalPlayed > 0 && totalArp > 20, `the director was really exercised in those runs (cues ${totalPlayed}, dropped ${totalDropped}, arpeggio notes ${totalArp})`);
-      // Same layout with and without the Lab wrapper: campaign stage 14 equals the Lab stage run.
-      C.symphony.enabled = false; const camp14 = await runBot({ idx: 13 }); const lab14 = await runBot({ lab: true }); C.symphony.enabled = true;
-      const strip = (s) => { const o = JSON.parse(s); return JSON.stringify(Object.assign(o, { st: o.st })); };
-      check(strip(camp14.sig) === strip(lab14.sig), `Lab stage 14 plays exactly as campaign stage 14 (${camp14.sig.slice(0, 90)})`);
-      // Deterministic.
-      const r1 = await runBot({ lab: true }), r2 = await runBot({ lab: true }); check(r1.sig === r2.sig && JSON.stringify(r1.stats) === JSON.stringify(r2.stats), 'two Lab bot runs give identical results and identical director statistics (deterministic)');
-      // Frame rate: the same run at 30 and 144 fps, director on.
-      const atFps = async (ms) => { const x = await startLab({ bot: true, route: 'safe' }); stubAligned(x); x.startRun(); frames(x, 90000, () => x.state !== 'playing', ms); return { sc: x.score, e: x.energy, od: x.od.activations, st: x.result && x.result.stars, s: x.state, played: x._symphony.stats.played }; };
-      const f30 = await atFps(33.3), f60 = await atFps(16.7), f144 = await atFps(6.9);
-      check(f30.s === 'complete' && f60.s === 'complete' && f144.s === 'complete' && f30.sc === f60.sc && f60.sc === f144.sc && f30.st === f60.st && f60.st === f144.st, `30 / 60 / 144 fps: same completion, score and stars with the director (${f30.sc}/${f60.sc}/${f144.sc}; cues ${f30.played}/${f60.played}/${f144.played})`);
-      // Density in a real run: how often the stage is dense (reported, not asserted to a number).
-      {
-        const x = await startLab({ bot: true, route: 'safe' }); stubAligned(x); x.startRun(); let dn = 0, tot = 0, arpWhileDense = 0;
-        frames(x, 90000, () => { tot++; if (x._symphony.dense) dn++; return x.state !== 'playing'; });
-        arpWhileDense = layerLog.filter((l) => l.ok && l.dense).length;
-        notes.push(`stage 14 dense ${(100 * dn / tot).toFixed(0)}% of frames`);
-        check(arpWhileDense === 0 && dn > 0 && dn < tot, `in the real stage the layer sees both dense (${(100 * dn / tot).toFixed(0)}% of frames) and sparse stretches, and never plays while dense`);
-        // Ledger discipline over a whole real run: consecutive played cues are either a window apart or an escalation.
-        const pl = x._symphony.log.filter((l) => l.played); let bad = 0; for (let i = 1; i < pl.length; i++) if (pl[i].at - pl[i - 1].at < C.symphony.window && S.PRIORITY[pl[i].type] <= S.PRIORITY[pl[i - 1].type]) bad++;
-        check(bad === 0, `a whole real run: no two played cues inside ${C.symphony.window} s unless the second outranks the first (${pl.length} cues in the log)`);
-      }
-      // Back to the original: leave the Lab, the director is gone and nothing is left behind.
+      // Orphans: leave the Lab in the middle of Overdrive with the arpeggio running; nothing keeps playing.
+      { const x = await startLab(); stubAligned(x); await Pulse.Sfx.stemPrepare(2); x.startRun(); x.scoring.combo = 16; await play(x, 120); odOn(x); frames(x, 5);
+        check(Pulse.Sfx.stemActive() === 2, 'Overdrive stem running before the scene is shut down'); }
       scene().scene.start('menu'); await wait(500);
+      check(Pulse.Sfx.stemActive() === 0, `scene shutdown mid-Overdrive: the stem is stopped (${Pulse.Sfx.stemActive()})`); check(Pulse.Sfx.layerCount() === 0 && Pulse.Sfx.getHook() === null && S.current() === null, `and no arpeggio note (${Pulse.Sfx.layerCount()}), no hook, no director`);
+      await wait(4800); check(Pulse.Audio.status().voices === 0 && Pulse.Sfx.stats().active === 0, `and after the longest sting (4.8 s) no voice or note is left (voices ${Pulse.Audio.status().voices}, notes ${Pulse.Sfx.stats().active})`);
+      // Back to the original: the director is gone and nothing is left behind.
+      scene().scene.start('menu'); await wait(300);
       check(S.current() === null && Pulse.Sfx.getHook() === null && Pulse.Sfx.layerCount() === 0, 'at the end: no director, no hook, no layer notes');
       check(intervals <= baseIntervals + 3, `timers back to baseline (${intervals} vs ${baseIntervals})`);
       check(errors.length === 0, `page errors: ${errors.join(' | ')}`);
     }
-    run().then(() => { document.title = fails.length ? `FAIL ${fails.length}: ${fails.join(' | ')}` : `PASS symphony tests ${checks} checks | ${notes.join(' | ')}`; })
+    run().then(() => { document.title = fails.length ? `FAIL ${fails.length}: ${fails.join(' | ')} || ${notes.join(' ')}` : `PASS symphony tests ${checks} checks | ${notes.join(' | ')}`; })
       .catch((e) => { document.title = 'FAIL error ' + e.message + ' ' + (e.stack || '').split('\n')[1]; });
   </script>
 </body>

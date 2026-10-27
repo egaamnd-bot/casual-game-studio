@@ -235,6 +235,9 @@
 
       const mode = arpMode(d.v);
       const tt = Rh.trackTime(scene.clock);
+      // The beat count restarted (Endless moved to the next world's track): forget the old track's times. A queued step is
+      // at most `lookahead` ahead of the clock, so anything further back than that is a restart, not a queued step.
+      if (tt < d.lastArpAt - cfg.lookahead - beatS / 4) d.lastArpAt = prevGrid(tt);
       if (!cfg.arp || !mode || (od && od.active) || d.dense || !scene.aligned()) {
         d.lastArpAt = Math.max(d.lastArpAt, prevGrid(tt)); // never back-fill what was held back
         return;
@@ -285,6 +288,7 @@
       restore.length = 0;
       Sfx.setHook(null);
       Sfx.layerStop(0);
+      Sfx.stemStop(0); // a scene shut down in the middle of Overdrive must not leave its stem looping
       Sfx.stemShape(false);
       if (scene._symphony === d) delete scene._symphony;
       if (current === d) current = null;

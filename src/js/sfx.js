@@ -422,6 +422,7 @@
     },
 
     layerCount() { return state.layer.length; },
+    layerLevel() { return state.layerGain ? state.layerGain.gain.value : layerLevel(); }, // the arpeggio bus gain (music volume x effects level)
 
     // ---- Overdrive stems (docs/ASSET_MANIFEST.md) ----
     // A 16-beat loop per world, played over the music while Overdrive is on. Decoded only when a
