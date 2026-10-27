@@ -1,6 +1,6 @@
 # Near-miss -> Overdrive prototype
 
-Status: **experiment, stage 10 (Precision) only. NOT DEVICE-TESTED.** Approved direction: GitHub Issue #24, priority B.
+Status: **experiment, stage 10 (Precision) only. Producer phone-tested APK run #81 (commit `7dcab297`) and reports it went well (Producer feedback, 2026-10-26; not an automated result). Wider rollout beyond stage 10 is not approved yet.** Approved direction: GitHub Issue #24, priority B.
 
 ## What the player feels
 
@@ -27,6 +27,6 @@ On stage 10, squeezing past a gate wall with almost no room (the orb's edge with
 
 Clearance agrees with `Level.hitsWall` over 6000 random plain and fork cases; exact boundaries (-0.01, 0, 0.01, 8, 8.01 px); both walls and both sides; orb radii 20 / 30 / 45 / 56; fork divider; same closest approach at 30 / 60 / 144 / 250 fps and with a 50 ms frame; moving orb and swaying gap; brush-then-drift; exactly `charge` more Overdrive than a clean pass; a lethal overlap pays nothing; tall tunnel pays once; pause mid-crossing; cap; no charge during Overdrive; retry resets; five repeated runs identical; other stages, Endless and `enabled: false` unchanged; a bot run of stage 10 (and stages 9 and 11) has identical state, score, energy, time and stars with the prototype on and off, and is deterministic.
 
-## For the Producer to judge on a phone
+## For the Producer to judge on a phone (first round done: "went well"; tuning notes welcome)
 
 Does stage 10 feel better with grazes charging Overdrive? Is 3 per graze (cap 15) too little or too much? Does "GRAZE" read clearly? If it feels good, the stage list can be widened in config; if not, set `enabled: false`.

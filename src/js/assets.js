@@ -125,7 +125,9 @@ Pulse.Assets = {
     if (window.PULSE_ASSET_BASE) scene.load.setBaseURL(window.PULSE_ASSET_BASE);
     for (const key of Object.keys(this.ATLASES)) {
       const base = this.ATLASES[key];
-      scene.load.atlas(key, `${base}.png`, `${base}.json`);
+      // Softened hazard palette (docs/PALETTE_SOFT.md): same frames and json, recoloured hazard pixels.
+      const png = key === 'pulse_gameplay' && Pulse.CONFIG.palette.soft ? `${base}_soft.png` : `${base}.png`;
+      scene.load.atlas(key, png, `${base}.json`);
     }
     if (!(window.PULSE_TEST && window.PULSE_TEST.noVfx)) for (const key of Object.keys(this.OPTIONAL_ATLASES)) {
       const base = this.OPTIONAL_ATLASES[key];
