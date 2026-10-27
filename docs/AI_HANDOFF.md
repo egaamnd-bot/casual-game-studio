@@ -18,7 +18,7 @@
 - **Not built / not tested:** nothing from the three new prototypes or Campaign Batch 3 exists on main yet.
 
 ## Rules in force
-Claude is Lead Developer, reviewer and merge operator (self-review, full regression, exact-SHA merge, verify main build, update this file); ChatGPT is a report reviewer, not a merge gate; the Producer decides product/gameplay and releases. Prototypes are flagged and playable only from LAB until the Producer approves wider use. Browser suites share a single lock on the 2-core machine (`/home/claude/bin/pulse-test`).
+Usage-efficiency rule (2026-10-27): see [AI_HANDOFF_PROTOCOL.md](AI_HANDOFF_PROTOCOL.md#usage-efficiency-permanent-2026-10-27-issue-28). Claude is Lead Developer, reviewer and merge operator (self-review, full regression, exact-SHA merge, verify main build, update this file); ChatGPT is a report reviewer, not a merge gate; the Producer decides product/gameplay and releases. Prototypes are flagged and playable only from LAB until the Producer approves wider use. Browser suites share a single lock on the 2-core machine (`/home/claude/bin/pulse-test`).
 
 ## Known limitations
 Mirror/route/Overdrive/graze tuning is by reasoning and bots, refined only by the Producer's phone feedback so far; echo readability and cue loudness not measured on a device; `gameplay.html` is a manual page that always fails headless; the barrier-ready corona and sound level have no specific device feedback.
