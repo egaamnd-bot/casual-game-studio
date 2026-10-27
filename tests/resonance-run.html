@@ -196,7 +196,7 @@
 
       // ---- Lifecycle: stage restart and scene shutdown leave no leaked state or rings ----
       {
-        const x = await startLab('resonance'); pinFn(x, () => 36); frames(x, 200); unpin(x);
+        const x = await startLab('resonance'); pinFn(x, () => 36); frames(x, 900, () => x.rz && x.rz.g && x.rz.g.scene && x.rz.g.commandBuffer.length > 0); unpin(x);
         const ring = x.rz.g, run0 = x.rz.run;
         check(ring.scene && ring.commandBuffer.length > 0, 'a run in progress has its overlay drawn');
         scene().scene.start('game', { mode: 'campaign', stageIndex: 0 }); await wait(450);
