@@ -1,6 +1,6 @@
 # Developer Campaign / QA Gauntlet
 
-Status: **REQUIREMENT RECORDED, NOT BUILT** (Producer rule 2026-10-27, Issue #28). Nothing here exists in the game yet. **NOT DEVICE-TESTED.**
+Status: **BUILT on `feature/dev-gauntlet` (PR pending merge), browser-tested only. NOT DEVICE-TESTED.** Requirement from Producer rule 2026-10-27, Issue #28.
 
 ## Purpose
 
@@ -55,3 +55,22 @@ Sections 7-9 are added only when their prototype is merged. Sequencing update (P
 ## Permanent rule
 
 Every newly approved mechanic must add its Gauntlet section (or an explicit written reason it cannot) as part of its own PR or the next Gauntlet PR. See `docs/AI_HANDOFF_PROTOCOL.md` and Decision #25.
+
+## Implemented (feature/dev-gauntlet)
+
+Open it from **Lab > Developer Gauntlet (QA)**. Code: `src/js/gauntlet.js`, `src/js/gauntlet-scene.js`; guarded hooks in `game-scene.js`, `lab-scene.js`, `main.js`. Guard: `CONFIG.gauntlet.enabled` and `CONFIG.lab.enabled`; off means no section is registered and no LAB entry exists (`tests/gauntlet-off.html`).
+Sections are Lab entries (`gauntlet-<n>-<key>`, stage id `lab-...`), never in `Pulse.STAGES`, never written to the save. After a run each section shows "Triggered: ..." or "Not triggered: ..." as proof. "Next section" chains them; "Sections" returns to the list.
+
+| # | Section | Mechanic | Trigger | Expected proof |
+|---|---|---|---|---|
+| 1 | Shrink and grow | core control | hold to shrink, release to grow | section clear |
+| 2 | Hazards | tight and moving gaps | pass gates without a hit | section clear |
+| 3 | Cyan barriers | smash barriers + ready cue | smash a cyan barrier | smashes >= 1 |
+| 4 | Risk routes | risk-reward lanes | fully clear the risk lane | routeClears >= 1 (safe lane: Not triggered) |
+| 5 | Mirror Pulse | mirror gates | clear a mirror gate | mirrorClears >= 1 |
+| 6 | Near-miss | graze to Overdrive | pass within 8 px of a wall | grazes >= 1 and Overdrive charged |
+| 7 | Resonance Gates | resonance | pass a gate at the right size | resonance count >= 1 |
+| 8 | Shatter Symphony | arpeggio | chain barrier smashes | peak arpeggio >= 1.5 |
+| 9 | World Shift | movement shifts | reach two movements | >= 2 shifts seen |
+
+Automated evidence (browser, headless): `tests/gauntlet.html` (124 checks: registration, every section cleared by the bot and proof shown, safe-lane negative, retry/replay/crash, chaining, direct select, exit, save text unchanged, CONFIG/stage snapshot unchanged, no leaked hooks or flags, normal stage still saves) and `tests/gauntlet-off.html` (production guard). Real-device validation: **NOT DEVICE-TESTED**.

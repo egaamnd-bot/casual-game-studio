@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pulse developer gauntlet</title>
+  <style>html, body { margin: 0; height: 100%; background: #0B0F19; overflow: hidden; }</style>
+</head>
+<body>
+  <script>
+    // Developer Campaign / QA Gauntlet (docs/DEV_GAUNTLET.md): every section through the real game systems, retry, chaining, exit,
+    // save isolation, flag cleanup and the production guard. The per-feature tests stay; this supplements them.
+    try { localStorage.clear(); } catch (e) {}
+    window.PULSE_ASSET_BASE = '../src/';
+    window.PULSE_TEST = { autoStart: true, holdReady: true, bot: false, mode: 'campaign', stageIndex: 0 };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.90.0/phaser.min.js"></script>
+  <script src="../src/js/config.js"></script>
+  <script src="../src/js/rhythm.js"></script>
+  <script src="../src/js/storage.js"></script>
+  <script src="../src/js/sfx.js"></script>
+  <script src="../src/js/melody.js"></script>
+  <script src="../src/js/symphony.js"></script>
+  <script src="../src/js/overdrive.js"></script>
+  <script src="../src/js/level.js"></script>
+  <script src="../src/js/graze.js"></script>
+  <script src="../src/js/mirror.js"></script>
+  <script src="../src/js/stages.js"></script>
+  <script src="../src/js/campaign.js"></script>
+  <script src="../src/js/resonance.js"></script>
+  <script src="../src/js/patterns.js"></script>
+  <script src="../src/js/skins.js"></script>
+  <script src="../src/js/render.js"></script>
+  <script src="../src/js/ui.js"></script>
+  <script src="../src/js/assets.js"></script>
+  <script src="../src/js/trail.js"></script>
+  <script src="../src/js/worldshift.js"></script>
+  <script src="../src/js/sprite-view.js"></script>
+  <script src="../src/js/game-scene.js"></script>
+  <script src="../src/js/menu-scenes.js"></script>
+  <script src="../src/js/lab.js"></script>
+  <script src="../src/js/lab-scene.js"></script>
+  <script src="../src/js/gauntlet.js"></script>
+  <script src="../src/js/gauntlet-scene.js"></script>
+  <script src="../src/js/main.js"></script>
+  <script>
+    const C = Pulse.CONFIG, G = Pulse.Gauntlet;
+    const fails = [], notes = [];
+    let checks = 0;
+    const check = (ok, msg) => { checks++; if (!ok) fails.push(msg); };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const scene = () => window.__pulseScene;
+    const game = () => window.__pulseGame;
+    const errors = [];
+    window.addEventListener('error', (e) => errors.push(e.message));
+    const fake = new WeakMap();
+    const clockOf = (sc) => { let c = fake.get(sc); if (!c) { c = { now: sc.time.now }; fake.set(sc, c); Object.defineProperty(sc.time, 'now', { get: () => c.now, set: () => {}, configurable: true }); } return c; };
+    const frames = (sc, n) => { const c = clockOf(sc); for (let i = 0; i < n; i++) { c.now += 16.667; sc.update(c.now, 16.667); sc.draw && sc.draw(); } };
+    // Runs until the run ends (complete / over); `pin` fixes the orb radius; the Gauntlet sampler runs every frame as it does in play.
+    const drive = (q, hook) => { const c = clockOf(q); let n = 0; while (q.state === 'playing' && n++ < 300000) { if (hook) hook(q); c.now += 16.667; q.update(c.now, 16.667); q.draw(); G.sample(q); } };
+    const startLab = async (id, opts) => {
+      game().scene.start('game', { mode: 'campaign', lab: id });
+      await wait(450);
+      const q = scene();
+      q.test = Object.assign({ holdReady: true, bot: true, route: 'safe' }, opts || {});
+      return q;
+    };
+    const begin = (q) => { q.startRun(); frames(q, 2); };
+    const saveText = () => localStorage.getItem(Pulse.Save.KEY);
+    const snapshot = () => JSON.stringify({ cfg: C, stages: Pulse.STAGES.map((s) => [s.id, s.items.length]) });
+    // the harness starts scenes directly, so unrelated scenes (lab) can stay active; what matters is Gauntlet on, game off
+    const onGauntletScreen = () => { const k = activeKey().split(','); return k.includes('gauntlet') && !k.includes('game'); };
+    const activeKey = () => game().scene.getScenes(true).map((s) => s.scene.key).join(',');
+    const flat = (list) => list.reduce((a, o) => a.concat(o, o.list ? flat(o.list) : []), []);
+    const textsOf = (sc) => flat(sc.children.list).filter((o) => typeof o.text === 'string').map((o) => o.text);
+
+    async function run() {
+      for (let i = 0; i < 200 && !(scene() && scene().state); i++) await wait(100);
+      await Pulse.Audio.loading; await wait(300); Pulse.Audio.unlock();
+
+      // ---- 1. Registration: nine sections, in order, none of them a campaign stage ----
+      const secs = G.sections();
+      const keys = G.SPECS.map((s) => s.key);
+      check(secs.length === 9 && G.skipped.length === 0, `all nine sections registered, none skipped (${secs.length}, skipped: ${G.skipped.join(',') || 'none'})`);
+      check(secs.map((e) => e.spec.key).join() === keys.join(), 'sections are in the curated order');
+      check(secs.every((e, i) => e.n === i + 1 && e.id.startsWith(`gauntlet-${i + 1}-`) && e.group === 'gauntlet'), 'ids, numbers and group');
+      const ids = Pulse.STAGES.map((s) => s.id);
+      check(Pulse.STAGES.length === 30 && new Set(ids).size === 30 && ids.every((id, i) => parseInt(id.slice(1), 10) === i + 1), 'the campaign list is untouched: 30 stages, unique ids, in order');
+      check(secs.every((e) => !ids.includes(e.stage.id) && Pulse.Campaign.validate(e.stage, C.width).length === 0), 'no section stage is a campaign stage, and every one validates');
+      check(secs.every((e) => e.spec.prompt && e.spec.trigger && e.spec.expect && e.spec.mechanic), 'every section has a prompt, a trigger, an expected result and a mechanic name');
+      // The prototype sections run the prototype's own flags; the others carry only what they need.
+      const flagOf = (k) => secs.find((e) => e.spec.key === k).flags;
+      check(!!flagOf('resonance').resonance && flagOf('resonance').resonance.gates && Object.keys(flagOf('resonance').resonance.gates).length >= 5, 'Resonance section carries the prototype\'s own gate bands');
+      check(flagOf('symphony').symphony === true && !!flagOf('worldshift').worldShift && flagOf('nearmiss').graze === true, 'Symphony, World Shift and near-miss flags are set on their sections only');
+      check(['core', 'hazards', 'barriers', 'routes', 'mirror'].every((k) => Object.keys(flagOf(k)).length === 0), 'core, hazards, barriers, routes and mirror use no experimental flag at all');
+      check(!JSON.stringify(Pulse.Lab.list().filter((e) => !e.group).map((e) => e.flags)).includes('graze'), 'the plain Lab prototypes carry no Gauntlet flag');
+
+      // ---- 2. The screens: LAB shows one clearly labelled entry, the Gauntlet screen lists the nine ----
+      const before = { snap: snapshot(), save: saveText() };
+      game().scene.start('lab'); await wait(300);
+      const labTexts = textsOf(game().scene.getScene('lab'));
+      check(labTexts.includes('Developer Gauntlet (QA)') && !labTexts.some((t) => /Shrink and grow|Cyan barriers/.test(t)), 'the LAB screen has one Developer Gauntlet (QA) entry and does not list the sections');
+      ['game','lab'].forEach((k) => game().scene.stop(k)); game().scene.start('gauntlet'); await wait(300);
+      const gTexts = textsOf(game().scene.getScene('gauntlet'));
+      check(secs.every((e) => gTexts.includes(e.title)) && gTexts.includes('Lab') && onGauntletScreen(), `the Gauntlet screen lists all nine sections with a way back (active: ${activeKey()}; texts: ${gTexts.slice(0, 6).join(' / ')})`);
+
+      // ---- 3. Every section, through the real systems, with the test bot ----
+      const results = {};
+      for (const e of secs) {
+        const k = e.spec.key;
+        const q = await startLab(e.id, k === 'routes' ? { route: 'risk' } : {});
+        const st = G.state(q);
+        check(q.lab === e && q.mode === 'campaign' && !!st, `${k}: opens as a Lab section with the Gauntlet state attached`);
+        check(st.prompt.visible && st.sub.visible && st.tag.text.includes(`${e.n}/9`), `${k}: shows its prompt and tag before the run starts`);
+        if (k === 'symphony') check(!!Pulse.Symphony.current(), `${k}: the audio director is attached`);
+        if (k === 'worldshift') check(!!q.ws, `${k}: the World Shift module is attached`);
+        begin(q);
+        check(q.state === 'playing' && !st.prompt.visible, `${k}: the prompt hides when the run starts`);
+        const pin = k === 'resonance' ? 36 : null; // inside every ring band (24-38, 26-46, 32-46): the "match the ring" trigger, held
+        if (pin) Object.defineProperty(q, 'radius', { get: () => pin, set: () => {}, configurable: true });
+        drive(q);
+        if (pin) delete q.radius;
+        const p = G.proof(q);
+        results[k] = { state: q.state, t: +q.elapsed.toFixed(1), items: e.stage.items.length, proof: p };
+        check(q.state === 'complete', `${k}: the bot clears the section (${q.state} at ${q.elapsed.toFixed(1)} s)`);
+        check(p && p.ok, `${k}: the mechanic really triggered (${p && p.text})`);
+        check(k === 'worldshift' ? q.elapsed < 90 : q.elapsed < 45, `${k}: stays short (${q.elapsed.toFixed(1)} s)`);
+        check(q.titleText.text === 'Section clear' && /Triggered/.test(textsOf(q).join('|')), `${k}: the clear screen says Section clear and what was triggered`);
+        const isLast = e.n === secs.length;
+        check(q.nextBtn.visible === !isLast && (isLast || q.nextBtn.label.text === 'Next section'), `${k}: ${isLast ? 'no Next button after the last section' : 'offers Next section'}`);
+        check(G.next(e) === (isLast ? null : secs[e.n]), `${k}: next() chains to ${isLast ? 'nothing (last section)' : secs[e.n].spec.key}`);
+        check(q.backBtn.label.text === 'Sections', `${k}: the exit button says Sections`);
+      }
+      notes.push(Object.keys(results).map((k) => `${k}:${results[k].t}s`).join(' '));
+
+      // The safe lane just passes: the section clears, and says honestly that no risk route was cleared.
+      {
+        const q = await startLab(secs.find((e) => e.spec.key === 'routes').id, { route: 'safe' });
+        begin(q); drive(q);
+        check(q.state === 'complete' && (q.routeClears || 0) === 0 && G.proof(q).ok === false && /Not triggered/.test(textsOf(q).join('|')), 'routes, safe lane: clears, no route clear counted, and the screen says Not triggered');
+      }
+
+      // ---- 4. Retry and section replay: counters back to zero, flags still on, no leftover state ----
+      {
+        const e = secs.find((s) => s.spec.key === 'barriers');
+        const q = await startLab(e.id, {});
+        begin(q); drive(q);
+        const first = G.state(q).smashes;
+        q.startRun(); frames(q, 2);
+        check(first >= 1 && G.state(q).smashes === 0 && q.state === 'playing', `retry: the run restarts at once with the proof counters cleared (${first} smashes before, ${G.state(q).smashes} after)`);
+        drive(q);
+        check(G.state(q).smashes === first && q.state === 'complete', 'replay: the same section pays the same again');
+        // a crash then a retry
+        q.startRun(); frames(q, 2);
+        Object.defineProperty(q, 'radius', { get: () => 6, set: () => {}, configurable: true });
+        drive(q); delete q.radius;
+        check(q.state === 'over', 'a hit ends the section as in the campaign (a tiny orb cannot smash the first barrier)');
+        q.startRun(); frames(q, 2);
+        check(q.state === 'playing' && G.state(q).smashes === 0, 'retry after a crash works and starts clean');
+      }
+
+      // ---- 5. Chaining, direct select and exit ----
+      {
+        const e1 = secs[0];
+        const q = await startLab(e1.id, {});
+        begin(q); drive(q);
+        check(q.state === 'complete' && q.nextBtn.label.text === 'Next section', 'section 1 clear offers Next section');
+        frames(q, 40); // the clock is faked: step past the restart lock so the buttons act
+        q.nextStage(); await wait(450);
+        check(scene().lab === secs[1] && scene().mode === 'campaign', 'Next section starts section 2 as a Lab entry (no campaign stage)');
+        scene().leave(); await wait(350);
+        check(onGauntletScreen(), `the exit button returns to the Gauntlet screen (active: ${activeKey()})`);
+        game().scene.start('game', { mode: 'campaign', lab: secs[6].id }); await wait(450);
+        check(scene().lab === secs[6], 'direct selection starts any section without playing the ones before it');
+        const last = await startLab(secs[8].id, {});
+        begin(last); drive(last);
+        check(last.state === 'complete' && !last.nextBtn.visible && G.next(secs[8]) === null, 'the last section has nothing after it');
+      }
+
+      // ---- 6. Save isolation, flag cleanup, and a normal run afterwards ----
+      const afterSave = saveText();
+      check(afterSave === before.save, `no save write at all across every section, retries, crashes and exits (save ${before.save === null ? 'absent' : 'unchanged'})`);
+      game().scene.start('menu'); await wait(350);
+      check(snapshot() === before.snap, 'CONFIG and the campaign stage list are byte-identical after leaving the mode');
+      check(Pulse.Sfx.getHook() === null && Pulse.Symphony.current() === null, 'no audio hook or director left behind');
+      {
+        // A normal campaign stage: stage 1.
+        game().scene.start('game', { mode: 'campaign', stageIndex: 0 }); await wait(450);
+        const n = scene(); n.test = { holdReady: true, bot: true, route: 'safe' }; begin(n);
+        check(!n.lab && G.state(n) === null && !Object.prototype.hasOwnProperty.call(n, 'contact'), 'a normal stage: no Gauntlet state, the scene\'s own contact method is untouched');
+        check(!n.ws && !(Pulse.Symphony.current()) && !(Pulse.Resonance.on(n)) && !n.grazeOn(), 'a normal stage: no World Shift, Symphony, Resonance or graze flag leaked in');
+        drive(n);
+        check(n.state === 'complete' && saveText() !== before.save, 'a normal stage still saves its result (stars) as before');
+        check(n.titleText.text === 'Stage clear' && n.nextBtn.label.text === 'Next stage', 'a normal stage keeps its own titles and buttons');
+        // the graze flag belongs to the section only: stage 10 still grazes by its own list, stage 5 does not
+        game().scene.start('game', { mode: 'campaign', stageIndex: 4 }); await wait(450);
+        check(!scene().grazeOn(), 'stage 5 does not graze (the near-miss section flag did not leak)');
+        game().scene.start('game', { mode: 'campaign', stageIndex: 9 }); await wait(450);
+        check(scene().grazeOn(), 'stage 10 still grazes by its own list');
+      }
+      check(errors.length === 0, `no page errors (${errors.slice(0, 2).join(' ; ')})`);
+    }
+
+    // Runs a page's tests and puts the verdict in the title (read by the headless runner).
+    if (!/manual=1/.test(location.search)) {
+      run().then(() => { document.title = fails.length ? `FAIL ${fails.length}: ${fails.join(' | ')}` : `PASS gauntlet tests ${checks} checks | ${notes.join(' | ')}`; })
+        .catch((e) => { document.title = 'FAIL error ' + e.message + ' ' + (e.stack || '').split('\n')[1]; });
+    }
+  </script>
+</body>
+</html>

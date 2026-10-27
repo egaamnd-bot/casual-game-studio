@@ -118,6 +118,7 @@
       this.createHud();
       this.createButtons();
       if (Pulse.WorldShift) Pulse.WorldShift.attach(this); // World Shift lab stage only (docs/WORLD_SHIFT.md)
+      if (Pulse.Gauntlet) Pulse.Gauntlet.attach(this); // Developer Gauntlet sections only (docs/DEV_GAUNTLET.md)
 
       this.input.on('pointerdown', this.onPointerDown, this);
       this.setupKeys();
@@ -131,6 +132,7 @@
         this.game.events.off('hidden', this.onFocusLost);
         if (Pulse.WorldShift) Pulse.WorldShift.detach(this);
         if (Pulse.Symphony) Pulse.Symphony.detach(this);
+        if (Pulse.Gauntlet) Pulse.Gauntlet.detach(this);
       });
 
       if (this.test) window.__pulseScene = this;
@@ -332,6 +334,7 @@
         if (finale) this.titleText.setFontSize(44);
         show(this.titleText, finale ? (this.stageIndex + 1 >= Pulse.STAGES.length ? 'Campaign complete' : `World ${this.stage.arc.index} complete`) : this.lab ? 'Prototype clear' : 'Stage clear', finale ? T.textBonus : T.text);
         if (this.lab && Pulse.WorldShift) Pulse.WorldShift.completeStyle(this);
+        if (this.lab && Pulse.Gauntlet) Pulse.Gauntlet.complete(this);
         if (finale) this.time.delayedCall(900, () => { if (this.state === 'complete') Pulse.Sfx.play('milestone'); });
         // Dim the frozen play field so the results and buttons read cleanly over it.
         this.overlay.fillStyle(T.background, 0.82).fillRect(0, 0, this.SW, this.SH);
@@ -352,14 +355,16 @@
       }
 
       // End-screen buttons stack along the bottom, primary action highest.
-      const hasNext = campaign && !this.lab && state === 'complete' && this.stageIndex + 1 < Pulse.STAGES.length;
+      const gNext = state === 'complete' && this.lab && Pulse.Gauntlet ? Pulse.Gauntlet.next(this.lab) : null; // Gauntlet: next section
+      const hasNext = !!gNext || (campaign && !this.lab && state === 'complete' && this.stageIndex + 1 < Pulse.STAGES.length);
       const row = state === 'complete' ? (hasNext ? [this.nextBtn] : []).concat([this.retryBtn, this.backBtn])
         : state === 'playing' ? [] : [this.backBtn];
       const bottom = this.SH - 64;
       row.forEach((b, i) => b.setY(bottom - (row.length - 1 - i) * 72));
       this.pauseBtn.setEnabled(state === 'playing');
       this.backBtn.setEnabled(row.includes(this.backBtn));
-      this.backBtn.label.setText(state === 'paused' ? 'Quit' : (this.lab ? 'Lab' : campaign ? 'Stages' : 'Menu'));
+      this.backBtn.label.setText(state === 'paused' ? 'Quit' : (this.lab ? (Pulse.Gauntlet && Pulse.Gauntlet.isSection(this.lab) ? 'Sections' : 'Lab') : campaign ? 'Stages' : 'Menu'));
+      this.nextBtn.label.setText(gNext ? 'Next section' : 'Next stage');
       this.retryBtn.setEnabled(row.includes(this.retryBtn));
       this.nextBtn.setEnabled(row.includes(this.nextBtn));
       this.updateHud();
@@ -426,6 +431,7 @@
       if (continuing) Pulse.Music.seek(0);
       if (this.view) this.view.spawn();
       if (Pulse.WorldShift) Pulse.WorldShift.reset(this); // a retry starts again in movement I
+      if (Pulse.Gauntlet) Pulse.Gauntlet.reset(this);
       this.setState('playing');
     }
 
@@ -515,10 +521,12 @@
 
     leave() {
       if (this.state === 'over' && !this.canAct()) return;
-      this.scene.start(this.lab ? 'lab' : this.mode === 'campaign' ? 'stages' : 'menu');
+      this.scene.start(this.lab ? (Pulse.Gauntlet && Pulse.Gauntlet.isSection(this.lab) ? 'gauntlet' : 'lab') : this.mode === 'campaign' ? 'stages' : 'menu');
     }
 
     nextStage() {
+      const g = this.lab && Pulse.Gauntlet ? Pulse.Gauntlet.next(this.lab) : null;
+      if (g) { this.scene.start('game', { mode: 'campaign', lab: g.id }); return; }
       this.scene.start('game', { mode: 'campaign', stageIndex: this.stageIndex + 1 });
     }
 
@@ -1147,7 +1155,7 @@
     // The prototype runs only in the campaign stages listed in CONFIG.graze.stageIds.
     grazeOn() {
       const G = C.graze;
-      return !!G.enabled && this.mode === 'campaign' && G.stageIds.indexOf(this.stage.id) >= 0;
+      return !!G.enabled && this.mode === 'campaign' && (G.stageIds.indexOf(this.stage.id) >= 0 || !!(this.lab && this.lab.flags && this.lab.flags.graze)); // lab flag: Gauntlet near-miss section
     }
 
     // Near-miss -> Overdrive prototype (docs/NEAR_MISS.md). Called once when a gate has been cleared. A graze is the
